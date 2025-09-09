@@ -16,6 +16,7 @@ export default function SellPage() {
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [stripeAccountStatus, setStripeAccountStatus] = useState<string>('unknown');
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -40,6 +41,22 @@ export default function SellPage() {
           .eq('id', user.id)
           .single();
         setProfile(profile);
+        
+        // Check Stripe account status if we have an account ID
+        if (profile?.stripe_account_id) {
+          try {
+            const response = await fetch('/api/check-stripe-account', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ accountId: profile.stripe_account_id })
+            });
+            const { status } = await response.json();
+            setStripeAccountStatus(status);
+          } catch (error) {
+            console.error('Error checking Stripe account status:', error);
+            setStripeAccountStatus('error');
+          }
+        }
       }
       
       setLoading(false);
@@ -49,6 +66,17 @@ export default function SellPage() {
   }, []);
 
   const isConnected = Boolean(profile?.stripe_account_id);
+  const isFullyOnboarded = stripeAccountStatus === 'onboarded';
+  
+  // Debug logging
+  console.log('Profile:', profile);
+  console.log('Stripe Account ID:', profile?.stripe_account_id);
+  console.log('Stripe Account Status:', stripeAccountStatus);
+  console.log('Is Connected:', isConnected);
+  console.log('Is Fully Onboarded:', isFullyOnboarded);
+  
+  // Check if we should show the connect button or the form
+  const shouldShowConnectButton = !isConnected || !isFullyOnboarded;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,12 +149,63 @@ export default function SellPage() {
             <CardTitle className="text-2xl">List Your Product</CardTitle>
           </CardHeader>
           <CardContent>
-            {!isConnected ? (
+            {shouldShowConnectButton ? (
               <div className="space-y-4">
-                <p className="text-red-500 font-medium">
-                  You must connect your Stripe account before listing a product.
-                </p>
+                {!isConnected ? (
+                  <p className="text-red-500 font-medium">
+                    You must connect your Stripe account before listing a product.
+                  </p>
+                ) : (
+                  <p className="text-orange-500 font-medium">
+                    Your Stripe account is not fully set up yet. Please complete the onboarding process.
+                  </p>
+                )}
                 <StripeConnectButton userId={user.id} />
+                {profile?.stripe_account_id && (
+                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                    <p className="text-sm text-blue-800">
+                      <strong>Debug Info:</strong><br/>
+                      Account ID: {profile.stripe_account_id}<br/>
+                      Status: {stripeAccountStatus}<br/>
+                      Fully Onboarded: {isFullyOnboarded ? 'Yes' : 'No'}
+                    </p>
+                    <div className="mt-2 space-x-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={async () => {
+                          try {
+                            const response = await fetch('/api/check-stripe-account', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ accountId: profile.stripe_account_id })
+                            });
+                            const { status } = await response.json();
+                            setStripeAccountStatus(status);
+                          } catch (error) {
+                            console.error('Error refreshing status:', error);
+                          }
+                        }}
+                      >
+                        Refresh Status
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={async () => {
+                          const supabase = createClient();
+                          await supabase
+                            .from('profiles')
+                            .update({ stripe_account_id: null })
+                            .eq('id', user.id);
+                          window.location.reload();
+                        }}
+                      >
+                        Clear Account ID
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-6">

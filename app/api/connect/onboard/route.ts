@@ -29,7 +29,14 @@ export async function POST(request: NextRequest) {
     // 1. Create a new Stripe Standard account for the seller (easier for testing)
     const account = await stripe.accounts.create({
       type: 'standard',
-      metadata: { userId }
+      country: 'US', // Add country
+      email: user.email, // Add email
+      metadata: { userId },
+      business_profile: {
+        url: 'https://thepatternsplace.com', // Your marketplace URL
+        mcc: '5999', // Miscellaneous retail stores
+        product_description: 'Digital products and services sold through ThePatternsPlace marketplace'
+      }
     });
 
     // 2. Save the account.id to the user's profile in Supabase
