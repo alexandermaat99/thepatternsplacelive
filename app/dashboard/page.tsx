@@ -1,42 +1,32 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { createClient } from '@/lib/supabase/client';
 import { StripeConnectButton } from '@/components/marketplace/stripe-connect-button';
+import { UserProfile } from '@/components/user-profile';
+import { useAuth } from '@/hooks/useAuth';
 import Link from 'next/link';
-import { CheckCircle, XCircle, ExternalLink } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { CheckCircle, XCircle, ExternalLink, LogOut } from 'lucide-react';
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<any>(null);
-  const [profile, setProfile] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const { 
+    user, 
+    profile, 
+    stripeStatus, 
+    loading, 
+    error, 
+    isAuthenticated,
+    canSell,
+    signOut 
+  } = useAuth();
 
-  useEffect(() => {
-    const fetchUserAndProfile = async () => {
-      const supabase = createClient();
-      
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-      
-      if (user) {
-        // Get user profile with Stripe account info
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-        setProfile(profile);
-      }
-      
-      setLoading(false);
-    };
-
-    fetchUserAndProfile();
-  }, []);
+  const handleSignOut = async () => {
+    await signOut();
+    window.location.href = '/';
+  };
 
   if (loading) {
     return (
@@ -49,7 +39,23 @@ export default function DashboardPage() {
     );
   }
 
-  if (!user) {
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="max-w-md">
+          <CardContent className="p-6 text-center">
+            <h2 className="text-xl font-semibold mb-4 text-red-600">Error</h2>
+            <p className="text-muted-foreground mb-4">{error}</p>
+            <Button onClick={() => window.location.reload()}>
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Card className="max-w-md">
@@ -67,16 +73,24 @@ export default function DashboardPage() {
     );
   }
 
-  const isStripeConnected = Boolean(profile?.stripe_account_id);
-
   return (
     <div className="min-h-screen bg-background py-8">
       <div className="container mx-auto px-4 max-w-4xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Manage your marketplace account and Stripe integration
-          </p>
+        <div className="mb-8 flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold">Dashboard</h1>
+            <p className="text-muted-foreground">
+              Manage your marketplace account and Stripe integration
+            </p>
+          </div>
+          <Button 
+            variant="outline" 
+            onClick={handleSignOut}
+            className="flex items-center gap-2"
+          >
+            <LogOut className="h-4 w-4" />
+            Sign Out
+          </Button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -85,7 +99,7 @@ export default function DashboardPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 Stripe Connect
-                {isStripeConnected ? (
+                {stripeStatus.isOnboarded ? (
                   <CheckCircle className="h-5 w-5 text-green-500" />
                 ) : (
                   <XCircle className="h-5 w-5 text-red-500" />
@@ -95,12 +109,12 @@ export default function DashboardPage() {
             <CardContent className="space-y-4">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium">Status:</span>
-                <Badge variant={isStripeConnected ? "default" : "destructive"}>
-                  {isStripeConnected ? "Connected" : "Not Connected"}
+                <Badge variant={stripeStatus.isOnboarded ? "default" : "destructive"}>
+                  {stripeStatus.isOnboarded ? "Connected" : "Not Connected"}
                 </Badge>
               </div>
               
-              {isStripeConnected ? (
+              {stripeStatus.isOnboarded ? (
                 <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">
                     Your Stripe account is connected and ready to receive payments.
@@ -135,7 +149,7 @@ export default function DashboardPage() {
                 </Button>
               </Link>
               
-              {isStripeConnected && (
+              {canSell && (
                 <Link href="/marketplace/sell" className="block">
                   <Button variant="outline" className="w-full justify-start">
                     <ExternalLink className="h-4 w-4 mr-2" />
@@ -150,44 +164,23 @@ export default function DashboardPage() {
                   Go Home
                 </Button>
               </Link>
+              
+              <Button 
+                variant="outline" 
+                className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
+                onClick={handleSignOut}
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out
+              </Button>
             </CardContent>
           </Card>
         </div>
 
-        {/* Account Info */}
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Account Information</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <span className="text-sm font-medium">Name:</span>
-                <p className="text-sm text-muted-foreground">
-                  {profile?.full_name || 'Not set'}
-                </p>
-              </div>
-              <div>
-                <span className="text-sm font-medium">Email:</span>
-                <p className="text-sm text-muted-foreground">
-                  {user.email}
-                </p>
-              </div>
-              <div>
-                <span className="text-sm font-medium">Stripe Account ID:</span>
-                <p className="text-sm text-muted-foreground font-mono">
-                  {profile?.stripe_account_id || 'Not connected'}
-                </p>
-              </div>
-              <div>
-                <span className="text-sm font-medium">Member Since:</span>
-                <p className="text-sm text-muted-foreground">
-                  {new Date(user.created_at).toLocaleDateString()}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* User Profile Component */}
+        <div className="mt-6">
+          <UserProfile />
+        </div>
       </div>
     </div>
   );

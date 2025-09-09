@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,14 +9,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { createClient } from '@/lib/supabase/client';
 import { StripeConnectButton } from '@/components/marketplace/stripe-connect-button';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function SellPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [user, setUser] = useState<any>(null);
-  const [profile, setProfile] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [stripeAccountStatus, setStripeAccountStatus] = useState<string>('unknown');
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -25,58 +22,23 @@ export default function SellPage() {
     image_url: ''
   });
 
-  useEffect(() => {
-    const fetchUserAndProfile = async () => {
-      const supabase = createClient();
-      
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-      
-      if (user) {
-        // Get user profile with Stripe account info
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-        setProfile(profile);
-        
-        // Check Stripe account status if we have an account ID
-        if (profile?.stripe_account_id) {
-          try {
-            const response = await fetch('/api/check-stripe-account', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ accountId: profile.stripe_account_id })
-            });
-            const { status } = await response.json();
-            setStripeAccountStatus(status);
-          } catch (error) {
-            console.error('Error checking Stripe account status:', error);
-            setStripeAccountStatus('error');
-          }
-        }
-      }
-      
-      setLoading(false);
-    };
+  // Use the new auth hook
+  const { 
+    user, 
+    profile, 
+    stripeStatus, 
+    loading, 
+    error, 
+    refreshStripeStatus,
+    isAuthenticated,
+    canSell 
+  } = useAuth();
 
-    fetchUserAndProfile();
-  }, []);
-
-  const isConnected = Boolean(profile?.stripe_account_id);
-  const isFullyOnboarded = stripeAccountStatus === 'onboarded';
-  
   // Debug logging
-  console.log('Profile:', profile);
-  console.log('Stripe Account ID:', profile?.stripe_account_id);
-  console.log('Stripe Account Status:', stripeAccountStatus);
-  console.log('Is Connected:', isConnected);
-  console.log('Is Fully Onboarded:', isFullyOnboarded);
+  console.log('Auth State:', { user, profile, stripeStatus, loading, error });
   
   // Check if we should show the connect button or the form
-  const shouldShowConnectButton = !isConnected || !isFullyOnboarded;
+  const shouldShowConnectButton = !canSell;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,7 +85,23 @@ export default function SellPage() {
     );
   }
 
-  if (!user) {
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="max-w-md">
+          <CardContent className="p-6 text-center">
+            <h2 className="text-xl font-semibold mb-4 text-red-600">Error</h2>
+            <p className="text-muted-foreground mb-4">{error}</p>
+            <Button onClick={() => window.location.reload()}>
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Card className="max-w-md">
@@ -151,7 +129,7 @@ export default function SellPage() {
           <CardContent>
             {shouldShowConnectButton ? (
               <div className="space-y-4">
-                {!isConnected ? (
+                {!stripeStatus.isConnected ? (
                   <p className="text-red-500 font-medium">
                     You must connect your Stripe account before listing a product.
                   </p>
@@ -166,26 +144,14 @@ export default function SellPage() {
                     <p className="text-sm text-blue-800">
                       <strong>Debug Info:</strong><br/>
                       Account ID: {profile.stripe_account_id}<br/>
-                      Status: {stripeAccountStatus}<br/>
-                      Fully Onboarded: {isFullyOnboarded ? 'Yes' : 'No'}
+                      Status: {stripeStatus.status}<br/>
+                      Fully Onboarded: {stripeStatus.isOnboarded ? 'Yes' : 'No'}
                     </p>
                     <div className="mt-2 space-x-2">
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={async () => {
-                          try {
-                            const response = await fetch('/api/check-stripe-account', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ accountId: profile.stripe_account_id })
-                            });
-                            const { status } = await response.json();
-                            setStripeAccountStatus(status);
-                          } catch (error) {
-                            console.error('Error refreshing status:', error);
-                          }
-                        }}
+                        onClick={refreshStripeStatus}
                       >
                         Refresh Status
                       </Button>
