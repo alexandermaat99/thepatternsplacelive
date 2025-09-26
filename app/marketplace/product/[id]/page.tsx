@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { ProductDetail } from '@/components/marketplace/product-detail';
+import { Navigation } from '@/components/navigation';
 import { notFound } from 'next/navigation';
 
 interface ProductPageProps {
@@ -30,8 +31,9 @@ export default async function ProductPage({ params }: ProductPageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background py-8">
-      <div className="container mx-auto px-4">
+    <div className="min-h-screen bg-background">
+      <Navigation title="The Patterns Place" showMarketplaceLinks={true} />
+      <div className="container mx-auto px-4 py-8">
         <ProductDetail product={product} />
       </div>
     </div>

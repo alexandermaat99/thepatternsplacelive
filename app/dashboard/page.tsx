@@ -8,7 +8,9 @@ import { UserProfile } from '@/components/user-profile';
 import { useAuth } from '@/hooks/useAuth';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { CheckCircle, XCircle, ExternalLink, LogOut } from 'lucide-react';
+import { CheckCircle, XCircle, ExternalLink, LogOut, Package } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { Navigation } from '@/components/navigation';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -31,10 +33,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p>Loading...</p>
-        </div>
+        <LoadingSpinner />
       </div>
     );
   }
@@ -74,8 +73,9 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background py-8">
-      <div className="container mx-auto px-4 max-w-4xl">
+    <div className="min-h-screen bg-background">
+      <Navigation title="The Patterns Place" showMarketplaceLinks={true} />
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="mb-8 flex justify-between items-start">
           <div>
             <h1 className="text-3xl font-bold">Dashboard</h1>
@@ -150,12 +150,20 @@ export default function DashboardPage() {
               </Link>
               
               {canSell && (
-                <Link href="/marketplace/sell" className="block">
-                  <Button variant="outline" className="w-full justify-start">
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    List New Product
-                  </Button>
-                </Link>
+                <>
+                  <Link href="/dashboard/my-products" className="block">
+                    <Button variant="outline" className="w-full justify-start">
+                      <Package className="h-4 w-4 mr-2" />
+                      View My Products
+                    </Button>
+                  </Link>
+                  <Link href="/marketplace/sell" className="block">
+                    <Button variant="outline" className="w-full justify-start">
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      List New Product
+                    </Button>
+                  </Link>
+                </>
               )}
               
               <Link href="/" className="block">

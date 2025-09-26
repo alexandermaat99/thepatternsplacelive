@@ -1,12 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatAmountForDisplay } from '@/lib/utils-client';
-import { loadStripe } from '@stripe/stripe-js';
 import Image from 'next/image';
+import { ArrowLeft, ShoppingCart } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { useCart } from '@/contexts/cart-context';
 
 interface Product {
   id: string;
@@ -28,43 +30,38 @@ interface ProductDetailProps {
 }
 
 export function ProductDetail({ product }: ProductDetailProps) {
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const { user, isAuthenticated } = useAuth();
+  const { addItem } = useCart();
 
-  const handlePurchase = async () => {
+  const handleAddToCart = () => {
     setIsLoading(true);
     
     try {
-      const response = await fetch('/api/checkout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          productId: product.id,
-        }),
-      });
-
-      const { sessionId, error } = await response.json();
-
-      if (error) {
-        throw new Error(error);
-      }
-
-      // Redirect to Stripe Checkout
-      const stripe = await loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
-      if (stripe) {
-        await stripe.redirectToCheckout({ sessionId });
-      }
+      addItem(product);
+      // Show success feedback
+      setTimeout(() => {
+        setIsLoading(false);
+      }, 500);
     } catch (error) {
-      console.error('Purchase error:', error);
-      alert('Failed to initiate purchase. Please try again.');
-    } finally {
+      console.error('Add to cart error:', error);
       setIsLoading(false);
     }
   };
 
   return (
     <div className="max-w-4xl mx-auto">
+      <div className="mb-6">
+        <Button 
+          variant="ghost" 
+          onClick={() => router.back()}
+          className="flex items-center gap-2"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </Button>
+      </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Product Image */}
         <div className="aspect-square relative overflow-hidden rounded-lg">
@@ -110,12 +107,17 @@ export function ProductDetail({ product }: ProductDetailProps) {
           </div>
 
           <Button 
-            onClick={handlePurchase} 
+            onClick={handleAddToCart} 
             className="w-full" 
             size="lg"
             disabled={isLoading}
           >
-            {isLoading ? 'Processing...' : 'Buy Now'}
+            {isLoading ? 'Adding...' : (
+              <>
+                <ShoppingCart className="h-4 w-4 mr-2" />
+                Add to Cart
+              </>
+            )}
           </Button>
         </div>
       </div>

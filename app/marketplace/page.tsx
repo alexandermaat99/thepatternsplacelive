@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { ProductCard } from '@/components/marketplace/product-card';
 import { Button } from '@/components/ui/button';
+import { Navigation } from '@/components/navigation';
 import Link from 'next/link';
 
 export default async function MarketplacePage() {
@@ -28,6 +29,7 @@ export default async function MarketplacePage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <Navigation title="The Patterns Place" showMarketplaceLinks={true} />
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Marketplace</h1>

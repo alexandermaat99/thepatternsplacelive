@@ -10,6 +10,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { createClient } from '@/lib/supabase/client';
 import { StripeConnectButton } from '@/components/marketplace/stripe-connect-button';
 import { useAuth } from '@/hooks/useAuth';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { Navigation } from '@/components/navigation';
+import { ArrowLeft } from 'lucide-react';
 
 export default function SellPage() {
   const router = useRouter();
@@ -77,10 +80,7 @@ export default function SellPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p>Loading...</p>
-        </div>
+        <LoadingSpinner />
       </div>
     );
   }
@@ -120,8 +120,19 @@ export default function SellPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background py-8">
-      <div className="container mx-auto px-4 max-w-2xl">
+    <div className="min-h-screen bg-background">
+      <Navigation title="The Patterns Place" showMarketplaceLinks={true} />
+      <div className="container mx-auto px-4 py-8 max-w-2xl">
+        <div className="mb-6">
+          <Button 
+            variant="ghost" 
+            onClick={() => router.back()}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </Button>
+        </div>
         <Card>
           <CardHeader>
             <CardTitle className="text-2xl">List Your Product</CardTitle>
