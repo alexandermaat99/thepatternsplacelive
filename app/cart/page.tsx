@@ -21,7 +21,7 @@ export default function CartPage() {
 
   if (state.items.length === 0) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="bg-background">
         <Navigation title="The Patterns Place" showMarketplaceLinks={true} />
         <div className="container mx-auto px-4 py-8 max-w-4xl">
           <div className="mb-6">
@@ -57,7 +57,7 @@ export default function CartPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background">
       <Navigation title="The Patterns Place" showMarketplaceLinks={true} />
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         <div className="mb-6 flex justify-between items-center">

@@ -56,16 +56,16 @@ export function ProductCard({ product }: ProductCardProps) {
       </div>
       
       <CardHeader className="p-4">
-        <div className="flex justify-between items-start">
-          <CardTitle className="text-lg font-semibold line-clamp-2">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-0">
+          <CardTitle className="text-lg font-semibold line-clamp-2 flex-1">
             {product.title}
           </CardTitle>
-          <Badge variant="secondary" className="ml-2">
+          <Badge variant="secondary" className="self-start sm:ml-2 flex-shrink-0">
             {product.category}
           </Badge>
         </div>
         {product.profiles && (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground mt-1">
             by {product.profiles.full_name}
           </p>
         )}

@@ -37,20 +37,33 @@ export function ProfileDropdown() {
 
   if (loading) {
     return (
-      <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
+      <div className="h-8 w-8 rounded-full bg-muted animate-pulse flex-shrink-0" />
     );
   }
 
   if (!user) {
     return (
-      <div className="flex gap-2">
-        <Button asChild size="sm" variant="outline">
-          <Link href="/auth/login">Sign in</Link>
-        </Button>
-        <Button asChild size="sm" variant="default">
-          <Link href="/auth/sign-up">Sign up</Link>
-        </Button>
-      </div>
+      <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="sm" className="h-8 w-8 rounded-full p-0 flex-shrink-0">
+            <User className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="w-48" align="end" forceMount>
+          <DropdownMenuItem asChild onClick={() => setIsOpen(false)}>
+            <Link href="/auth/login" className="flex items-center">
+              <User className="mr-2 h-4 w-4" />
+              <span>Sign in</span>
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild onClick={() => setIsOpen(false)}>
+            <Link href="/auth/sign-up" className="flex items-center">
+              <User className="mr-2 h-4 w-4" />
+              <span>Sign up</span>
+            </Link>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     );
   }
 
@@ -61,7 +74,7 @@ export function ProfileDropdown() {
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+        <Button variant="ghost" className="relative h-8 w-8 rounded-full p-0 flex-shrink-0">
           <Avatar className="h-8 w-8">
             <AvatarImage src={profile?.avatar_url || ''} alt={profile?.full_name || user.email || ''} />
             <AvatarFallback className="text-xs">

@@ -28,13 +28,13 @@ export default async function MarketplacePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background">
       <Navigation title="The Patterns Place" showMarketplaceLinks={true} />
       <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Marketplace</h1>
-          <Link href="/marketplace/sell">
-            <Button>Sell Your Product</Button>
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold">Marketplace</h1>
+          <Link href="/marketplace/sell" className="self-start sm:self-auto">
+            <Button size="sm" className="w-full sm:w-auto">Sell Your Product</Button>
           </Link>
         </div>
         
