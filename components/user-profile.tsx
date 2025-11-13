@@ -1,9 +1,12 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
+import { AvatarUpload } from '@/components/avatar-upload';
+import { createClient } from '@/lib/supabase/client';
 import { CheckCircle, XCircle, ExternalLink, User, CreditCard } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -17,10 +20,65 @@ export function UserProfile() {
     loading, 
     error, 
     refreshStripeStatus,
+    refreshProfile,
     isAuthenticated,
     canSell,
     signOut 
   } = useAuth();
+  
+  const [currentProfile, setCurrentProfile] = useState(profile);
+  
+  // Update local profile state when profile changes
+  useEffect(() => {
+    setCurrentProfile(profile);
+  }, [profile]);
+  
+  const handleAvatarUpload = async (avatarUrl: string | null) => {
+    console.log('[AVATAR DEBUG] handleAvatarUpload called with URL:', avatarUrl);
+    console.log('[AVATAR DEBUG] Current profile before refresh:', profile);
+    console.log('[AVATAR DEBUG] Current profile avatar_url:', profile?.avatar_url);
+    
+    if (!avatarUrl) {
+      // Photo was removed
+      await refreshProfile();
+      return;
+    }
+    
+    // Wait for database to be ready
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Refresh profile and get the updated profile
+    console.log('[AVATAR DEBUG] Calling refreshProfile...');
+    const updatedProfile = await refreshProfile();
+    
+    if (updatedProfile) {
+      console.log('[AVATAR DEBUG] Updated profile received:', updatedProfile);
+      console.log('[AVATAR DEBUG] Updated avatar_url:', updatedProfile.avatar_url);
+      console.log('[AVATAR DEBUG] Expected avatar_url:', avatarUrl);
+      console.log('[AVATAR DEBUG] URLs match?', updatedProfile.avatar_url === avatarUrl);
+      
+      // Check if the URL matches
+      if (updatedProfile.avatar_url !== avatarUrl) {
+        console.error('[AVATAR DEBUG] URLs don\'t match! DB has:', updatedProfile.avatar_url, 'Expected:', avatarUrl);
+        // Try one more refresh
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const retryProfile = await refreshProfile();
+        if (retryProfile && retryProfile.avatar_url !== avatarUrl) {
+          console.error('[AVATAR DEBUG] Still mismatched after retry. Forcing reload...');
+          setTimeout(() => window.location.reload(), 500);
+        }
+      } else {
+        console.log('[AVATAR DEBUG] URLs match! Success!');
+      }
+    } else {
+      console.error('[AVATAR DEBUG] refreshProfile returned null! Forcing reload...');
+      setTimeout(() => window.location.reload(), 500);
+    }
+  };
+  
+  const userInitials = currentProfile?.full_name 
+    ? currentProfile.full_name.split(' ').map(n => n[0]).join('').toUpperCase()
+    : user?.email?.charAt(0).toUpperCase() || 'U';
 
   const handleSignOut = async () => {
     await signOut();
@@ -71,12 +129,24 @@ export function UserProfile() {
             User Profile
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
+          {/* Avatar Upload Section */}
+          {user && !loading && (
+            <div className="flex justify-center pb-4 border-b">
+              <AvatarUpload
+                currentAvatarUrl={currentProfile?.avatar_url || profile?.avatar_url}
+                userId={user.id}
+                userInitials={userInitials}
+                onUploadComplete={handleAvatarUpload}
+              />
+            </div>
+          )}
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <span className="text-sm font-medium">Name:</span>
               <p className="text-sm text-muted-foreground">
-                {profile?.full_name || 'Not set'}
+                {currentProfile?.full_name || 'Not set'}
               </p>
             </div>
             <div>

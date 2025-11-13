@@ -63,23 +63,14 @@ export function useAuth() {
 
         console.log('useAuth: User found, trying to get profile...');
         
-        // Try to get profile with timeout
+        // Try to get profile (with longer timeout for initial load)
         let profile = null;
         try {
-          const profilePromise = supabase
+          const { data: profileData, error: profileError } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', user.id)
             .single();
-          
-          const profileTimeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Profile timeout')), 2000)
-          );
-          
-          const { data: profileData, error: profileError } = await Promise.race([
-            profilePromise,
-            profileTimeoutPromise
-          ]) as any;
 
           if (!profileError && profileData) {
             profile = profileData;
@@ -91,38 +82,50 @@ export function useAuth() {
           console.log('useAuth: Profile query failed, continuing without profile:', error);
         }
         
-        // Check Stripe account status if we have an account ID
-        let stripeStatus: StripeAccountStatus = {
-          isConnected: false,
-          isOnboarded: false,
-          accountId: null,
-          status: 'unknown'
-        };
-
-        if (profile?.stripe_account_id) {
-          console.log('useAuth: Checking Stripe status for account:', profile.stripe_account_id);
-          try {
-            stripeStatus = await getStripeAccountStatus(profile.stripe_account_id);
-            console.log('useAuth: Stripe status:', stripeStatus);
-          } catch (error) {
-            console.error('Error checking Stripe status:', error);
-            stripeStatus = {
-              isConnected: true,
-              isOnboarded: false,
-              accountId: profile.stripe_account_id,
-              status: 'error'
-            };
-          }
-        }
-
+        // Set initial state with user and profile (don't wait for Stripe)
         if (mounted) {
-          console.log('useAuth: Setting final auth state');
+          console.log('useAuth: Setting initial auth state');
           setAuthState({
             user,
             profile,
-            stripeStatus,
+            stripeStatus: {
+              isConnected: false,
+              isOnboarded: false,
+              accountId: profile?.stripe_account_id || null,
+              status: 'unknown'
+            },
             loading: false,
             error: null
+          });
+        }
+
+        // Check Stripe account status asynchronously (non-blocking)
+        if (profile?.stripe_account_id) {
+          console.log('useAuth: Checking Stripe status for account:', profile.stripe_account_id);
+          // Don't await - let it run in background
+          getStripeAccountStatus(profile.stripe_account_id)
+            .then((stripeStatus) => {
+              console.log('useAuth: Stripe status:', stripeStatus);
+              if (mounted) {
+                setAuthState(prev => ({
+                  ...prev,
+                  stripeStatus
+                }));
+              }
+            })
+            .catch((error) => {
+              console.error('Error checking Stripe status:', error);
+              if (mounted) {
+                setAuthState(prev => ({
+                  ...prev,
+                  stripeStatus: {
+                    isConnected: true,
+                    isOnboarded: false,
+                    accountId: profile.stripe_account_id,
+                    status: 'error'
+                  }
+                }));
+              }
           });
         }
       } catch (error) {
@@ -136,10 +139,14 @@ export function useAuth() {
         }
       } finally {
         isInitializing = false;
+        // Clear timeout when initialization completes (success or error)
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
       }
     };
 
-    // Set a timeout to prevent infinite loading
+    // Set a timeout to prevent infinite loading (increased to 10 seconds)
     timeoutId = setTimeout(() => {
       if (mounted && isInitializing) {
         console.log('useAuth: Timeout reached, stopping loading');
@@ -150,7 +157,7 @@ export function useAuth() {
         }));
         isInitializing = false;
       }
-    }, 4000); // 4 second timeout
+    }, 10000); // 10 second timeout
 
     initializeAuth();
 
@@ -185,6 +192,57 @@ export function useAuth() {
       setAuthState(prev => ({ ...prev, stripeStatus }));
     } catch (error) {
       console.error('Error refreshing Stripe status:', error);
+    }
+  };
+
+  const refreshProfile = async (): Promise<UserProfile | null> => {
+    if (!authState.user) {
+      console.log('[AVATAR DEBUG] refreshProfile: No user found');
+      return null;
+    }
+
+    console.log('[AVATAR DEBUG] refreshProfile: Starting refresh for user:', authState.user.id);
+    console.log('[AVATAR DEBUG] refreshProfile: Current profile:', authState.profile);
+
+    try {
+      const supabase = createClient();
+      
+      // Add a small delay to ensure DB write has propagated
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      const { data: updatedProfile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authState.user.id)
+        .single();
+
+      if (error) {
+        console.error('[AVATAR DEBUG] refreshProfile: Error fetching profile:', error);
+        return null;
+      }
+
+      console.log('[AVATAR DEBUG] refreshProfile: Fetched profile from DB:', updatedProfile);
+      console.log('[AVATAR DEBUG] refreshProfile: Old avatar_url:', authState.profile?.avatar_url);
+      console.log('[AVATAR DEBUG] refreshProfile: New avatar_url:', updatedProfile?.avatar_url);
+      console.log('[AVATAR DEBUG] refreshProfile: URLs match?', authState.profile?.avatar_url === updatedProfile?.avatar_url);
+
+      if (updatedProfile) {
+        // Update profile in state
+        console.log('[AVATAR DEBUG] refreshProfile: Updating state with new profile');
+        setAuthState(prev => {
+          const newState = { ...prev, profile: updatedProfile };
+          console.log('[AVATAR DEBUG] refreshProfile: New state profile:', newState.profile);
+          return newState;
+        });
+        console.log('[AVATAR DEBUG] refreshProfile: State updated');
+        return updatedProfile;
+      } else {
+        console.log('[AVATAR DEBUG] refreshProfile: No profile data returned');
+        return null;
+      }
+    } catch (error) {
+      console.error('[AVATAR DEBUG] refreshProfile: Exception:', error);
+      return null;
     }
   };
 
@@ -225,6 +283,7 @@ export function useAuth() {
   return {
     ...authState,
     refreshStripeStatus,
+    refreshProfile,
     signOut,
     isAuthenticated: !!authState.user,
     canSell: authState.stripeStatus.isOnboarded

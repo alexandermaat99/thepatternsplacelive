@@ -75,8 +75,11 @@ export function ProfileDropdown() {
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full p-0 flex-shrink-0">
-          <Avatar className="h-8 w-8">
-            <AvatarImage src={profile?.avatar_url || ''} alt={profile?.full_name || user.email || ''} />
+          <Avatar className="h-8 w-8" key={`${profile?.avatar_url || 'no-avatar'}-${profile?.updated_at || ''}`}>
+            <AvatarImage 
+              src={profile?.avatar_url ? `${profile.avatar_url.split('?')[0]}?v=${profile.updated_at ? new Date(profile.updated_at).getTime() : Date.now()}` : ''} 
+              alt={profile?.full_name || user.email || ''} 
+            />
             <AvatarFallback className="text-xs">
               {userInitials}
             </AvatarFallback>
