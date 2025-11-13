@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { createClient } from '@/lib/supabase/client';
 import { StripeConnectButton } from '@/components/marketplace/stripe-connect-button';
+import { MultiImageUpload } from '@/components/marketplace/multi-image-upload';
 import { useAuth } from '@/hooks/useAuth';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { Navigation } from '@/components/navigation';
@@ -22,7 +23,7 @@ export default function SellPage() {
     description: '',
     price: '',
     category: '',
-    image_url: ''
+    images: [] as string[]
   });
 
   // Use the new auth hook
@@ -61,7 +62,8 @@ export default function SellPage() {
           price: parseFloat(formData.price),
           currency: 'USD',
           category: formData.category,
-          image_url: formData.image_url || null,
+          images: formData.images.length > 0 ? formData.images : [],
+          image_url: formData.images[0] || null, // Keep for backward compatibility
           user_id: user.id,
           is_active: true
         });
@@ -234,16 +236,14 @@ export default function SellPage() {
                   />
                 </div>
 
-                <div>
-                  <Label htmlFor="image_url">Image URL (optional)</Label>
-                  <Input
-                    id="image_url"
-                    type="url"
-                    value={formData.image_url}
-                    onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                    placeholder="https://example.com/image.jpg"
+                {user && (
+                  <MultiImageUpload
+                    value={formData.images}
+                    onChange={(urls) => setFormData({ ...formData, images: urls })}
+                    userId={user.id}
+                    maxImages={10}
                   />
-                </div>
+                )}
 
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? 'Creating...' : 'List Product'}

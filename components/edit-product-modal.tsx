@@ -13,6 +13,8 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { createClient } from '@/lib/supabase/client';
+import { MultiImageUpload } from '@/components/marketplace/multi-image-upload';
+import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 
 interface Product {
@@ -34,12 +36,14 @@ interface EditProductModalProps {
 
 export function EditProductModal({ product, isOpen, onClose }: EditProductModalProps) {
   const router = useRouter();
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     price: '',
     category: '',
+    images: [] as string[],
     image_url: '',
     is_active: true
   });
@@ -47,11 +51,20 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
   // Update form data when product changes
   useEffect(() => {
     if (product) {
+      // Handle both old image_url and new images array
+      let images: string[] = [];
+      if ((product as any).images && Array.isArray((product as any).images)) {
+        images = (product as any).images;
+      } else if (product.image_url) {
+        images = [product.image_url];
+      }
+      
       setFormData({
         title: product.title,
         description: product.description,
         price: product.price.toString(),
         category: product.category,
+        images,
         image_url: product.image_url || '',
         is_active: product.is_active
       });
@@ -71,7 +84,8 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
           description: formData.description,
           price: parseFloat(formData.price),
           category: formData.category,
-          image_url: formData.image_url || null,
+          images: formData.images.length > 0 ? formData.images : [],
+          image_url: formData.images[0] || null, // Keep for backward compatibility
           is_active: formData.is_active,
           updated_at: new Date().toISOString()
         })
@@ -147,16 +161,14 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
             </div>
           </div>
 
-          <div>
-            <Label htmlFor="image_url">Image URL (optional)</Label>
-            <Input
-              id="image_url"
-              type="url"
-              value={formData.image_url}
-              onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-              placeholder="https://example.com/image.jpg"
+          {user && (
+            <MultiImageUpload
+              value={formData.images}
+              onChange={(urls) => setFormData({ ...formData, images: urls })}
+              userId={user.id}
+              maxImages={10}
             />
-          </div>
+          )}
 
           <div className="flex items-center space-x-2">
             <input

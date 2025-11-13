@@ -7,15 +7,13 @@ import { useAuth } from '@/hooks/useAuth';
 import { Navigation } from '@/components/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { formatAmountForDisplay } from '@/lib/utils-client';
-import { CreditCard, Lock, ArrowLeft } from 'lucide-react';
+import { Lock, ArrowLeft } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { state, clearCart } = useCart();
+  const { state } = useCart();
   const { isAuthenticated, loading: authLoading } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -37,17 +35,37 @@ export default function CheckoutPage() {
     setIsProcessing(true);
     
     try {
-      // TODO: Implement actual checkout with Stripe
-      // For now, we'll just simulate a successful checkout
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Prepare cart items for checkout
+      const cartItems = state.items.map(item => ({
+        productId: item.product.id,
+        quantity: item.quantity,
+      }));
+
+      // Create Stripe checkout session
+      const response = await fetch('/api/checkout/cart', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ items: cartItems }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create checkout session');
+      }
+
+      const { url } = await response.json();
       
-      // Clear cart and redirect to success page
-      clearCart();
-      router.push('/checkout/success');
+      if (url) {
+        // Redirect to Stripe Checkout
+        window.location.href = url;
+      } else {
+        throw new Error('No checkout URL received');
+      }
     } catch (error) {
       console.error('Checkout error:', error);
-      alert('Checkout failed. Please try again.');
-    } finally {
+      alert(error instanceof Error ? error.message : 'Checkout failed. Please try again.');
       setIsProcessing(false);
     }
   };
@@ -79,92 +97,7 @@ export default function CheckoutPage() {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Checkout Form */}
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CreditCard className="h-5 w-5" />
-                  Payment Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="cardNumber">Card Number</Label>
-                  <Input
-                    id="cardNumber"
-                    placeholder="1234 5678 9012 3456"
-                    disabled={isProcessing}
-                  />
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="expiry">Expiry Date</Label>
-                    <Input
-                      id="expiry"
-                      placeholder="MM/YY"
-                      disabled={isProcessing}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="cvc">CVC</Label>
-                    <Input
-                      id="cvc"
-                      placeholder="123"
-                      disabled={isProcessing}
-                    />
-                  </div>
-                </div>
-                
-                <div>
-                  <Label htmlFor="name">Cardholder Name</Label>
-                  <Input
-                    id="name"
-                    placeholder="John Doe"
-                    disabled={isProcessing}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Billing Address</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="address">Address</Label>
-                  <Input
-                    id="address"
-                    placeholder="123 Main St"
-                    disabled={isProcessing}
-                  />
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="city">City</Label>
-                    <Input
-                      id="city"
-                      placeholder="New York"
-                      disabled={isProcessing}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="zip">ZIP Code</Label>
-                    <Input
-                      id="zip"
-                      placeholder="10001"
-                      disabled={isProcessing}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
+        <div className="max-w-2xl mx-auto">
           {/* Order Summary */}
           <div>
             <Card>

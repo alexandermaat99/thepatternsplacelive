@@ -39,28 +39,79 @@ export async function POST(request: NextRequest) {
       case 'checkout.session.completed': {
         const session = event.data.object;
         
-        // Create order record
-        const { error: orderError } = await supabase
-          .from('orders')
-          .insert({
-            product_id: session.metadata?.productId,
-            buyer_id: session.metadata?.buyerId,
-            seller_id: session.metadata?.sellerId,
-            stripe_session_id: session.id,
-            status: 'completed',
-            amount: session.amount_total ? session.amount_total / 100 : 0,
-            currency: session.currency?.toUpperCase() || 'USD',
-          });
+        // Check if this is a cart checkout (multiple products) or single product checkout
+        const cartItems = session.metadata?.cartItems;
+        
+        if (cartItems) {
+          // Cart checkout - create multiple orders
+          try {
+            const items = JSON.parse(cartItems);
+            
+            // Get product details to get seller_id for each product
+            const productIds = items.map((item: { productId: string }) => item.productId);
+            const { data: products } = await supabase
+              .from('products')
+              .select('id, user_id, price, currency')
+              .in('id', productIds);
+            
+            if (products) {
+              // Create an order for each product in the cart
+              const orders = items.map((item: { productId: string; quantity: number }) => {
+                const product = products.find(p => p.id === item.productId);
+                if (!product) return null;
+                
+                return {
+                  product_id: item.productId,
+                  buyer_id: session.metadata?.buyerId || null,
+                  seller_id: product.user_id, // products.user_id is the profile id, which equals auth.users.id
+                  stripe_session_id: session.id,
+                  status: 'completed',
+                  amount: product.price * item.quantity,
+                  currency: product.currency || 'USD',
+                  buyer_email: session.metadata?.buyerEmail || session.customer_email || null,
+                };
+              }).filter(Boolean);
+              
+              if (orders.length > 0) {
+                const { error: orderError } = await supabase
+                  .from('orders')
+                  .insert(orders);
+                
+                if (orderError) {
+                  console.error('Error creating cart orders:', orderError);
+                }
+              }
+            }
+          } catch (parseError) {
+            console.error('Error parsing cart items:', parseError);
+          }
+        } else {
+          // Single product checkout (legacy)
+          const { data: product } = await supabase
+            .from('products')
+            .select('user_id')
+            .eq('id', session.metadata?.productId)
+            .single();
+          
+          if (product) {
+            const { error: orderError } = await supabase
+              .from('orders')
+              .insert({
+                product_id: session.metadata?.productId,
+                buyer_id: session.metadata?.buyerId || null,
+                seller_id: product.user_id, // products.user_id is the profile id, which equals auth.users.id
+                stripe_session_id: session.id,
+                status: 'completed',
+                amount: session.amount_total ? session.amount_total / 100 : 0,
+                currency: session.currency?.toUpperCase() || 'USD',
+                buyer_email: session.metadata?.buyerEmail || session.customer_email || null,
+              });
 
-        if (orderError) {
-          console.error('Error creating order:', orderError);
+            if (orderError) {
+              console.error('Error creating order:', orderError);
+            }
+          }
         }
-
-        // Mark product as sold (optional - you might want to keep it active for multiple sales)
-        // const { error: productError } = await supabase
-        //   .from('products')
-        //   .update({ is_active: false })
-        //   .eq('id', session.metadata?.productId);
 
         break;
       }

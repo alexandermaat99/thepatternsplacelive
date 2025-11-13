@@ -14,6 +14,7 @@ interface Product {
   price: number;
   currency: string;
   image_url?: string;
+  images?: string[];
   category: string;
   profiles?: {
     full_name: string;
@@ -26,15 +27,26 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product }: ProductCardProps) {
+  // Get the first image from images array or fallback to image_url
+  const getImageUrl = () => {
+    if (product.images && Array.isArray(product.images) && product.images.length > 0) {
+      return product.images[0];
+    }
+    return product.image_url;
+  };
+
+  const imageUrl = getImageUrl();
+
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
       <div className="aspect-square relative overflow-hidden">
-        {product.image_url ? (
+        {imageUrl ? (
           <Image
-            src={product.image_url}
+            src={imageUrl}
             alt={product.title}
             fill
             className="object-cover"
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
           />
         ) : (
           <div className="w-full h-full bg-muted flex items-center justify-center">

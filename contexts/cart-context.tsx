@@ -9,6 +9,7 @@ interface Product {
   price: number;
   currency: string;
   image_url?: string;
+  images?: string[];
   category: string;
 }
 

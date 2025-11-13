@@ -1,12 +1,23 @@
 'use client';
 
+import { useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Navigation } from '@/components/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle, ShoppingBag, Home } from 'lucide-react';
+import { useCart } from '@/contexts/cart-context';
 import Link from 'next/link';
 
 export default function CheckoutSuccessPage() {
+  const searchParams = useSearchParams();
+  const sessionId = searchParams.get('session_id');
+  const { clearCart } = useCart();
+
+  // Clear cart on successful checkout
+  useEffect(() => {
+    clearCart();
+  }, [clearCart]);
   return (
     <div className="min-h-screen bg-background">
       <Navigation title="The Patterns Place" showMarketplaceLinks={true} />

@@ -28,7 +28,7 @@ STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret
 
 1. Go to your Supabase dashboard
 2. Navigate to the SQL Editor
-3. Copy and paste the contents of `database-schema.sql`
+3. Copy and paste the contents of `sql/database-schema.sql`
 4. Run the SQL script
 
 This will create:

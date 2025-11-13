@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatAmountForDisplay } from '@/lib/utils-client';
-import Image from 'next/image';
+import { ProductImageGallery } from '@/components/marketplace/product-image-gallery';
 import { ArrowLeft, ShoppingCart } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useCart } from '@/contexts/cart-context';
@@ -17,6 +17,7 @@ interface Product {
   price: number;
   currency: string;
   image_url?: string;
+  images?: string[];
   category: string;
   user_id: string;
   profiles?: {
@@ -63,21 +64,17 @@ export function ProductDetail({ product }: ProductDetailProps) {
         </Button>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Product Image */}
-        <div className="aspect-square relative overflow-hidden rounded-lg">
-          {product.image_url ? (
-            <Image
-              src={product.image_url}
-              alt={product.title}
-              fill
-              className="object-cover"
-            />
-          ) : (
-            <div className="w-full h-full bg-muted flex items-center justify-center">
-              <span className="text-muted-foreground">No image available</span>
-            </div>
-          )}
-        </div>
+        {/* Product Images */}
+        <ProductImageGallery
+          images={
+            product.images && Array.isArray(product.images) && product.images.length > 0
+              ? product.images
+              : product.image_url
+              ? [product.image_url]
+              : []
+          }
+          title={product.title}
+        />
 
         {/* Product Info */}
         <div className="space-y-6">
