@@ -16,6 +16,7 @@ import { createClient } from '@/lib/supabase/client';
 import { MultiImageUpload } from '@/components/marketplace/multi-image-upload';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
+import { DIFFICULTY_LEVELS } from '@/lib/constants';
 
 interface Product {
   id: string;
@@ -25,6 +26,7 @@ interface Product {
   currency: string;
   image_url?: string;
   category: string;
+  difficulty?: string | null;
   is_active: boolean;
 }
 
@@ -43,6 +45,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
     description: '',
     price: '',
     category: '',
+    difficulty: '',
     images: [] as string[],
     image_url: '',
     is_active: true
@@ -64,6 +67,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
         description: product.description,
         price: product.price.toString(),
         category: product.category,
+        difficulty: product.difficulty || '',
         images,
         image_url: product.image_url || '',
         is_active: product.is_active
@@ -144,6 +148,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
         description: sanitizedDescription || null, // Always include, even if empty
         price: parseFloat(formData.price),
         category: formData.category.trim(),
+        difficulty: formData.difficulty || null,
         images: validImages.length > 0 ? validImages : [],
         image_url: validImages[0] || null,
         is_active: formData.is_active,
@@ -325,6 +330,23 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
                 required
                 placeholder="e.g., Electronics, Clothing, Books"
               />
+            </div>
+
+            <div>
+              <Label htmlFor="difficulty">Difficulty Level</Label>
+              <select
+                id="difficulty"
+                value={formData.difficulty}
+                onChange={(e) => setFormData({ ...formData, difficulty: e.target.value })}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+              >
+                <option value="">Select difficulty level</option>
+                {DIFFICULTY_LEVELS.map((level) => (
+                  <option key={level.value} value={level.value}>
+                    {level.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 

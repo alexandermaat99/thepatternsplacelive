@@ -14,6 +14,7 @@ interface Product {
   currency: string;
   image_url?: string;
   category: string;
+  difficulty?: string | null;
   is_active: boolean;
 }
 

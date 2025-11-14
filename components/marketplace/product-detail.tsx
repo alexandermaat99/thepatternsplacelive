@@ -10,6 +10,7 @@ import { ArrowLeft, ShoppingCart } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useCart } from '@/contexts/cart-context';
 import { linkifyText } from '@/lib/text-utils';
+import { getDifficultyLabel, getDifficultyVariant } from '@/lib/constants';
 
 interface Product {
   id: string;
@@ -20,6 +21,7 @@ interface Product {
   image_url?: string;
   images?: string[];
   category: string;
+  difficulty?: string | null;
   user_id: string;
   profiles?: {
     full_name: string;
@@ -80,8 +82,13 @@ export function ProductDetail({ product }: ProductDetailProps) {
         {/* Product Info */}
         <div className="space-y-6">
           <div>
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
               <Badge variant="secondary">{product.category}</Badge>
+              {product.difficulty && (
+                <Badge variant={getDifficultyVariant(product.difficulty)}>
+                  {getDifficultyLabel(product.difficulty)}
+                </Badge>
+              )}
             </div>
             <h1 className="text-3xl font-bold">{product.title}</h1>
             {product.profiles && (

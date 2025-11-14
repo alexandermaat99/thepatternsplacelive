@@ -11,6 +11,7 @@ interface Product {
   image_url?: string;
   images?: string[];
   category: string;
+  difficulty?: string | null;
 }
 
 interface CartItem {

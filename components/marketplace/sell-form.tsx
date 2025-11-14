@@ -12,6 +12,7 @@ import { StripeConnectButton } from '@/components/marketplace/stripe-connect-but
 import { MultiImageUpload } from '@/components/marketplace/multi-image-upload';
 import { ArrowLeft } from 'lucide-react';
 import type { UserProfile, StripeAccountStatus } from '@/lib/auth-helpers';
+import { DIFFICULTY_LEVELS } from '@/lib/constants';
 
 interface SellFormProps {
   user: any;
@@ -28,6 +29,7 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
     description: '',
     price: '',
     category: '',
+    difficulty: '' as string,
     images: [] as string[]
   });
 
@@ -49,6 +51,7 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
           price: parseFloat(formData.price),
           currency: 'USD',
           category: formData.category,
+          difficulty: formData.difficulty || null,
           images: formData.images.length > 0 ? formData.images : [],
           image_url: formData.images[0] || null,
           user_id: user.id,
@@ -154,6 +157,23 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                   required
                   placeholder="e.g., Electronics, Clothing, Books"
                 />
+              </div>
+
+              <div>
+                <Label htmlFor="difficulty">Difficulty Level</Label>
+                <select
+                  id="difficulty"
+                  value={formData.difficulty}
+                  onChange={(e) => setFormData({ ...formData, difficulty: e.target.value })}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+                >
+                  <option value="">Select difficulty level</option>
+                  {DIFFICULTY_LEVELS.map((level) => (
+                    <option key={level.value} value={level.value}>
+                      {level.label}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {user && (

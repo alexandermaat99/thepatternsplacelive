@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { formatAmountForDisplay } from '@/lib/utils-client';
 import Link from 'next/link';
 import Image from 'next/image';
+import { getDifficultyLabel, getDifficultyVariant } from '@/lib/constants';
 
 interface Product {
   id: string;
@@ -16,6 +17,7 @@ interface Product {
   image_url?: string;
   images?: string[];
   category: string;
+  difficulty?: string | null;
   profiles?: {
     full_name: string;
     avatar_url?: string;
@@ -67,6 +69,11 @@ export function ProductCard({ product }: ProductCardProps) {
             <CardTitle className="text-lg font-semibold line-clamp-2 flex-1">
               {product.title}
             </CardTitle>
+            {product.difficulty && (
+              <Badge variant={getDifficultyVariant(product.difficulty)} className="self-start sm:ml-2 flex-shrink-0">
+                {getDifficultyLabel(product.difficulty)}
+              </Badge>
+            )}
           </div>
           {product.profiles && (
             <p className="text-sm text-muted-foreground mt-1">
