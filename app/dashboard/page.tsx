@@ -6,7 +6,7 @@ import { UserProfile } from '@/components/user-profile';
 import { SignOutButton } from '@/components/sign-out-button';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { CheckCircle, XCircle, ExternalLink, Package } from 'lucide-react';
+import { CheckCircle, XCircle, ExternalLink, Package, Heart } from 'lucide-react';
 import { getCurrentUserWithProfileServer, getStripeAccountStatusServer } from '@/lib/auth-helpers-server';
 
 export default async function DashboardPage() {
@@ -104,6 +104,13 @@ export default async function DashboardPage() {
                 <Button variant="outline" className="w-full justify-start">
                   <ExternalLink className="h-4 w-4 mr-2" />
                   Browse Marketplace
+                </Button>
+              </Link>
+              
+              <Link href="/dashboard/favorites" className="block">
+                <Button variant="outline" className="w-full justify-start">
+                  <Heart className="h-4 w-4 mr-2" />
+                  View My Favorites
                 </Button>
               </Link>
               

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import { ThemeProvider } from "next-themes";
-import { CartProvider } from "@/contexts/cart-context";
+import { Providers } from "@/components/providers";
 import { Footer } from "@/components/footer";
 import "./globals.css";
 
@@ -35,12 +35,12 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <CartProvider>
+          <Providers>
             <div className="flex-1">
               {children}
             </div>
             <Footer />
-          </CartProvider>
+          </Providers>
         </ThemeProvider>
       </body>
     </html>
