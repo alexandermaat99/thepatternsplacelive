@@ -9,7 +9,7 @@ export interface CompressionOptions {
 const defaultOptions: CompressionOptions = {
   maxSizeMB: 1, // Compress to max 1MB
   maxWidthOrHeight: 1920, // Max dimension
-  useWebWorker: true, // Use web worker for better performance
+  useWebWorker: false, // Disable web worker to avoid hanging issues
 };
 
 /**

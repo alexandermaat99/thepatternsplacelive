@@ -50,7 +50,30 @@ export function useAuth() {
         
         if (!mounted) return;
         
-        if (authError || !user) {
+        if (authError) {
+          console.error('useAuth: Auth error:', authError);
+          // Don't clear user state on auth errors - might be temporary network issue
+          // Only clear if it's a clear "not authenticated" error
+          if (authError.message?.includes('JWT') || authError.message?.includes('session')) {
+            console.log('useAuth: Session expired or invalid, clearing state');
+            setAuthState(prev => ({ 
+              ...prev, 
+              user: null, 
+              profile: null, 
+              loading: false 
+            }));
+          } else {
+            // Keep existing state on other errors (network issues, etc.)
+            setAuthState(prev => ({ 
+              ...prev, 
+              loading: false,
+              error: authError.message || 'Auth error'
+            }));
+          }
+          return;
+        }
+        
+        if (!user) {
           console.log('useAuth: No user found');
           setAuthState(prev => ({ 
             ...prev, 
@@ -150,10 +173,14 @@ export function useAuth() {
     timeoutId = setTimeout(() => {
       if (mounted && isInitializing) {
         console.log('useAuth: Timeout reached, stopping loading');
+        // Don't clear user state on timeout - might just be slow network
+        // Keep existing user state if we have it
         setAuthState(prev => ({ 
           ...prev, 
-          loading: false, 
-          error: 'Authentication timeout' 
+          loading: false,
+          // Only set error if we don't have a user (actual timeout)
+          // If we have a user, it's just a slow profile fetch
+          error: prev.user ? null : 'Authentication timeout'
         }));
         isInitializing = false;
       }

@@ -27,9 +27,19 @@ export async function updateSession(request: NextRequest) {
           supabaseResponse = NextResponse.next({
             request,
           });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options),
-          );
+          cookiesToSet.forEach(({ name, value, options }) => {
+            // Ensure cookies have proper settings for localhost
+            supabaseResponse.cookies.set(name, value, {
+              ...options,
+              // Don't set domain in localhost - let browser handle it
+              // SameSite: 'lax' helps with localhost cookie issues
+              sameSite: options?.sameSite || 'lax',
+              // Secure should be false for localhost (http)
+              secure: process.env.NODE_ENV === 'production',
+              // HttpOnly is set by Supabase automatically
+              httpOnly: options?.httpOnly ?? true,
+            });
+          });
         },
       },
     },
@@ -41,11 +51,16 @@ export async function updateSession(request: NextRequest) {
 
   // IMPORTANT: DO NOT REMOVE auth.getUser()
 
+  // Refresh the session - this is critical for maintaining auth state
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser();
 
+  // Only redirect if we're certain there's no user AND it's not a public route
+  // Don't redirect on auth errors - might be temporary (preserves session)
   if (
+    !authError &&
     request.nextUrl.pathname !== "/" &&
     !user &&
     !request.nextUrl.pathname.startsWith("/login") &&

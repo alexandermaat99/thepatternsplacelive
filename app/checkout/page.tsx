@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/contexts/cart-context';
 import { useAuth } from '@/hooks/useAuth';
-import { Navigation } from '@/components/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatAmountForDisplay } from '@/lib/utils-client';
@@ -83,9 +82,7 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navigation title="The Patterns Place" showMarketplaceLinks={true} />
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="mb-6">
           <Button 
             variant="ghost" 

@@ -10,21 +10,29 @@ import { createClient } from '@/lib/supabase/client';
 import { CheckCircle, XCircle, ExternalLink, User, CreditCard } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import type { UserProfile as UserProfileType, StripeAccountStatus } from '@/lib/auth-helpers';
 
-export function UserProfile() {
+interface UserProfileProps {
+  // Optional props from server component - if provided, use these instead of useAuth
+  serverUser?: any;
+  serverProfile?: UserProfileType | null;
+  serverStripeStatus?: StripeAccountStatus;
+}
+
+export function UserProfile({ serverUser, serverProfile, serverStripeStatus }: UserProfileProps = {}) {
   const router = useRouter();
-  const { 
-    user, 
-    profile, 
-    stripeStatus, 
-    loading, 
-    error, 
-    refreshStripeStatus,
-    refreshProfile,
-    isAuthenticated,
-    canSell,
-    signOut 
-  } = useAuth();
+  const authHook = useAuth();
+  
+  // Use server props if available, otherwise fall back to useAuth hook
+  const user = serverUser || authHook.user;
+  const profile = serverProfile !== undefined ? serverProfile : authHook.profile;
+  const stripeStatus = serverStripeStatus || authHook.stripeStatus;
+  const loading = serverUser ? false : authHook.loading; // If server props provided, not loading
+  const isAuthenticated = serverUser ? !!serverUser : authHook.isAuthenticated;
+  const canSell = stripeStatus?.isOnboarded || false;
+  const refreshStripeStatus = authHook.refreshStripeStatus;
+  const refreshProfile = authHook.refreshProfile;
+  const signOut = authHook.signOut;
   
   const [currentProfile, setCurrentProfile] = useState(profile);
   
@@ -183,7 +191,7 @@ export function UserProfile() {
           <CardTitle className="flex items-center gap-2">
             <CreditCard className="h-5 w-5" />
             Stripe Connection
-            {stripeStatus.isOnboarded ? (
+            {stripeStatus?.isOnboarded ? (
               <CheckCircle className="h-5 w-5 text-green-500" />
             ) : (
               <XCircle className="h-5 w-5 text-red-500" />
@@ -193,8 +201,8 @@ export function UserProfile() {
         <CardContent className="space-y-4">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium">Status:</span>
-            <Badge variant={stripeStatus.isOnboarded ? "default" : "destructive"}>
-              {stripeStatus.isOnboarded ? "Connected & Ready" : "Not Connected"}
+            <Badge variant={stripeStatus?.isOnboarded ? "default" : "destructive"}>
+              {stripeStatus?.isOnboarded ? "Connected & Ready" : "Not Connected"}
             </Badge>
           </div>
           

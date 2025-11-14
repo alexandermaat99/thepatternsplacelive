@@ -1,258 +1,39 @@
-'use client';
-
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { createClient } from '@/lib/supabase/client';
-import { StripeConnectButton } from '@/components/marketplace/stripe-connect-button';
-import { MultiImageUpload } from '@/components/marketplace/multi-image-upload';
-import { useAuth } from '@/hooks/useAuth';
+import { redirect } from 'next/navigation';
+import { getCurrentUserWithProfileServer, getStripeAccountStatusServer } from '@/lib/auth-helpers-server';
+import { SellForm } from '@/components/marketplace/sell-form';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { Navigation } from '@/components/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
-export default function SellPage() {
-  const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    price: '',
-    category: '',
-    images: [] as string[]
-  });
-
-  // Use the new auth hook
-  const { 
-    user, 
-    profile, 
-    stripeStatus, 
-    loading, 
-    error, 
-    refreshStripeStatus,
-    isAuthenticated,
-    canSell 
-  } = useAuth();
-
-  // Debug logging
-  console.log('Auth State:', { user, profile, stripeStatus, loading, error });
+export default async function SellPage() {
+  // Fetch user and profile on the server (faster)
+  const authData = await getCurrentUserWithProfileServer();
   
-  // Check if we should show the connect button or the form
-  const shouldShowConnectButton = !canSell;
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      if (!user) {
-        throw new Error('You must be logged in to list a product');
-      }
-
-      const supabase = createClient();
-      const { error } = await supabase
-        .from('products')
-        .insert({
-          title: formData.title,
-          description: formData.description,
-          price: parseFloat(formData.price),
-          currency: 'USD',
-          category: formData.category,
-          images: formData.images.length > 0 ? formData.images : [],
-          image_url: formData.images[0] || null, // Keep for backward compatibility
-          user_id: user.id,
-          is_active: true
-        });
-
-      if (error) throw error;
-
-      router.push('/marketplace');
-    } catch (error) {
-      console.error('Error creating product:', error);
-      alert('Failed to create product. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <LoadingSpinner />
-      </div>
-    );
+  if (!authData || !authData.user) {
+    redirect('/auth/login');
   }
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card className="max-w-md">
-          <CardContent className="p-6 text-center">
-            <h2 className="text-xl font-semibold mb-4 text-red-600">Error</h2>
-            <p className="text-muted-foreground mb-4">{error}</p>
-            <Button onClick={() => window.location.reload()}>
-              Try Again
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const { user, profile } = authData;
 
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card className="max-w-md">
-          <CardContent className="p-6 text-center">
-            <h2 className="text-xl font-semibold mb-4">Authentication Required</h2>
-            <p className="text-muted-foreground mb-4">
-              You must be logged in to list products.
-            </p>
-            <Button onClick={() => router.push('/auth/login')}>
-              Go to Login
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-background">
-      <Navigation title="The Patterns Place" showMarketplaceLinks={true} />
-      <div className="container mx-auto px-4 py-8 max-w-2xl">
-        <div className="mb-6">
-          <Button 
-            variant="ghost" 
-            onClick={() => router.back()}
-            className="flex items-center gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </Button>
-        </div>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl">List Your Product</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {shouldShowConnectButton ? (
-              <div className="space-y-4">
-                {!stripeStatus.isConnected ? (
-                  <p className="text-red-500 font-medium">
-                    You must connect your Stripe account before listing a product.
-                  </p>
-                ) : (
-                  <p className="text-orange-500 font-medium">
-                    Your Stripe account is not fully set up yet. Please complete the onboarding process.
-                  </p>
-                )}
-                <StripeConnectButton userId={user.id} />
-                {profile?.stripe_account_id && (
-                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
-                    <p className="text-sm text-blue-800">
-                      <strong>Debug Info:</strong><br/>
-                      Account ID: {profile.stripe_account_id}<br/>
-                      Status: {stripeStatus.status}<br/>
-                      Fully Onboarded: {stripeStatus.isOnboarded ? 'Yes' : 'No'}
-                    </p>
-                    <div className="mt-2 space-x-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={refreshStripeStatus}
-                      >
-                        Refresh Status
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={async () => {
-                          const supabase = createClient();
-                          await supabase
-                            .from('profiles')
-                            .update({ stripe_account_id: null })
-                            .eq('id', user.id);
-                          window.location.reload();
-                        }}
-                      >
-                        Clear Account ID
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div>
-                  <Label htmlFor="title">Product Title</Label>
-                  <Input
-                    id="title"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    required
-                    placeholder="Enter product title"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, description: e.target.value })}
-                    required
-                    placeholder="Describe your product"
-                    rows={4}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="price">Price (USD)</Label>
-                  <Input
-                    id="price"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                    required
-                    placeholder="0.00"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="category">Category</Label>
-                  <Input
-                    id="category"
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    required
-                    placeholder="e.g., Electronics, Clothing, Books"
-                  />
-                </div>
-
-                {user && (
-                  <MultiImageUpload
-                    value={formData.images}
-                    onChange={(urls) => setFormData({ ...formData, images: urls })}
-                    userId={user.id}
-                    maxImages={10}
-                  />
-                )}
-
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? 'Creating...' : 'List Product'}
-                </Button>
-              </form>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+  // Fetch Stripe status in parallel (non-blocking, with timeout)
+  const stripeStatusPromise = getStripeAccountStatusServer(profile?.stripe_account_id || null);
+  
+  // Use Promise.race to add a timeout so Stripe check doesn't block the page
+  const stripeStatusTimeout = new Promise(resolve => 
+    setTimeout(() => resolve({
+      isConnected: !!profile?.stripe_account_id,
+      isOnboarded: false,
+      accountId: profile?.stripe_account_id || null,
+      status: 'unknown' as const
+    }), 2000) // 2 second timeout
   );
-} 
+
+  const stripeStatus = await Promise.race([
+    stripeStatusPromise,
+    stripeStatusTimeout
+  ]) as any;
+
+  const canSell = stripeStatus.isOnboarded;
+
+  return <SellForm user={user} profile={profile} stripeStatus={stripeStatus} canSell={canSell} />;
+}

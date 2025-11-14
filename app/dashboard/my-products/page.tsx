@@ -1,6 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
 import { ProductCard } from '@/components/marketplace/product-card';
-import { Navigation } from '@/components/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -19,30 +18,36 @@ export default async function MyProductsPage() {
     redirect('/auth/login');
   }
   
-  // Fetch user's products from the database
-  const { data: products, error } = await supabase
-    .from('products')
-    .select(`
-      *,
-      profiles:user_id (
-        full_name,
-        avatar_url
-      )
-    `)
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false });
+  // Fetch user's products from the database with separate queries for better performance
+  // No need to join profiles since we already know the user
+  const [activeProductsResult, inactiveProductsResult] = await Promise.all([
+    supabase
+      .from('products')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('products')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('is_active', false)
+      .order('created_at', { ascending: false })
+  ]);
 
-  if (error) {
-    console.error('Error fetching products:', error);
+  const activeProducts = activeProductsResult.data || [];
+  const inactiveProducts = inactiveProductsResult.data || [];
+  const products = [...activeProducts, ...inactiveProducts];
+
+  if (activeProductsResult.error) {
+    console.error('Error fetching active products:', activeProductsResult.error);
+  }
+  if (inactiveProductsResult.error) {
+    console.error('Error fetching inactive products:', inactiveProductsResult.error);
   }
 
-  const activeProducts = products?.filter(p => p.is_active) || [];
-  const inactiveProducts = products?.filter(p => !p.is_active) || [];
-
   return (
-    <div className="min-h-screen bg-background">
-      <Navigation title="The Patterns Place" showMarketplaceLinks={true} />
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
+    <div className="container mx-auto px-4 py-8 max-w-6xl">
         <div className="mb-8 flex justify-between items-start">
           <div>
             <h1 className="text-3xl font-bold flex items-center gap-2">
@@ -145,7 +150,6 @@ export default async function MyProductsPage() {
             </CardContent>
           </Card>
         )}
-      </div>
     </div>
   );
 }

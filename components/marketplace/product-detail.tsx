@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +9,7 @@ import { ProductImageGallery } from '@/components/marketplace/product-image-gall
 import { ArrowLeft, ShoppingCart } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useCart } from '@/contexts/cart-context';
+import { linkifyText } from '@/lib/text-utils';
 
 interface Product {
   id: string;
@@ -98,9 +99,11 @@ export function ProductDetail({ product }: ProductDetailProps) {
 
           <div>
             <h3 className="font-semibold mb-2">Description</h3>
-            <p className="text-muted-foreground whitespace-pre-wrap">
-              {product.description}
-            </p>
+            <div className="text-muted-foreground whitespace-pre-wrap">
+              {linkifyText(product.description).map((part, index) => (
+                <React.Fragment key={index}>{part}</React.Fragment>
+              ))}
+            </div>
           </div>
 
           <Button 

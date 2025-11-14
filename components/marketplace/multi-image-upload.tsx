@@ -40,6 +40,11 @@ export function MultiImageUpload({
     onChange(newImages.map((img) => img.url).filter(Boolean));
   };
 
+  // Sync images state with parent onChange callback
+  React.useEffect(() => {
+    onChange(images.map((img) => img.url).filter(Boolean));
+  }, [images]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
@@ -67,8 +72,8 @@ export function MultiImageUpload({
       compressing: true,
     }));
 
-    const updatedImages = [...images, ...newItems];
-    updateImages(updatedImages);
+    // Add new items to state
+    setImages((prevImages) => [...prevImages, ...newItems]);
 
     // Process each file: compress then upload
     for (let i = 0; i < newItems.length; i++) {
@@ -76,48 +81,90 @@ export function MultiImageUpload({
       if (!item.file) continue;
 
       try {
-        // Compress image
-        const compressedFile = await compressImage(item.file, {
-          maxSizeMB: 1,
-          maxWidthOrHeight: 1920,
-        });
+        console.log(`Processing image ${i + 1}/${newItems.length}: ${item.file.name}`);
+        
+        // Compress image with timeout and fallback
+        console.log('Compressing image...');
+        let compressedFile: File;
+        
+        try {
+          const compressionPromise = compressImage(item.file, {
+            maxSizeMB: 1,
+            maxWidthOrHeight: 1920,
+            useWebWorker: false, // Disable web worker to avoid hanging issues
+          });
+          
+          const timeoutPromise = new Promise<File>((_, reject) => 
+            setTimeout(() => reject(new Error('Compression timed out')), 30000)
+          );
+          
+          compressedFile = await Promise.race([compressionPromise, timeoutPromise]);
+          console.log('Compression complete, size:', compressedFile.size);
+        } catch (compressionError) {
+          console.warn('Compression failed or timed out, using original file:', compressionError);
+          // Fallback to original file if compression fails
+          compressedFile = item.file;
+        }
 
         // Update item to show it's done compressing, now uploading
-        const itemIndex = updatedImages.findIndex((img) => img.id === item.id);
-        if (itemIndex !== -1) {
-          updatedImages[itemIndex] = {
-            ...updatedImages[itemIndex],
+        setImages((prevImages) => {
+          const itemIndex = prevImages.findIndex((img) => img.id === item.id);
+          if (itemIndex === -1) {
+            console.warn('Item not found after compression:', item.id);
+            return prevImages;
+          }
+          
+          const updated = [...prevImages];
+          updated[itemIndex] = {
+            ...updated[itemIndex],
             compressing: false,
             uploading: true,
             file: compressedFile,
           };
-          updateImages([...updatedImages]);
+          return updated;
+        });
+
+        // Upload to Supabase with timeout
+        console.log('Uploading to Supabase...');
+        const uploadPromise = uploadImage(compressedFile, item.id);
+        const uploadTimeoutPromise = new Promise<string>((_, reject) => 
+          setTimeout(() => reject(new Error('Upload timed out after 60 seconds')), 60000)
+        );
+        
+        const url = await Promise.race([uploadPromise, uploadTimeoutPromise]);
+        console.log('Upload complete, URL:', url);
+        
+        if (!url) {
+          throw new Error('Upload failed: No URL returned');
         }
 
-        // Upload to Supabase
-        const url = await uploadImage(compressedFile, item.id, updatedImages);
-        if (url) {
-          const finalIndex = updatedImages.findIndex((img) => img.id === item.id);
-          if (finalIndex !== -1) {
-            updatedImages[finalIndex] = {
-              ...updatedImages[finalIndex],
-              url,
-              uploading: false,
-              compressing: false,
-              file: undefined,
-            };
-            updateImages([...updatedImages]);
+        // Update item with final URL
+        setImages((prevImages) => {
+          const finalIndex = prevImages.findIndex((img) => img.id === item.id);
+          if (finalIndex === -1) {
+            console.warn('Item not found after upload:', item.id);
+            return prevImages;
           }
-        }
+          
+          const updated = [...prevImages];
+          updated[finalIndex] = {
+            ...updated[finalIndex],
+            url,
+            uploading: false,
+            compressing: false,
+            file: undefined,
+          };
+          return updated;
+        });
       } catch (error) {
         console.error('Error processing image:', error);
-        // Remove failed item
-        const failedIndex = updatedImages.findIndex((img) => img.id === item.id);
-        if (failedIndex !== -1) {
-          updatedImages.splice(failedIndex, 1);
-          updateImages([...updatedImages]);
-        }
-        alert(`Failed to upload ${item.file.name}. Please try again.`);
+        // Remove failed item and show error
+        setImages((prevImages) => {
+          const filtered = prevImages.filter((img) => img.id !== item.id);
+          return filtered;
+        });
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+        alert(`Failed to upload ${item.file.name}: ${errorMsg}`);
       }
     }
 
@@ -129,15 +176,16 @@ export function MultiImageUpload({
 
   const uploadImage = async (
     file: File,
-    itemId: string,
-    currentImages: ImageItem[]
+    itemId: string
   ): Promise<string | null> => {
     try {
       const supabase = createClient();
 
       // Generate unique filename
-      const fileExt = file.name.split('.').pop();
+      const fileExt = file.name.split('.').pop() || 'jpg';
       const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+      console.log('Uploading file:', fileName, 'Size:', file.size, 'Type:', file.type);
 
       // Upload file
       const { data, error } = await supabase.storage
@@ -149,7 +197,33 @@ export function MultiImageUpload({
 
       if (error) {
         console.error('Upload error:', error);
+        // Check if it's a duplicate file error
+        if (error.message?.includes('already exists') || error.message?.includes('duplicate')) {
+          // Try with a different filename
+          const retryFileName = `${userId}/${Date.now()}-${Math.random().toString(36).substring(7)}-retry.${fileExt}`;
+          console.log('Retrying upload with filename:', retryFileName);
+          const { data: retryData, error: retryError } = await supabase.storage
+            .from('product-images')
+            .upload(retryFileName, file, {
+              cacheControl: '3600',
+              upsert: false,
+            });
+          
+          if (retryError) {
+            throw retryError;
+          }
+          
+          const { data: { publicUrl } } = supabase.storage
+            .from('product-images')
+            .getPublicUrl(retryData.path);
+          console.log('Retry upload successful, URL:', publicUrl);
+          return publicUrl;
+        }
         throw error;
+      }
+
+      if (!data) {
+        throw new Error('Upload succeeded but no data returned');
       }
 
       // Get public URL
@@ -157,6 +231,11 @@ export function MultiImageUpload({
         .from('product-images')
         .getPublicUrl(data.path);
 
+      if (!publicUrl) {
+        throw new Error('Failed to get public URL');
+      }
+
+      console.log('Upload successful, public URL:', publicUrl);
       return publicUrl;
     } catch (error) {
       console.error('Upload error:', error);
@@ -165,15 +244,16 @@ export function MultiImageUpload({
   };
 
   const handleRemove = (id: string) => {
-    const updatedImages = images.filter((img) => img.id !== id);
-    updateImages(updatedImages);
+    setImages((prevImages) => prevImages.filter((img) => img.id !== id));
   };
 
   const handleReorder = (fromIndex: number, toIndex: number) => {
-    const updatedImages = [...images];
-    const [moved] = updatedImages.splice(fromIndex, 1);
-    updatedImages.splice(toIndex, 0, moved);
-    updateImages(updatedImages);
+    setImages((prevImages) => {
+      const updated = [...prevImages];
+      const [moved] = updated.splice(fromIndex, 1);
+      updated.splice(toIndex, 0, moved);
+      return updated;
+    });
   };
 
   const [objectUrls, setObjectUrls] = useState<Map<string, string>>(new Map());

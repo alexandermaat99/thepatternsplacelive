@@ -39,52 +39,42 @@ export function ProductCard({ product }: ProductCardProps) {
 
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
-      <div className="aspect-square relative overflow-hidden">
-        {imageUrl ? (
-          <Image
-            src={imageUrl}
-            alt={product.title}
-            fill
-            className="object-cover"
-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-          />
-        ) : (
-          <div className="w-full h-full bg-muted flex items-center justify-center">
-            <span className="text-muted-foreground">No image</span>
+      <Link href={`/marketplace/product/${product.id}`} className="w-full">
+        <div className="aspect-square relative overflow-hidden">
+          {imageUrl ? (
+            <Image
+              src={imageUrl}
+              alt={product.title}
+              fill
+              className="object-cover"
+              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+            />
+          ) : (
+            <div className="w-full h-full bg-muted flex items-center justify-center">
+              <span className="text-muted-foreground">No image</span>
+            </div>
+          )}
+          {/* Price overlay bubble */}
+          <div className="absolute bottom-2 left-2 bg-background/90 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-lg border border-border/50">
+            <span className="text-sm font-bold text-foreground">
+              {formatAmountForDisplay(product.price, product.currency)}
+            </span>
           </div>
-        )}
-      </div>
-      
-      <CardHeader className="p-4">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-0">
-          <CardTitle className="text-lg font-semibold line-clamp-2 flex-1">
-            {product.title}
-          </CardTitle>
-          <Badge variant="secondary" className="self-start sm:ml-2 flex-shrink-0">
-            {product.category}
-          </Badge>
         </div>
-        {product.profiles && (
-          <p className="text-sm text-muted-foreground mt-1">
-            by {product.profiles.full_name}
-          </p>
-        )}
-      </CardHeader>
-      
-      <CardContent className="p-4 pt-0">
-        <p className="text-sm text-muted-foreground line-clamp-3">
-          {product.description}
-        </p>
-        <p className="text-xl font-bold mt-2">
-          {formatAmountForDisplay(product.price, product.currency)}
-        </p>
-      </CardContent>
-      
-      <CardFooter className="p-4 pt-0">
-        <Link href={`/marketplace/product/${product.id}`} className="w-full">
-          <Button className="w-full">View Details</Button>
-        </Link>
-      </CardFooter>
+        
+        <CardHeader className="p-4">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-0">
+            <CardTitle className="text-lg font-semibold line-clamp-2 flex-1">
+              {product.title}
+            </CardTitle>
+          </div>
+          {product.profiles && (
+            <p className="text-sm text-muted-foreground mt-1">
+              by {product.profiles.full_name}
+            </p>
+          )}
+        </CardHeader>
+      </Link>
     </Card>
   );
 } 

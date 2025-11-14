@@ -1,7 +1,6 @@
 'use client';
 
 import { useCart } from '@/contexts/cart-context';
-import { Navigation } from '@/components/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -21,9 +20,7 @@ export default function CartPage() {
 
   if (state.items.length === 0) {
     return (
-      <div className="bg-background">
-        <Navigation title="The Patterns Place" showMarketplaceLinks={true} />
-        <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
           <div className="mb-6">
             <Button 
               variant="ghost" 
@@ -51,15 +48,12 @@ export default function CartPage() {
               </Link>
             </CardContent>
           </Card>
-        </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-background">
-      <Navigation title="The Patterns Place" showMarketplaceLinks={true} />
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
+    <div className="container mx-auto px-4 py-8 max-w-6xl">
         <div className="mb-6 flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold flex items-center gap-2">
@@ -196,7 +190,6 @@ export default function CartPage() {
             </Card>
           </div>
         </div>
-      </div>
     </div>
   );
 }

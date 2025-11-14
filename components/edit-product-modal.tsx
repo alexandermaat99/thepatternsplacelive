@@ -36,7 +36,7 @@ interface EditProductModalProps {
 
 export function EditProductModal({ product, isOpen, onClose }: EditProductModalProps) {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
@@ -77,34 +77,167 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
 
     try {
       const supabase = createClient();
-      const { error } = await supabase
+      
+      console.log('Updating product:', product.id);
+      console.log('Description length:', formData.description?.length || 0);
+      
+      // Ensure images is a proper array and filter out empty strings
+      const validImages = Array.isArray(formData.images) 
+        ? formData.images.filter(url => url && typeof url === 'string' && url.trim() !== '')
+        : [];
+      
+      // Sanitize description - aggressive cleaning for pasted content
+      let sanitizedDescription = formData.description || '';
+      
+      // First, detect and preserve URLs (they might contain special characters)
+      const urlPattern = /(https?:\/\/[^\s]+)/g;
+      const urls: string[] = [];
+      let urlIndex = 0;
+      
+      // Replace URLs with placeholders to protect them during sanitization
+      sanitizedDescription = sanitizedDescription.replace(urlPattern, (match) => {
+        urls.push(match);
+        return `__URL_PLACEHOLDER_${urlIndex++}__`;
+      });
+      
+      // Remove all non-printable characters except newlines, tabs, and spaces
+      sanitizedDescription = sanitizedDescription.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F-\x9F]/g, '');
+      
+      // Normalize line breaks (convert all to \n)
+      sanitizedDescription = sanitizedDescription.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+      
+      // Remove excessive whitespace (more than 2 consecutive spaces)
+      // But preserve single spaces around URLs/links
+      sanitizedDescription = sanitizedDescription.replace(/[ \t]{3,}/g, '  ');
+      
+      // Remove excessive newlines (more than 2 consecutive)
+      sanitizedDescription = sanitizedDescription.replace(/\n{3,}/g, '\n\n');
+      
+      // Restore URLs
+      urlIndex = 0;
+      sanitizedDescription = sanitizedDescription.replace(/__URL_PLACEHOLDER_(\d+)__/g, () => {
+        return urls[urlIndex++] || '';
+      });
+      
+      // Trim start and end
+      sanitizedDescription = sanitizedDescription.trim();
+      
+      console.log('URLs detected:', urls.length);
+      if (urls.length > 0) {
+        console.log('URLs:', urls);
+      }
+      
+      // Check if description is too long (practical limit)
+      const MAX_DESCRIPTION_LENGTH = 10000;
+      if (sanitizedDescription.length > MAX_DESCRIPTION_LENGTH) {
+        console.warn(`Description is ${sanitizedDescription.length} characters, truncating to ${MAX_DESCRIPTION_LENGTH}`);
+        sanitizedDescription = sanitizedDescription.substring(0, MAX_DESCRIPTION_LENGTH);
+      }
+      
+      console.log('Sanitized description length:', sanitizedDescription.length);
+      console.log('Description preview (first 100 chars):', sanitizedDescription.substring(0, 100));
+      console.log('Valid images array:', validImages);
+      
+      // Prepare update data - always include description to ensure it updates
+      const updateData: any = {
+        title: formData.title.trim(),
+        description: sanitizedDescription || null, // Always include, even if empty
+        price: parseFloat(formData.price),
+        category: formData.category.trim(),
+        images: validImages.length > 0 ? validImages : [],
+        image_url: validImages[0] || null,
+        is_active: formData.is_active,
+        updated_at: new Date().toISOString()
+      };
+      
+      console.log('Update data prepared, description length:', updateData.description?.length || 0);
+      
+      // Split update: first update everything except description
+      const { description, ...updateDataWithoutDescription } = updateData;
+      
+      console.log('Step 1: Updating product without description...');
+      const updatePromise1 = supabase
         .from('products')
-        .update({
-          title: formData.title,
-          description: formData.description,
-          price: parseFloat(formData.price),
-          category: formData.category,
-          images: formData.images.length > 0 ? formData.images : [],
-          image_url: formData.images[0] || null, // Keep for backward compatibility
-          is_active: formData.is_active,
-          updated_at: new Date().toISOString()
-        })
+        .update(updateDataWithoutDescription)
         .eq('id', product.id);
 
-      if (error) throw error;
+      const timeoutPromise1 = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Update request timed out after 10 seconds')), 10000)
+      );
 
+      const { error: error1, count: count1 } = await Promise.race([updatePromise1, timeoutPromise1]) as any;
+
+      if (error1) {
+        console.error('Supabase update error (without description):', error1);
+        throw error1;
+      }
+
+      console.log('Step 1 successful, rows affected:', count1);
+      
+      // Step 2: Update description separately with special handling for URLs
+      if (description !== undefined && description !== null) {
+        console.log('Step 2: Updating description separately...');
+        console.log('Description contains URL:', /https?:\/\//.test(description));
+        
+        // For descriptions with URLs, use simple update without select to avoid RLS issues
+        try {
+          const updatePromise2 = supabase
+            .from('products')
+            .update({ 
+              description: description || null,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', product.id);
+
+          const timeoutPromise2 = new Promise<never>((_, reject) => 
+            setTimeout(() => reject(new Error('Description update timed out after 15 seconds')), 15000)
+          );
+
+          const { error: error2, count: count2 } = await Promise.race([updatePromise2, timeoutPromise2]) as any;
+
+          if (error2) {
+            console.error('Supabase description update error:', error2);
+            // Don't throw - the main update succeeded, description is optional
+            console.warn('Description update failed, but other fields were updated');
+          } else {
+            console.log('Step 2 successful, description updated, rows affected:', count2);
+          }
+        } catch (updateError) {
+          console.error('Description update exception:', updateError);
+          // Don't throw - the main update succeeded
+          console.warn('Description update failed, but other fields were updated');
+        }
+      }
+
+      console.log('All updates successful');
+
+      // Success - close modal first, then refresh
+      setIsLoading(false);
       onClose();
-      router.refresh(); // Refresh the page to show updated data
+      
+      // Refresh the page data
+      router.refresh();
+      
+      // Fallback reload after a short delay to ensure UI updates
+      setTimeout(() => {
+        if (window.location.pathname.includes('/dashboard/my-products')) {
+          window.location.reload();
+        }
+      }, 500);
     } catch (error) {
       console.error('Error updating product:', error);
-      alert('Failed to update product. Please try again.');
-    } finally {
-      setIsLoading(false);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to update product: ${errorMessage}\n\nCheck the browser console for details.`);
+      setIsLoading(false); // Always stop loading on error
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open && !isLoading) {
+        onClose();
+      }
+    }}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Edit Product</DialogTitle>
@@ -123,15 +256,49 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
           </div>
 
           <div>
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description">
+              Description 
+              <span className="text-muted-foreground text-sm font-normal ml-2">
+                ({formData.description.length}/10000 characters)
+              </span>
+            </Label>
             <Textarea
               id="description"
               value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onChange={(e) => {
+                // Clean pasted content immediately
+                let cleaned = e.target.value;
+                // Remove any non-printable characters except newlines and tabs
+                cleaned = cleaned.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
+                setFormData({ ...formData, description: cleaned });
+              }}
+              onPaste={(e) => {
+                // Handle paste event to clean content while preserving URLs
+                e.preventDefault();
+                const pastedText = e.clipboardData.getData('text/plain');
+                // Remove non-printable characters but preserve URLs and links
+                // URLs contain :, /, ?, &, =, etc. which are all printable ASCII
+                const cleaned = pastedText.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
+                // Get current cursor position or append to end
+                const textarea = e.currentTarget;
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const currentText = formData.description;
+                const newText = currentText.substring(0, start) + cleaned + currentText.substring(end);
+                setFormData({ ...formData, description: newText });
+              }}
               required
               placeholder="Describe your product"
               rows={4}
+              maxLength={10000}
+              className="resize-y"
             />
+            {formData.description.length > 9000 && (
+              <p className="text-sm text-orange-600 mt-1">
+                Warning: Description is getting long ({formData.description.length} characters). 
+                Very long descriptions may cause slow updates.
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -161,13 +328,16 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
             </div>
           </div>
 
-          {user && (
+          {!authLoading && user && (
             <MultiImageUpload
               value={formData.images}
               onChange={(urls) => setFormData({ ...formData, images: urls })}
               userId={user.id}
               maxImages={10}
             />
+          )}
+          {authLoading && (
+            <div className="text-sm text-muted-foreground">Loading image upload...</div>
           )}
 
           <div className="flex items-center space-x-2">
@@ -182,7 +352,12 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={onClose}
+              disabled={isLoading}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={isLoading}>

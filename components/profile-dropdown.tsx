@@ -27,7 +27,7 @@ import Link from 'next/link';
 
 export function ProfileDropdown() {
   const router = useRouter();
-  const { user, profile, signOut, loading } = useAuth();
+  const { user, profile, signOut, loading, error } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
   const handleSignOut = async () => {
@@ -35,13 +35,17 @@ export function ProfileDropdown() {
     setIsOpen(false);
   };
 
-  if (loading) {
+  // Show loading state only if we don't have a user yet
+  if (loading && !user) {
     return (
       <div className="h-8 w-8 rounded-full bg-muted animate-pulse flex-shrink-0" />
     );
   }
 
-  if (!user) {
+  // Only show login options if we're sure there's no user
+  // If there's an error but we have a user, show the user (error might be temporary)
+  // This prevents showing login when auth is temporarily unavailable
+  if (!user && !loading) {
     return (
       <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
         <DropdownMenuTrigger asChild>
