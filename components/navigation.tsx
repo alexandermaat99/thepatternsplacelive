@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { ProfileDropdown } from '@/components/profile-dropdown';
 import { CartIcon } from '@/components/cart-icon';
 import { Button } from '@/components/ui/button';
-import Image from 'next/image';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,42 +14,34 @@ import {
 import { Menu, X, ShoppingBag, Package } from 'lucide-react';
 
 interface NavigationProps {
-  title?: string;
   showMarketplaceLinks?: boolean;
 }
 
-export function Navigation({ 
-  showMarketplaceLinks = false 
-}: NavigationProps) {
+export function Navigation({ showMarketplaceLinks = false }: NavigationProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
-    <nav className="w-full border-b border-b-foreground/10 h-12 sm:h-16">
-      <div className="w-full max-w-5xl mx-auto h-full px-4 sm:px-6 relative">
-        <div className="flex h-full items-center justify-between">
+    <nav className="w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
+      <div className="container mx-auto px-4 sm:px-6 h-14">
+        <div className="grid grid-cols-3 h-full items-center">
           {/* Left: Hamburger + Marketplace links */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 justify-start">
             {showMarketplaceLinks && (
               <>
-                {/* Hamburger menu, always visible on mobile */}
+                {/* Mobile menu */}
                 <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
                   <DropdownMenuTrigger asChild>
                     <Button 
                       variant="ghost" 
-                      size="sm" 
-                      className="md:hidden h-8 w-8 p-0 relative"
+                      size="icon" 
+                      className="md:hidden"
                       aria-label="Menu"
                     >
-                      <Menu 
-                        className={`h-5 w-5 absolute transition-all duration-300 ${
-                          isMenuOpen ? 'opacity-0 rotate-90 scale-0' : 'opacity-100 rotate-0 scale-100'
-                        }`}
-                      />
-                      <X 
-                        className={`h-5 w-5 absolute transition-all duration-300 ${
-                          isMenuOpen ? 'opacity-100 rotate-0 scale-100' : 'opacity-0 -rotate-90 scale-0'
-                        }`}
-                      />
+                      {isMenuOpen ? (
+                        <X className="h-5 w-5" />
+                      ) : (
+                        <Menu className="h-5 w-5" />
+                      )}
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" className="w-48">
@@ -68,15 +59,16 @@ export function Navigation({
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-                {/* Marketplace links, visible on md+ screens */}
+                
+                {/* Desktop links */}
                 <div className="hidden md:flex items-center gap-2">
-                  <Button asChild variant="ghost" size="sm" className="h-8">
+                  <Button asChild variant="ghost" size="sm">
                     <Link href="/marketplace" className="flex items-center gap-2">
                       <ShoppingBag className="h-4 w-4" />
                       <span>Marketplace</span>
                     </Link>
                   </Button>
-                  <Button asChild variant="ghost" size="sm" className="h-8">
+                  <Button asChild variant="ghost" size="sm">
                     <Link href="/marketplace/sell" className="flex items-center gap-2">
                       <Package className="h-4 w-4" />
                       <span>Sell</span>
@@ -87,25 +79,22 @@ export function Navigation({
             )}
           </div>
 
-          {/* Center: Logo - absolutely positioned */}
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
+          {/* Center: Logo */}
+          <div className="flex items-center justify-center">
             <Link 
               href="/" 
-              className="hover:opacity-80 transition-opacity flex items-center"
+              className="flex items-center hover:opacity-80 transition-opacity"
             >
-              <Image 
+              <img 
                 src="/logos/back_logo.svg" 
                 alt="The Patterns Place" 
-                width={120} 
-                height={32} 
                 className="h-6 sm:h-8 w-auto"
-                priority
               />
             </Link>
           </div>
 
           {/* Right: Cart + Profile */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 justify-end">
             <CartIcon />
             <ProfileDropdown />
           </div>

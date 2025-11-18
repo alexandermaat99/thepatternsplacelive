@@ -192,12 +192,15 @@ export function useAuth() {
     const supabase = createClient();
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('useAuth: Auth state changed:', event);
-        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+        console.log('useAuth: Auth state changed:', event, session?.user?.id);
+        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
           // Clear any existing timeout
           if (timeoutId) {
             clearTimeout(timeoutId);
           }
+          // Reset the initialization flag to allow re-initialization
+          isInitializing = false;
+          // Force re-initialization
           await initializeAuth();
         }
       }

@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { createClient } from '@/lib/supabase/client';
 import { MultiImageUpload } from '@/components/marketplace/multi-image-upload';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import { DIFFICULTY_LEVELS } from '@/lib/constants';
 

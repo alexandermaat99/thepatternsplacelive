@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/contexts/auth-context';
 import { AvatarUpload } from '@/components/avatar-upload';
 import { createClient } from '@/lib/supabase/client';
 import { CheckCircle, XCircle, ExternalLink, User, CreditCard } from 'lucide-react';

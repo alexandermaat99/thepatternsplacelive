@@ -33,16 +33,41 @@ export function LoginForm({
     setError(null);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
+      // Sign in with email and password
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
         password,
       });
-      if (error) throw error;
-      // Update this route to redirect to an authenticated route. The user already has an active session.
-      router.push("/protected");
+      
+      if (signInError) {
+        throw signInError;
+      }
+      
+      if (!data?.session) {
+        throw new Error("Login failed - no session created");
+      }
+
+      // Verify the session is established by checking the user
+      // This ensures cookies are properly set before redirecting
+      const { data: { user }, error: getUserError } = await supabase.auth.getUser();
+      
+      if (getUserError || !user) {
+        throw new Error("Failed to verify session after login");
+      }
+
+      // Refresh the router to sync server-side state
+      router.refresh();
+      
+      // Use window.location for a hard redirect to ensure cookies are sent
+      // This is more reliable than router.push for authentication flows
+      window.location.href = "/protected";
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "An error occurred");
-    } finally {
+      console.error("Login error:", error);
+      setError(
+        error instanceof Error 
+          ? error.message 
+          : "An error occurred during login. Please try again."
+      );
       setIsLoading(false);
     }
   };

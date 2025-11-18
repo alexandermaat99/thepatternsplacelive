@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { useAuth } from './useAuth';
+import { useAuth } from '@/contexts/auth-context';
 
 export function useFavorites() {
   const { user } = useAuth();

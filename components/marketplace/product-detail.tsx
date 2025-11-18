@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { formatAmountForDisplay } from '@/lib/utils-client';
 import { ProductImageGallery } from '@/components/marketplace/product-image-gallery';
 import { ArrowLeft, ShoppingCart } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/contexts/auth-context';
 import { useCart } from '@/contexts/cart-context';
 import { linkifyText } from '@/lib/text-utils';
 import { getDifficultyLabel, getDifficultyVariant } from '@/lib/constants';

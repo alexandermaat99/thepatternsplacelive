@@ -59,6 +59,8 @@ export async function updateSession(request: NextRequest) {
 
   // Only redirect if we're certain there's no user AND it's not a public route
   // Don't redirect on auth errors - might be temporary (preserves session)
+  // Also don't redirect /protected - let the page component handle auth check
+  // This prevents redirect loops when cookies are being set
   if (
     !authError &&
     request.nextUrl.pathname !== "/" &&
@@ -68,7 +70,8 @@ export async function updateSession(request: NextRequest) {
     !request.nextUrl.pathname.startsWith("/api") &&
     !request.nextUrl.pathname.startsWith("/marketplace") &&
     !request.nextUrl.pathname.startsWith("/cart") &&
-    !request.nextUrl.pathname.startsWith("/checkout/success")
+    !request.nextUrl.pathname.startsWith("/checkout/success") &&
+    !request.nextUrl.pathname.startsWith("/protected")
   ) {
     // no user, potentially respond by redirecting the user to the login page
     const url = request.nextUrl.clone();
