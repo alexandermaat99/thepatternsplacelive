@@ -14,7 +14,7 @@ export default async function DashboardPage() {
   const authData = await getCurrentUserWithProfileServer();
   
   if (!authData || !authData.user) {
-    redirect('/auth/login');
+    redirect(`/auth/login?redirect=${encodeURIComponent('/dashboard')}`);
   }
 
   const { user, profile } = authData;

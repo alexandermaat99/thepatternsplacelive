@@ -13,7 +13,7 @@ export default async function FavoritesPage() {
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   
   if (authError || !user) {
-    redirect('/auth/login');
+    redirect(`/auth/login?redirect=${encodeURIComponent('/dashboard/favorites')}`);
   }
 
   // Fetch user's favorite product IDs

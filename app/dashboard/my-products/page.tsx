@@ -15,7 +15,7 @@ export default async function MyProductsPage() {
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   
   if (authError || !user) {
-    redirect('/auth/login');
+    redirect(`/auth/login?redirect=${encodeURIComponent('/dashboard/my-products')}`);
   }
   
   // Fetch user's products from the database with separate queries for better performance

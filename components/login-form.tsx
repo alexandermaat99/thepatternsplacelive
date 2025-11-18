@@ -13,8 +13,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect } from "react";
 
 export function LoginForm({
   className,
@@ -25,6 +25,39 @@ export function LoginForm({
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  
+  // Get the redirect URL from query params, or fallback to referrer
+  const redirectUrlFromParams = searchParams.get("redirect");
+  
+  // Get referrer from browser (for when user navigates from public pages)
+  const [referrerUrl, setReferrerUrl] = useState<string | null>(null);
+  
+  useEffect(() => {
+    // Only use referrer if no redirect parameter is set
+    if (!redirectUrlFromParams && typeof window !== 'undefined') {
+      const referrer = document.referrer;
+      if (referrer) {
+        try {
+          const referrerUrlObj = new URL(referrer);
+          const currentUrlObj = new URL(window.location.href);
+          // Only use referrer if it's from the same origin
+          if (referrerUrlObj.origin === currentUrlObj.origin) {
+            const referrerPath = referrerUrlObj.pathname + referrerUrlObj.search;
+            // Don't redirect back to login/auth pages
+            if (!referrerPath.startsWith('/auth') && !referrerPath.startsWith('/login')) {
+              setReferrerUrl(referrerPath);
+            }
+          }
+        } catch (e) {
+          // Invalid URL, ignore
+        }
+      }
+    }
+  }, [redirectUrlFromParams]);
+  
+  // Prefer redirect parameter over referrer
+  const redirectUrl = redirectUrlFromParams || referrerUrl;
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,9 +91,38 @@ export function LoginForm({
       // Refresh the router to sync server-side state
       router.refresh();
       
+      // Determine redirect destination
+      // Validate redirect URL to prevent open redirect vulnerabilities
+      const getRedirectUrl = (): string => {
+        if (!redirectUrl) {
+          return "/dashboard"; // Default to dashboard
+        }
+        
+        // Validate redirect URL - must be a relative path starting with /
+        // This prevents open redirect attacks (redirecting to external sites)
+        const decodedRedirect = decodeURIComponent(redirectUrl);
+        
+        // Allow only relative paths (starting with /)
+        // Reject absolute URLs, protocol-relative URLs, or URLs with //
+        if (
+          decodedRedirect.startsWith("/") &&
+          !decodedRedirect.startsWith("//") &&
+          !decodedRedirect.includes(":") &&
+          !decodedRedirect.includes("<") &&
+          !decodedRedirect.includes(">")
+        ) {
+          return decodedRedirect;
+        }
+        
+        // If invalid, default to dashboard
+        return "/dashboard";
+      };
+      
+      const destination = getRedirectUrl();
+      
       // Use window.location for a hard redirect to ensure cookies are sent
       // This is more reliable than router.push for authentication flows
-      window.location.href = "/protected";
+      window.location.href = destination;
     } catch (error: unknown) {
       console.error("Login error:", error);
       setError(

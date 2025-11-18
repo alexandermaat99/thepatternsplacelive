@@ -10,7 +10,7 @@ export default async function SellPage() {
   const authData = await getCurrentUserWithProfileServer();
   
   if (!authData || !authData.user) {
-    redirect('/auth/login');
+    redirect(`/auth/login?redirect=${encodeURIComponent('/marketplace/sell')}`);
   }
 
   const { user, profile } = authData;
