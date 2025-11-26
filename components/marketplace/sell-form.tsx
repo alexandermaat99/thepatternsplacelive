@@ -27,10 +27,11 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
   const [formData, setFormData] = useState({
     title: '',
     description: '',
+    details: '',
     price: '',
     category: '',
     difficulty: '' as string,
-    images: [] as string[]
+    images: [] as string[],
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -43,20 +44,19 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
       }
 
       const supabase = createClient();
-      const { error } = await supabase
-        .from('products')
-        .insert({
-          title: formData.title,
-          description: formData.description,
-          price: parseFloat(formData.price),
-          currency: 'USD',
-          category: formData.category,
-          difficulty: formData.difficulty || null,
-          images: formData.images.length > 0 ? formData.images : [],
-          image_url: formData.images[0] || null,
-          user_id: user.id,
-          is_active: true
-        });
+      const { error } = await supabase.from('products').insert({
+        title: formData.title,
+        description: formData.description,
+        details: formData.details || null,
+        price: parseFloat(formData.price),
+        currency: 'USD',
+        category: formData.category,
+        difficulty: formData.difficulty || null,
+        images: formData.images.length > 0 ? formData.images : [],
+        image_url: formData.images[0] || null,
+        user_id: user.id,
+        is_active: true,
+      });
 
       if (error) throw error;
 
@@ -72,11 +72,7 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
       <div className="mb-6">
-        <Button 
-          variant="ghost" 
-          onClick={() => router.back()}
-          className="flex items-center gap-2"
-        >
+        <Button variant="ghost" onClick={() => router.back()} className="flex items-center gap-2">
           <ArrowLeft className="h-4 w-4" />
           Back
         </Button>
@@ -94,16 +90,20 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                 </p>
               ) : (
                 <p className="text-orange-500 font-medium">
-                  Your Stripe account is not fully set up yet. Please complete the onboarding process.
+                  Your Stripe account is not fully set up yet. Please complete the onboarding
+                  process.
                 </p>
               )}
               <StripeConnectButton userId={user.id} />
               {profile?.stripe_account_id && (
                 <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
                   <p className="text-sm text-blue-800">
-                    <strong>Debug Info:</strong><br/>
-                    Account ID: {profile.stripe_account_id}<br/>
-                    Status: {stripeStatus.status}<br/>
+                    <strong>Debug Info:</strong>
+                    <br />
+                    Account ID: {profile.stripe_account_id}
+                    <br />
+                    Status: {stripeStatus.status}
+                    <br />
                     Fully Onboarded: {stripeStatus.isOnboarded ? 'Yes' : 'No'}
                   </p>
                 </div>
@@ -116,7 +116,7 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                 <Input
                   id="title"
                   value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  onChange={e => setFormData({ ...formData, title: e.target.value })}
                   required
                   placeholder="Enter product title"
                 />
@@ -127,9 +127,24 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                 <Textarea
                   id="description"
                   value={formData.description}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, description: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
                   required
                   placeholder="Describe your product"
+                  rows={4}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="details">Details (Optional)</Label>
+                <Textarea
+                  id="details"
+                  value={formData.details}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                    setFormData({ ...formData, details: e.target.value })
+                  }
+                  placeholder="Additional product details, specifications, or information"
                   rows={4}
                 />
               </div>
@@ -142,7 +157,7 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                   step="0.01"
                   min="0"
                   value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                  onChange={e => setFormData({ ...formData, price: e.target.value })}
                   required
                   placeholder="0.00"
                 />
@@ -153,7 +168,7 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                 <Input
                   id="category"
                   value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  onChange={e => setFormData({ ...formData, category: e.target.value })}
                   required
                   placeholder="e.g., Electronics, Clothing, Books"
                 />
@@ -164,11 +179,11 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                 <select
                   id="difficulty"
                   value={formData.difficulty}
-                  onChange={(e) => setFormData({ ...formData, difficulty: e.target.value })}
+                  onChange={e => setFormData({ ...formData, difficulty: e.target.value })}
                   className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
                 >
                   <option value="">Select difficulty level</option>
-                  {DIFFICULTY_LEVELS.map((level) => (
+                  {DIFFICULTY_LEVELS.map(level => (
                     <option key={level.value} value={level.value}>
                       {level.label}
                     </option>
@@ -179,7 +194,7 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
               {user && (
                 <MultiImageUpload
                   value={formData.images}
-                  onChange={(urls) => setFormData({ ...formData, images: urls })}
+                  onChange={urls => setFormData({ ...formData, images: urls })}
                   userId={user.id}
                   maxImages={10}
                 />
@@ -195,4 +210,3 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
     </div>
   );
 }
-

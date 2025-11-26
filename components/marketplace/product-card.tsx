@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -37,6 +38,7 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, hideFavorite = false }: ProductCardProps) {
+  const router = useRouter();
   const { isFavorite, toggleFavorite } = useFavorites();
   const { showToast } = useToast();
   const { user } = useAuth();
@@ -141,7 +143,16 @@ export function ProductCard({ product, hideFavorite = false }: ProductCardProps)
           {product.profiles && (
             <p className="text-sm text-muted-foreground mt-1">
               {product.profiles.username ? (
-                <>@{product.profiles.username}</>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    router.push(`/marketplace/seller/${product.profiles.username}`);
+                  }}
+                  className="hover:text-primary transition-colors underline text-left"
+                >
+                  @{product.profiles.username}
+                </button>
               ) : (
                 <>by {product.profiles.full_name || 'Unknown'}</>
               )}

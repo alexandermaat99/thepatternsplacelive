@@ -48,7 +48,7 @@ export default async function MyProductsPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
-        <div className="mb-8 flex justify-between items-start">
+        <div className="mb-8 flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
           <div>
             <h1 className="text-3xl font-bold flex items-center gap-2">
               <Package className="h-8 w-8" />
@@ -58,8 +58,8 @@ export default async function MyProductsPage() {
               Manage your products and track their performance
             </p>
           </div>
-          <Link href="/marketplace/sell">
-            <Button className="flex items-center gap-2">
+          <Link href="/marketplace/sell" className="w-full sm:w-auto">
+            <Button className="flex items-center gap-2 w-full sm:w-auto">
               <Plus className="h-4 w-4" />
               Add New Product
             </Button>

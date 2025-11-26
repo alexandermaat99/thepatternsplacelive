@@ -43,12 +43,13 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
   const [formData, setFormData] = useState({
     title: '',
     description: '',
+    details: '',
     price: '',
     category: '',
     difficulty: '',
     images: [] as string[],
     image_url: '',
-    is_active: true
+    is_active: true,
   });
 
   // Update form data when product changes
@@ -61,16 +62,17 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
       } else if (product.image_url) {
         images = [product.image_url];
       }
-      
+
       setFormData({
         title: product.title,
         description: product.description,
+        details: (product as any).details || '',
         price: product.price.toString(),
         category: product.category,
         difficulty: product.difficulty || '',
         images,
         image_url: product.image_url || '',
-        is_active: product.is_active
+        is_active: product.is_active,
       });
     }
   }, [product]);
@@ -81,96 +83,105 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
 
     try {
       const supabase = createClient();
-      
+
       console.log('Updating product:', product.id);
       console.log('Description length:', formData.description?.length || 0);
-      
+
       // Ensure images is a proper array and filter out empty strings
-      const validImages = Array.isArray(formData.images) 
+      const validImages = Array.isArray(formData.images)
         ? formData.images.filter(url => url && typeof url === 'string' && url.trim() !== '')
         : [];
-      
+
       // Sanitize description - aggressive cleaning for pasted content
       let sanitizedDescription = formData.description || '';
-      
+
       // First, detect and preserve URLs (they might contain special characters)
       const urlPattern = /(https?:\/\/[^\s]+)/g;
       const urls: string[] = [];
       let urlIndex = 0;
-      
+
       // Replace URLs with placeholders to protect them during sanitization
-      sanitizedDescription = sanitizedDescription.replace(urlPattern, (match) => {
+      sanitizedDescription = sanitizedDescription.replace(urlPattern, match => {
         urls.push(match);
         return `__URL_PLACEHOLDER_${urlIndex++}__`;
       });
-      
+
       // Remove all non-printable characters except newlines, tabs, and spaces
-      sanitizedDescription = sanitizedDescription.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F-\x9F]/g, '');
-      
+      sanitizedDescription = sanitizedDescription.replace(
+        /[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F-\x9F]/g,
+        ''
+      );
+
       // Normalize line breaks (convert all to \n)
       sanitizedDescription = sanitizedDescription.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-      
+
       // Remove excessive whitespace (more than 2 consecutive spaces)
       // But preserve single spaces around URLs/links
       sanitizedDescription = sanitizedDescription.replace(/[ \t]{3,}/g, '  ');
-      
+
       // Remove excessive newlines (more than 2 consecutive)
       sanitizedDescription = sanitizedDescription.replace(/\n{3,}/g, '\n\n');
-      
+
       // Restore URLs
       urlIndex = 0;
       sanitizedDescription = sanitizedDescription.replace(/__URL_PLACEHOLDER_(\d+)__/g, () => {
         return urls[urlIndex++] || '';
       });
-      
+
       // Trim start and end
       sanitizedDescription = sanitizedDescription.trim();
-      
+
       console.log('URLs detected:', urls.length);
       if (urls.length > 0) {
         console.log('URLs:', urls);
       }
-      
+
       // Check if description is too long (practical limit)
       const MAX_DESCRIPTION_LENGTH = 10000;
       if (sanitizedDescription.length > MAX_DESCRIPTION_LENGTH) {
-        console.warn(`Description is ${sanitizedDescription.length} characters, truncating to ${MAX_DESCRIPTION_LENGTH}`);
+        console.warn(
+          `Description is ${sanitizedDescription.length} characters, truncating to ${MAX_DESCRIPTION_LENGTH}`
+        );
         sanitizedDescription = sanitizedDescription.substring(0, MAX_DESCRIPTION_LENGTH);
       }
-      
+
       console.log('Sanitized description length:', sanitizedDescription.length);
       console.log('Description preview (first 100 chars):', sanitizedDescription.substring(0, 100));
       console.log('Valid images array:', validImages);
-      
+
       // Prepare update data - always include description to ensure it updates
       const updateData: any = {
         title: formData.title.trim(),
         description: sanitizedDescription || null, // Always include, even if empty
+        details: formData.details?.trim() || null,
         price: parseFloat(formData.price),
         category: formData.category.trim(),
         difficulty: formData.difficulty || null,
         images: validImages.length > 0 ? validImages : [],
         image_url: validImages[0] || null,
         is_active: formData.is_active,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       };
-      
+
       console.log('Update data prepared, description length:', updateData.description?.length || 0);
-      
+
       // Split update: first update everything except description
       const { description, ...updateDataWithoutDescription } = updateData;
-      
+
       console.log('Step 1: Updating product without description...');
       const updatePromise1 = supabase
         .from('products')
         .update(updateDataWithoutDescription)
         .eq('id', product.id);
 
-      const timeoutPromise1 = new Promise<never>((_, reject) => 
+      const timeoutPromise1 = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('Update request timed out after 10 seconds')), 10000)
       );
 
-      const { error: error1, count: count1 } = await Promise.race([updatePromise1, timeoutPromise1]) as any;
+      const { error: error1, count: count1 } = (await Promise.race([
+        updatePromise1,
+        timeoutPromise1,
+      ])) as any;
 
       if (error1) {
         console.error('Supabase update error (without description):', error1);
@@ -178,27 +189,33 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
       }
 
       console.log('Step 1 successful, rows affected:', count1);
-      
+
       // Step 2: Update description separately with special handling for URLs
       if (description !== undefined && description !== null) {
         console.log('Step 2: Updating description separately...');
         console.log('Description contains URL:', /https?:\/\//.test(description));
-        
+
         // For descriptions with URLs, use simple update without select to avoid RLS issues
         try {
           const updatePromise2 = supabase
             .from('products')
-            .update({ 
+            .update({
               description: description || null,
-              updated_at: new Date().toISOString()
+              updated_at: new Date().toISOString(),
             })
             .eq('id', product.id);
 
-          const timeoutPromise2 = new Promise<never>((_, reject) => 
-            setTimeout(() => reject(new Error('Description update timed out after 15 seconds')), 15000)
+          const timeoutPromise2 = new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error('Description update timed out after 15 seconds')),
+              15000
+            )
           );
 
-          const { error: error2, count: count2 } = await Promise.race([updatePromise2, timeoutPromise2]) as any;
+          const { error: error2, count: count2 } = (await Promise.race([
+            updatePromise2,
+            timeoutPromise2,
+          ])) as any;
 
           if (error2) {
             console.error('Supabase description update error:', error2);
@@ -219,10 +236,10 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
       // Success - close modal first, then refresh
       setIsLoading(false);
       onClose();
-      
+
       // Refresh the page data
       router.refresh();
-      
+
       // Fallback reload after a short delay to ensure UI updates
       setTimeout(() => {
         if (window.location.pathname.includes('/dashboard/my-products')) {
@@ -238,23 +255,26 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => {
-      if (!open && !isLoading) {
-        onClose();
-      }
-    }}>
-      <DialogContent className="max-w-2xl">
+    <Dialog
+      open={isOpen}
+      onOpenChange={open => {
+        if (!open && !isLoading) {
+          onClose();
+        }
+      }}
+    >
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Product</DialogTitle>
         </DialogHeader>
-        
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="title">Product Title</Label>
             <Input
               id="title"
               value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              onChange={e => setFormData({ ...formData, title: e.target.value })}
               required
               placeholder="Enter product title"
             />
@@ -262,7 +282,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
 
           <div>
             <Label htmlFor="description">
-              Description 
+              Description
               <span className="text-muted-foreground text-sm font-normal ml-2">
                 ({formData.description.length}/10000 characters)
               </span>
@@ -270,14 +290,14 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
             <Textarea
               id="description"
               value={formData.description}
-              onChange={(e) => {
+              onChange={e => {
                 // Clean pasted content immediately
                 let cleaned = e.target.value;
                 // Remove any non-printable characters except newlines and tabs
                 cleaned = cleaned.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
                 setFormData({ ...formData, description: cleaned });
               }}
-              onPaste={(e) => {
+              onPaste={e => {
                 // Handle paste event to clean content while preserving URLs
                 e.preventDefault();
                 const pastedText = e.clipboardData.getData('text/plain');
@@ -289,21 +309,34 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
                 const start = textarea.selectionStart;
                 const end = textarea.selectionEnd;
                 const currentText = formData.description;
-                const newText = currentText.substring(0, start) + cleaned + currentText.substring(end);
+                const newText =
+                  currentText.substring(0, start) + cleaned + currentText.substring(end);
                 setFormData({ ...formData, description: newText });
               }}
               required
               placeholder="Describe your product"
-              rows={4}
+              rows={6}
               maxLength={10000}
-              className="resize-y"
+              className="resize-y min-h-[120px] max-h-[300px] overflow-y-auto"
             />
             {formData.description.length > 9000 && (
               <p className="text-sm text-orange-600 mt-1">
-                Warning: Description is getting long ({formData.description.length} characters). 
+                Warning: Description is getting long ({formData.description.length} characters).
                 Very long descriptions may cause slow updates.
               </p>
             )}
+          </div>
+
+          <div>
+            <Label htmlFor="details">Details (Optional)</Label>
+            <Textarea
+              id="details"
+              value={formData.details}
+              onChange={e => setFormData({ ...formData, details: e.target.value })}
+              placeholder="Additional product details, specifications, or information"
+              rows={4}
+              className="resize-y min-h-[120px] max-h-[300px] overflow-y-auto"
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -315,7 +348,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
                 step="0.01"
                 min="0"
                 value={formData.price}
-                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                onChange={e => setFormData({ ...formData, price: e.target.value })}
                 required
                 placeholder="0.00"
               />
@@ -326,7 +359,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
               <Input
                 id="category"
                 value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                onChange={e => setFormData({ ...formData, category: e.target.value })}
                 required
                 placeholder="e.g., Electronics, Clothing, Books"
               />
@@ -337,11 +370,11 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
               <select
                 id="difficulty"
                 value={formData.difficulty}
-                onChange={(e) => setFormData({ ...formData, difficulty: e.target.value })}
+                onChange={e => setFormData({ ...formData, difficulty: e.target.value })}
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
               >
                 <option value="">Select difficulty level</option>
-                {DIFFICULTY_LEVELS.map((level) => (
+                {DIFFICULTY_LEVELS.map(level => (
                   <option key={level.value} value={level.value}>
                     {level.label}
                   </option>
@@ -353,7 +386,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
           {!authLoading && user && (
             <MultiImageUpload
               value={formData.images}
-              onChange={(urls) => setFormData({ ...formData, images: urls })}
+              onChange={urls => setFormData({ ...formData, images: urls })}
               userId={user.id}
               maxImages={10}
             />
@@ -367,22 +400,23 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
               type="checkbox"
               id="is_active"
               checked={formData.is_active}
-              onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+              onChange={e => setFormData({ ...formData, is_active: e.target.checked })}
               className="rounded border-gray-300"
             />
             <Label htmlFor="is_active">Product is active (visible in marketplace)</Label>
           </div>
 
-          <DialogFooter>
-            <Button 
-              type="button" 
-              variant="outline" 
+          <DialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
               onClick={onClose}
               disabled={isLoading}
+              className="w-full sm:w-auto"
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading}>
+            <Button type="submit" disabled={isLoading} className="w-full sm:w-auto">
               {isLoading ? 'Updating...' : 'Update Product'}
             </Button>
           </DialogFooter>
