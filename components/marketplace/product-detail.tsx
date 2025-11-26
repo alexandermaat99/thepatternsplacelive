@@ -194,10 +194,17 @@ export function ProductDetail({ product }: ProductDetailProps) {
               <div className="relative">
                 <div
                   className={`text-muted-foreground whitespace-pre-wrap overflow-hidden transition-[max-height] duration-500 ease-in-out ${
-                    isDetailsExpanded
-                      ? 'max-h-[1000px]'
-                      : 'max-h-32 [mask-image:linear-gradient(to_bottom,rgba(0,0,0,1) 60%,rgba(0,0,0,0))] dark:[mask-image:linear-gradient(to_bottom,rgba(255,255,255,1) 60%,rgba(255,255,255,0))]'
+                    isDetailsExpanded ? 'max-h-[1000px]' : 'max-h-32'
                   }`}
+                  style={
+                    !isDetailsExpanded
+                      ? {
+                          maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 65%, rgba(0,0,0,0))',
+                          WebkitMaskImage:
+                            'linear-gradient(to bottom, rgba(0,0,0,1) 65%, rgba(0,0,0,0))',
+                        }
+                      : undefined
+                  }
                 >
                   {linkifyText(product.details).map((part, index) => (
                     <React.Fragment key={index}>{part}</React.Fragment>
