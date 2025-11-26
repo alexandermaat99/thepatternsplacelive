@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { createClient } from '@/lib/supabase/client';
 import { MultiImageUpload } from '@/components/marketplace/multi-image-upload';
+import { DigitalFileUpload } from '@/components/marketplace/digital-file-upload';
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import { DIFFICULTY_LEVELS } from '@/lib/constants';
@@ -49,6 +50,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
     difficulty: '',
     images: [] as string[],
     image_url: '',
+    files: [] as string[],
     is_active: true,
   });
 
@@ -63,6 +65,11 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
         images = [product.image_url];
       }
 
+      // Handle files array
+      const files = (product as any).files && Array.isArray((product as any).files) 
+        ? (product as any).files 
+        : [];
+
       setFormData({
         title: product.title,
         description: product.description,
@@ -72,6 +79,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
         difficulty: product.difficulty || '',
         images,
         image_url: product.image_url || '',
+        files,
         is_active: product.is_active,
       });
     }
@@ -145,7 +153,52 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
         sanitizedDescription = sanitizedDescription.substring(0, MAX_DESCRIPTION_LENGTH);
       }
 
+      // Sanitize details field (same process as description)
+      let sanitizedDetails = formData.details || '';
+      
+      // Detect and preserve URLs
+      const detailsUrlPattern = /(https?:\/\/[^\s]+)/g;
+      const detailsUrls: string[] = [];
+      let detailsUrlIndex = 0;
+
+      sanitizedDetails = sanitizedDetails.replace(detailsUrlPattern, match => {
+        detailsUrls.push(match);
+        return `__URL_PLACEHOLDER_${detailsUrlIndex++}__`;
+      });
+
+      // Remove non-printable characters
+      sanitizedDetails = sanitizedDetails.replace(
+        /[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F-\x9F]/g,
+        ''
+      );
+
+      // Normalize line breaks
+      sanitizedDetails = sanitizedDetails.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+      // Remove excessive whitespace
+      sanitizedDetails = sanitizedDetails.replace(/[ \t]{3,}/g, '  ');
+
+      // Remove excessive newlines
+      sanitizedDetails = sanitizedDetails.replace(/\n{3,}/g, '\n\n');
+
+      // Restore URLs
+      detailsUrlIndex = 0;
+      sanitizedDetails = sanitizedDetails.replace(/__URL_PLACEHOLDER_(\d+)__/g, () => {
+        return detailsUrls[detailsUrlIndex++] || '';
+      });
+
+      // Trim and limit length
+      sanitizedDetails = sanitizedDetails.trim();
+      const MAX_DETAILS_LENGTH = 10000;
+      if (sanitizedDetails.length > MAX_DETAILS_LENGTH) {
+        console.warn(
+          `Details is ${sanitizedDetails.length} characters, truncating to ${MAX_DETAILS_LENGTH}`
+        );
+        sanitizedDetails = sanitizedDetails.substring(0, MAX_DETAILS_LENGTH);
+      }
+
       console.log('Sanitized description length:', sanitizedDescription.length);
+      console.log('Sanitized details length:', sanitizedDetails.length);
       console.log('Description preview (first 100 chars):', sanitizedDescription.substring(0, 100));
       console.log('Valid images array:', validImages);
 
@@ -153,12 +206,13 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
       const updateData: any = {
         title: formData.title.trim(),
         description: sanitizedDescription || null, // Always include, even if empty
-        details: formData.details?.trim() || null,
+        details: sanitizedDetails || null,
         price: parseFloat(formData.price),
         category: formData.category.trim(),
         difficulty: formData.difficulty || null,
         images: validImages.length > 0 ? validImages : [],
         image_url: validImages[0] || null,
+        files: formData.files.length > 0 ? formData.files : [],
         is_active: formData.is_active,
         updated_at: new Date().toISOString(),
       };
@@ -328,15 +382,56 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
           </div>
 
           <div>
-            <Label htmlFor="details">Details (Optional)</Label>
+            <Label htmlFor="details">
+              Details (Optional)
+              <span className="text-muted-foreground text-sm font-normal ml-2">
+                ({formData.details.length}/10000 characters)
+              </span>
+            </Label>
             <Textarea
               id="details"
               value={formData.details}
-              onChange={e => setFormData({ ...formData, details: e.target.value })}
+              onChange={e => {
+                // Clean pasted content immediately
+                let cleaned = e.target.value;
+                // Remove any non-printable characters except newlines and tabs
+                cleaned = cleaned.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
+                // Limit to 10000 characters
+                if (cleaned.length <= 10000) {
+                  setFormData({ ...formData, details: cleaned });
+                }
+              }}
+              onPaste={e => {
+                // Handle paste event to clean content while preserving URLs
+                e.preventDefault();
+                const pastedText = e.clipboardData.getData('text/plain');
+                // Remove non-printable characters but preserve URLs and links
+                const cleaned = pastedText.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
+                // Get current cursor position or append to end
+                const textarea = e.currentTarget;
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const currentText = formData.details;
+                const newText =
+                  currentText.substring(0, start) + cleaned + currentText.substring(end);
+                // Limit to 10000 characters
+                if (newText.length <= 10000) {
+                  setFormData({ ...formData, details: newText });
+                } else {
+                  setFormData({ ...formData, details: newText.substring(0, 10000) });
+                }
+              }}
               placeholder="Additional product details, specifications, or information"
               rows={4}
+              maxLength={10000}
               className="resize-y min-h-[120px] max-h-[300px] overflow-y-auto"
             />
+            {formData.details.length > 9000 && (
+              <p className="text-sm text-orange-600 mt-1">
+                Warning: Details is getting long ({formData.details.length} characters).
+                Very long details may cause slow updates.
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -384,15 +479,25 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
           </div>
 
           {!authLoading && user && (
-            <MultiImageUpload
-              value={formData.images}
-              onChange={urls => setFormData({ ...formData, images: urls })}
-              userId={user.id}
-              maxImages={10}
-            />
+            <>
+              <MultiImageUpload
+                value={formData.images}
+                onChange={urls => setFormData({ ...formData, images: urls })}
+                userId={user.id}
+                maxImages={10}
+              />
+
+              <DigitalFileUpload
+                value={formData.files}
+                onChange={paths => setFormData({ ...formData, files: paths })}
+                userId={user.id}
+                maxFiles={10}
+                maxFileSizeMB={100}
+              />
+            </>
           )}
           {authLoading && (
-            <div className="text-sm text-muted-foreground">Loading image upload...</div>
+            <div className="text-sm text-muted-foreground">Loading upload components...</div>
           )}
 
           <div className="flex items-center space-x-2">

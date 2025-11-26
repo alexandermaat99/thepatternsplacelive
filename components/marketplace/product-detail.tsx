@@ -15,6 +15,7 @@ import { useToast } from '@/contexts/toast-context';
 import { AuthPromptDialog } from '@/components/auth-prompt-dialog';
 import { linkifyText } from '@/lib/text-utils';
 import { getDifficultyLabel, getDifficultyVariant } from '@/lib/constants';
+import { ProductFilesDownload } from '@/components/marketplace/product-files-download';
 
 interface Product {
   id: string;
@@ -25,6 +26,7 @@ interface Product {
   currency: string;
   image_url?: string;
   images?: string[];
+  files?: string[];
   category: string;
   difficulty?: string | null;
   user_id: string;
@@ -185,73 +187,42 @@ export function ProductDetail({ product }: ProductDetailProps) {
             </div>
           </div>
 
-          {/* Details Section */}
-          <div className="border-t pt-4">
-            <button
-              onClick={() => setIsDetailsExpanded(!isDetailsExpanded)}
-              className="flex items-center justify-between w-full text-left hover:opacity-80 transition-opacity"
-            >
-              <h3 className="font-semibold">Details</h3>
-              <div
-                className="transition-transform duration-300 ease-in-out"
-                style={{ transform: isDetailsExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
-              >
-                <ChevronDown className="h-5 w-5 text-muted-foreground" />
-              </div>
-            </button>
-            <div
-              className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                isDetailsExpanded ? 'max-h-[2000px] opacity-100 mt-3' : 'max-h-0 opacity-0'
-              }`}
-            >
-              <div className="space-y-4">
-                {product.details ? (
-                  <div className="text-muted-foreground whitespace-pre-wrap">
-                    {linkifyText(product.details).map((part, index) => (
-                      <React.Fragment key={index}>{part}</React.Fragment>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-muted-foreground text-sm italic">
-                    No additional details provided.
-                  </div>
-                )}
-                <div className="space-y-2 text-sm pt-4 border-t">
-                  <div className="flex justify-between py-2 border-b">
-                    <span className="text-muted-foreground">Category</span>
-                    <span className="font-medium">{product.category}</span>
-                  </div>
-                  {product.difficulty && (
-                    <div className="flex justify-between py-2 border-b">
-                      <span className="text-muted-foreground">Difficulty</span>
-                      <span className="font-medium">{getDifficultyLabel(product.difficulty)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between py-2 border-b">
-                    <span className="text-muted-foreground">Product ID</span>
-                    <span className="font-mono text-xs">{product.id}</span>
-                  </div>
-                  {product.profiles && (
-                    <div className="flex justify-between py-2">
-                      <span className="text-muted-foreground">Seller</span>
-                      <span className="font-medium">
-                        {product.profiles.username ? (
-                          <Link
-                            href={`/marketplace/seller/${product.profiles.username}`}
-                            className="hover:text-primary transition-colors"
-                          >
-                            @{product.profiles.username}
-                          </Link>
-                        ) : (
-                          product.profiles.full_name || 'Unknown'
-                        )}
-                      </span>
-                    </div>
-                  )}
+          {/* More Details Section */}
+          {product.details && (
+            <div className="border-t pt-4">
+              <h3 className="font-semibold mb-3">More Details</h3>
+              <div className="relative">
+                <div
+                  className={`text-muted-foreground whitespace-pre-wrap overflow-hidden transition-[max-height] duration-500 ease-in-out ${
+                    isDetailsExpanded
+                      ? 'max-h-[1000px]'
+                      : 'max-h-32 [mask-image:linear-gradient(to_bottom,rgba(0,0,0,1) 60%,rgba(0,0,0,0))] dark:[mask-image:linear-gradient(to_bottom,rgba(255,255,255,1) 60%,rgba(255,255,255,0))]'
+                  }`}
+                >
+                  {linkifyText(product.details).map((part, index) => (
+                    <React.Fragment key={index}>{part}</React.Fragment>
+                  ))}
                 </div>
+                {!isDetailsExpanded ? (
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsDetailsExpanded(true)}
+                    className="mt-4 w-full"
+                  >
+                    Show more
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsDetailsExpanded(false)}
+                    className="mt-4 w-full"
+                  >
+                    Show less
+                  </Button>
+                )}
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 

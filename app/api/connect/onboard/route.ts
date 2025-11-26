@@ -54,10 +54,11 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Create an onboarding link for Standard account
+    const origin = request.nextUrl.origin;
     const accountLink = await stripe.accountLinks.create({
       account: account.id,
-      refresh_url: 'http://localhost:3000/dashboard',
-      return_url: 'http://localhost:3000/dashboard',
+      refresh_url: `${origin}/dashboard`,
+      return_url: `${origin}/dashboard`,
       type: 'account_onboarding',
     });
 

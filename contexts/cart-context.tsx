@@ -14,13 +14,8 @@ interface Product {
   difficulty?: string | null;
 }
 
-interface CartItem {
-  product: Product;
-  quantity: number;
-}
-
 interface CartState {
-  items: CartItem[];
+  items: Product[];
   total: number;
   itemCount: number;
 }
@@ -28,15 +23,13 @@ interface CartState {
 type CartAction =
   | { type: 'ADD_ITEM'; payload: Product }
   | { type: 'REMOVE_ITEM'; payload: string }
-  | { type: 'UPDATE_QUANTITY'; payload: { productId: string; quantity: number } }
   | { type: 'CLEAR_CART' }
-  | { type: 'LOAD_CART'; payload: CartItem[] };
+  | { type: 'LOAD_CART'; payload: Product[] };
 
 interface CartContextType {
   state: CartState;
   addItem: (product: Product) => void;
   removeItem: (productId: string) => void;
-  updateQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
 }
 
@@ -45,56 +38,30 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 const cartReducer = (state: CartState, action: CartAction): CartState => {
   switch (action.type) {
     case 'ADD_ITEM': {
-      const existingItem = state.items.find(item => item.product.id === action.payload.id);
+      // For digital products, don't allow duplicates
+      const existingItem = state.items.find(item => item.id === action.payload.id);
       
       if (existingItem) {
-        const updatedItems = state.items.map(item =>
-          item.product.id === action.payload.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
-        return {
-          ...state,
-          items: updatedItems,
-          total: updatedItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0),
-          itemCount: updatedItems.reduce((sum, item) => sum + item.quantity, 0)
-        };
-      } else {
-        const newItems = [...state.items, { product: action.payload, quantity: 1 }];
-        return {
-          ...state,
-          items: newItems,
-          total: newItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0),
-          itemCount: newItems.reduce((sum, item) => sum + item.quantity, 0)
-        };
+        // Product already in cart, don't add again
+        return state;
       }
-    }
-    
-    case 'REMOVE_ITEM': {
-      const updatedItems = state.items.filter(item => item.product.id !== action.payload);
+      
+      const newItems = [...state.items, action.payload];
       return {
         ...state,
-        items: updatedItems,
-        total: updatedItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0),
-        itemCount: updatedItems.reduce((sum, item) => sum + item.quantity, 0)
+        items: newItems,
+        total: newItems.reduce((sum, item) => sum + item.price, 0),
+        itemCount: newItems.length
       };
     }
     
-    case 'UPDATE_QUANTITY': {
-      if (action.payload.quantity <= 0) {
-        return cartReducer(state, { type: 'REMOVE_ITEM', payload: action.payload.productId });
-      }
-      
-      const updatedItems = state.items.map(item =>
-        item.product.id === action.payload.productId
-          ? { ...item, quantity: action.payload.quantity }
-          : item
-      );
+    case 'REMOVE_ITEM': {
+      const updatedItems = state.items.filter(item => item.id !== action.payload);
       return {
         ...state,
         items: updatedItems,
-        total: updatedItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0),
-        itemCount: updatedItems.reduce((sum, item) => sum + item.quantity, 0)
+        total: updatedItems.reduce((sum, item) => sum + item.price, 0),
+        itemCount: updatedItems.length
       };
     }
     
@@ -106,10 +73,14 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
       };
     
     case 'LOAD_CART':
+      // Handle both old format (with quantity) and new format (without)
+      const normalizedItems = action.payload.map((item: any) => 
+        item.product ? item.product : item
+      );
       return {
-        items: action.payload,
-        total: action.payload.reduce((sum, item) => sum + (item.product.price * item.quantity), 0),
-        itemCount: action.payload.reduce((sum, item) => sum + item.quantity, 0)
+        items: normalizedItems,
+        total: normalizedItems.reduce((sum: number, item: Product) => sum + item.price, 0),
+        itemCount: normalizedItems.length
       };
     
     default:
@@ -152,10 +123,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'REMOVE_ITEM', payload: productId });
   };
 
-  const updateQuantity = (productId: string, quantity: number) => {
-    dispatch({ type: 'UPDATE_QUANTITY', payload: { productId, quantity } });
-  };
-
   const clearCart = () => {
     dispatch({ type: 'CLEAR_CART' });
   };
@@ -165,7 +132,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
       state,
       addItem,
       removeItem,
-      updateQuantity,
       clearCart
     }}>
       {children}

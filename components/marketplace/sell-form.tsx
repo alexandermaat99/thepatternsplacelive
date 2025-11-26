@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { createClient } from '@/lib/supabase/client';
 import { StripeConnectButton } from '@/components/marketplace/stripe-connect-button';
 import { MultiImageUpload } from '@/components/marketplace/multi-image-upload';
+import { DigitalFileUpload } from '@/components/marketplace/digital-file-upload';
 import { ArrowLeft } from 'lucide-react';
 import type { UserProfile, StripeAccountStatus } from '@/lib/auth-helpers';
 import { DIFFICULTY_LEVELS } from '@/lib/constants';
@@ -32,6 +33,7 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
     category: '',
     difficulty: '' as string,
     images: [] as string[],
+    files: [] as string[],
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -54,6 +56,7 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
         difficulty: formData.difficulty || null,
         images: formData.images.length > 0 ? formData.images : [],
         image_url: formData.images[0] || null,
+        files: formData.files.length > 0 ? formData.files : [],
         user_id: user.id,
         is_active: true,
       });
@@ -137,16 +140,30 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
               </div>
 
               <div>
-                <Label htmlFor="details">Details (Optional)</Label>
+                <Label htmlFor="details">
+                  Details (Optional)
+                  <span className="text-muted-foreground text-sm font-normal ml-2">
+                    ({formData.details.length}/10000 characters)
+                  </span>
+                </Label>
                 <Textarea
                   id="details"
                   value={formData.details}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                    setFormData({ ...formData, details: e.target.value })
-                  }
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                    const value = e.target.value;
+                    if (value.length <= 10000) {
+                      setFormData({ ...formData, details: value });
+                    }
+                  }}
                   placeholder="Additional product details, specifications, or information"
                   rows={4}
+                  maxLength={10000}
                 />
+                {formData.details.length > 9000 && (
+                  <p className="text-sm text-orange-600 mt-1">
+                    Warning: Details is getting long ({formData.details.length} characters).
+                  </p>
+                )}
               </div>
 
               <div>
@@ -192,12 +209,22 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
               </div>
 
               {user && (
-                <MultiImageUpload
-                  value={formData.images}
-                  onChange={urls => setFormData({ ...formData, images: urls })}
-                  userId={user.id}
-                  maxImages={10}
-                />
+                <>
+                  <MultiImageUpload
+                    value={formData.images}
+                    onChange={urls => setFormData({ ...formData, images: urls })}
+                    userId={user.id}
+                    maxImages={10}
+                  />
+
+                  <DigitalFileUpload
+                    value={formData.files}
+                    onChange={paths => setFormData({ ...formData, files: paths })}
+                    userId={user.id}
+                    maxFiles={10}
+                    maxFileSizeMB={100}
+                  />
+                </>
               )}
 
               <Button type="submit" className="w-full" disabled={isLoading}>

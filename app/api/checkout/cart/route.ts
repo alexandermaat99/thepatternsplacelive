@@ -5,7 +5,7 @@ import { formatAmountForStripe } from '@/lib/stripe';
 
 export async function POST(request: NextRequest) {
   try {
-    const { items } = await request.json(); // items: [{ productId, quantity }]
+    const { items } = await request.json(); // items: [{ productId, quantity }] - quantity always 1 for digital products
     
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
@@ -49,9 +49,82 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get all unique seller IDs
+    const sellerIds = [...new Set(products.map((p: any) => p.user_id))];
+    
+    // Get seller profiles with Stripe account IDs
+    const { data: sellerProfiles, error: sellerError } = await supabase
+      .from('profiles')
+      .select('id, stripe_account_id')
+      .in('id', sellerIds);
+
+    if (sellerError || !sellerProfiles) {
+      return NextResponse.json(
+        { error: 'Error fetching seller information' },
+        { status: 500 }
+      );
+    }
+
+    // Create a map of seller ID to Stripe account ID
+    const sellerStripeMap = new Map(
+      sellerProfiles.map((p: any) => [p.id, p.stripe_account_id])
+    );
+
+    // Check that all products have sellers with connected Stripe accounts
+    const productsWithoutStripe = products.filter(
+      (p: any) => !sellerStripeMap.get(p.user_id)
+    );
+    if (productsWithoutStripe.length > 0) {
+      return NextResponse.json(
+        { error: 'Some sellers have not connected their Stripe accounts' },
+        { status: 400 }
+      );
+    }
+
+    // Verify all seller Stripe accounts are active
+    const stripe = getStripe();
+    const uniqueSellerAccounts = new Set(
+      products.map((p: any) => sellerStripeMap.get(p.user_id)).filter(Boolean)
+    );
+
+    // Check all seller accounts
+    for (const accountId of uniqueSellerAccounts) {
+      try {
+        const account = await stripe.accounts.retrieve(accountId);
+        if (!account.charges_enabled || !account.details_submitted) {
+          return NextResponse.json(
+            { error: 'One or more seller accounts are not fully set up' },
+            { status: 400 }
+          );
+        }
+      } catch (error) {
+        console.error('Error retrieving seller account:', error);
+        return NextResponse.json(
+          { error: 'Invalid seller Stripe account' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // For cart checkout with multiple sellers, we need to handle it differently
+    // Stripe Checkout doesn't support per-line-item transfers, so we have two options:
+    // 1. Only allow single-seller carts (simpler)
+    // 2. Create separate checkout sessions per seller (more complex)
+    // For now, we'll allow multi-seller carts but transfer to the first seller
+    // In production, you might want to split into multiple sessions or use Payment Intents
+    
+    const sellerAccountIds = Array.from(uniqueSellerAccounts);
+    const primarySellerAccountId = sellerAccountIds[0];
+    
+    // If multiple sellers, warn but proceed with first seller
+    // TODO: Consider splitting into multiple checkout sessions for better UX
+    if (sellerAccountIds.length > 1) {
+      console.warn(`Cart contains products from ${sellerAccountIds.length} different sellers. Using first seller for transfer.`);
+    }
+
     // Build line items for Stripe
     const lineItems = items.map((item: { productId: string; quantity: number }) => {
-      const product = products.find(p => p.id === item.productId);
+      const product = products.find((p: any) => p.id === item.productId);
       if (!product) {
         throw new Error(`Product ${item.productId} not found`);
       }
@@ -70,12 +143,30 @@ export async function POST(request: NextRequest) {
       };
     });
 
-    // Create Stripe checkout session
-    const stripe = getStripe();
+    // Calculate total amount for platform fee (optional)
+    const totalAmount = items.reduce((sum, item) => {
+      const product = products.find((p: any) => p.id === item.productId);
+      return sum + (product?.price || 0) * item.quantity;
+    }, 0);
+    
+    // Platform fee (optional - set to 0 or a percentage)
+    const platformFeeAmount = 0; // Change this to your desired platform fee
+
+    // Create Stripe checkout session with Connect transfer
+    // Note: For multi-seller carts, consider splitting into separate sessions
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: lineItems,
       mode: 'payment',
+      payment_intent_data: {
+        // Transfer payment to primary seller's Stripe Connect account
+        // For multi-seller carts, you may want to handle transfers in webhook
+        transfer_data: {
+          destination: primarySellerAccountId,
+        },
+        // Optional: Add platform fee
+        // application_fee_amount: platformFeeAmount,
+      },
       success_url: `${request.nextUrl.origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${request.nextUrl.origin}/cart`,
       customer_email: user.email || undefined,
@@ -87,6 +178,9 @@ export async function POST(request: NextRequest) {
           productId: item.productId,
           quantity: item.quantity,
         }))),
+        // Store seller account IDs for webhook processing
+        sellerAccountIds: JSON.stringify(sellerAccountIds),
+        primarySellerAccountId: primarySellerAccountId,
       },
     });
 

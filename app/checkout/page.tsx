@@ -34,10 +34,10 @@ export default function CheckoutPage() {
     setIsProcessing(true);
     
     try {
-      // Prepare cart items for checkout
+      // Prepare cart items for checkout (digital products, quantity always 1)
       const cartItems = state.items.map(item => ({
-        productId: item.product.id,
-        quantity: item.quantity,
+        productId: item.id,
+        quantity: 1,
       }));
 
       // Create Stripe checkout session
@@ -104,13 +104,12 @@ export default function CheckoutPage() {
               <CardContent className="space-y-4">
                 <div className="space-y-3">
                   {state.items.map((item) => (
-                    <div key={item.product.id} className="flex justify-between items-center">
+                    <div key={item.id} className="flex justify-between items-center">
                       <div>
-                        <p className="font-medium">{item.product.title}</p>
-                        <p className="text-sm text-muted-foreground">Qty: {item.quantity}</p>
+                        <p className="font-medium">{item.title}</p>
                       </div>
                       <p className="font-medium">
-                        {formatAmountForDisplay(item.product.price * item.quantity, 'USD')}
+                        {formatAmountForDisplay(item.price, item.currency)}
                       </p>
                     </div>
                   ))}
@@ -164,6 +163,5 @@ export default function CheckoutPage() {
           </div>
         </div>
       </div>
-    </div>
   );
 }

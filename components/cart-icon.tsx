@@ -20,9 +20,9 @@ export function CartIcon() {
         <ShoppingCart className="h-4 w-4" />
         </Link>
       </Button>
-        {state.itemCount > 0 && (
+        {state.items.length > 0 && (
         <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-semibold rounded-full h-4 w-4 min-w-[1rem] flex items-center justify-center leading-none border-2 border-background shadow-sm pointer-events-none">
-            {state.itemCount > 99 ? '99+' : state.itemCount}
+            {state.items.length > 99 ? '99+' : state.items.length}
           </span>
         )}
     </div>
