@@ -11,6 +11,8 @@ import { getDifficultyLabel, getDifficultyVariant } from '@/lib/constants';
 import { Heart } from 'lucide-react';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useToast } from '@/contexts/toast-context';
+import { useAuth } from '@/contexts/auth-context';
+import { AuthPromptDialog } from '@/components/auth-prompt-dialog';
 
 interface Product {
   id: string;
@@ -30,13 +32,16 @@ interface Product {
 
 interface ProductCardProps {
   product: Product;
+  hideFavorite?: boolean;
 }
 
-export function ProductCard({ product }: ProductCardProps) {
+export function ProductCard({ product, hideFavorite = false }: ProductCardProps) {
   const { isFavorite, toggleFavorite } = useFavorites();
   const { showToast } = useToast();
+  const { user } = useAuth();
   const [isHovered, setIsHovered] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
+  const [showAuthDialog, setShowAuthDialog] = useState(false);
   
   // Get the first image from images array or fallback to image_url
   const getImageUrl = () => {
@@ -54,6 +59,12 @@ export function ProductCard({ product }: ProductCardProps) {
     e.stopPropagation();
     
     if (isToggling) return;
+    
+    // Check if user is authenticated
+    if (!user) {
+      setShowAuthDialog(true);
+      return;
+    }
     
     setIsToggling(true);
     const wasFavorite = favorited;
@@ -97,20 +108,22 @@ export function ProductCard({ product }: ProductCardProps) {
           </div>
           
           {/* Favorite heart button - appears on hover, always visible if favorited */}
-          <button
-            onClick={handleFavoriteClick}
-            className={`absolute top-2 right-2 p-2 rounded-full bg-background/90 backdrop-blur-sm shadow-lg border border-border/50 transition-all duration-200 z-10 ${
-              isHovered || favorited ? 'opacity-100 scale-100' : 'opacity-0 scale-95 md:opacity-0'
-            } ${isToggling ? 'pointer-events-none opacity-50' : 'hover:scale-110 active:scale-95'} ${
-              favorited ? 'text-red-500 opacity-100' : 'text-muted-foreground hover:text-red-500'
-            }`}
-            aria-label={favorited ? 'Remove from favorites' : 'Add to favorites'}
-            type="button"
-          >
-            <Heart 
-              className={`h-5 w-5 transition-all ${favorited ? 'fill-current' : ''}`}
-            />
-          </button>
+          {!hideFavorite && (
+            <button
+              onClick={handleFavoriteClick}
+              className={`absolute top-2 right-2 p-2 rounded-full bg-background/90 backdrop-blur-sm shadow-lg border border-border/50 transition-all duration-200 z-10 ${
+                isHovered || favorited ? 'opacity-100 scale-100' : 'opacity-0 scale-95 md:opacity-0'
+              } ${isToggling ? 'pointer-events-none opacity-50' : 'hover:scale-110 active:scale-95'} ${
+                favorited ? 'text-red-500 opacity-100' : 'text-muted-foreground hover:text-red-500'
+              }`}
+              aria-label={favorited ? 'Remove from favorites' : 'Add to favorites'}
+              type="button"
+            >
+              <Heart 
+                className={`h-5 w-5 transition-all ${favorited ? 'fill-current' : ''}`}
+              />
+            </button>
+          )}
         </div>
         
         <CardHeader className="p-4">
@@ -131,6 +144,11 @@ export function ProductCard({ product }: ProductCardProps) {
           )}
         </CardHeader>
       </Link>
+      
+      <AuthPromptDialog 
+        isOpen={showAuthDialog} 
+        onClose={() => setShowAuthDialog(false)} 
+      />
     </Card>
   );
 } 

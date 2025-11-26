@@ -81,11 +81,11 @@ export default async function FavoritesPage() {
   const validProducts = products?.filter(p => favoriteProductIds.includes(p.id)) || [];
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-6xl">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">My Favorites</h1>
+    <div className="container mx-auto px-4 py-8 max-w-7xl">
+      <div className="mb-10">
+        <h1 className="text-3xl sm:text-4xl font-bold mb-2">My Favorites</h1>
         <p className="text-muted-foreground">
-          {validProducts.length} {validProducts.length === 1 ? 'product' : 'products'} saved
+          {validProducts.length} {validProducts.length === 1 ? 'pattern' : 'patterns'} saved for later
         </p>
       </div>
 
@@ -98,16 +98,16 @@ export default async function FavoritesPage() {
       ) : (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
-            <Heart className="h-16 w-16 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium text-muted-foreground mb-2">
-              No active favorites
+            <Heart className="h-16 w-16 text-muted-foreground mb-4 opacity-50" />
+            <h3 className="text-xl font-semibold mb-3">
+              No favorites yet
             </h3>
-            <p className="text-sm text-muted-foreground mb-6 text-center max-w-md">
-              Some of your favorited products may have been removed or are no longer available.
+            <p className="text-muted-foreground mb-6 text-center max-w-md">
+              Start exploring the marketplace and heart patterns you love! They'll show up here for easy access.
             </p>
             <Link href="/marketplace">
               <Button>
-                Browse Marketplace
+                Explore Marketplace
               </Button>
             </Link>
           </CardContent>

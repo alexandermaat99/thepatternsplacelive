@@ -104,7 +104,7 @@ export default async function MyProductsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {activeProducts.map((product) => (
                 <div key={product.id} className="relative">
-                  <ProductCard product={product} />
+                  <ProductCard product={product} hideFavorite={true} />
                   <ProductActions product={product} />
                 </div>
               ))}
@@ -122,7 +122,7 @@ export default async function MyProductsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {inactiveProducts.map((product) => (
                 <div key={product.id} className="relative opacity-60">
-                  <ProductCard product={product} />
+                  <ProductCard product={product} hideFavorite={true} />
                   <ProductActions product={product} />
                 </div>
               ))}

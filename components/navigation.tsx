@@ -21,8 +21,8 @@ export function Navigation({ showMarketplaceLinks = false }: NavigationProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
-    <nav className="w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
-      <div className="container mx-auto px-4 sm:px-6 h-14">
+    <nav className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
+      <div className="container max-w-screen-xl mx-auto px-4 sm:px-6 h-14">
         <div className="grid grid-cols-3 h-full items-center">
           {/* Left: Hamburger + Marketplace links */}
           <div className="flex items-center gap-2 justify-start">

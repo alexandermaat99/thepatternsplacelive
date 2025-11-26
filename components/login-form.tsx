@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
+import { X } from "lucide-react";
 
 export function LoginForm({
   className,
@@ -29,6 +30,8 @@ export function LoginForm({
   
   // Get the redirect URL from query params, or fallback to referrer
   const redirectUrlFromParams = searchParams.get("redirect");
+  // Get action parameter (e.g., "heart" for favorite action)
+  const action = searchParams.get("action");
   
   // Get referrer from browser (for when user navigates from public pages)
   const [referrerUrl, setReferrerUrl] = useState<string | null>(null);
@@ -134,14 +137,48 @@ export function LoginForm({
     }
   };
 
+  const handleBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push('/');
+    }
+  };
+
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl">Login</CardTitle>
-          <CardDescription>
-            Enter your email below to login to your account
-          </CardDescription>
+      <Card className="relative">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
+          onClick={handleBack}
+          aria-label="Close"
+        >
+          <X className="h-4 w-4" />
+          <span className="sr-only">Close</span>
+        </Button>
+        <CardHeader className="space-y-4">
+          <div className="flex justify-center">
+            <img
+              src="/logos/back_logo.svg"
+              alt="The Patterns Place"
+              className="h-10 w-auto"
+            />
+          </div>
+          <div className="space-y-2 text-center">
+            <CardTitle className="text-2xl">Welcome back!</CardTitle>
+            {action === "heart" ? (
+              <CardDescription>
+                Yay! You found something you like. Sign in so you can keep track of your favorite patterns!
+              </CardDescription>
+            ) : (
+              <CardDescription>
+                Enter your email below to sign in to your account
+              </CardDescription>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin}>
@@ -151,7 +188,7 @@ export function LoginForm({
                 <Input
                   id="email"
                   type="email"
-                  placeholder="m@example.com"
+                  placeholder="name@example.com"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -170,6 +207,7 @@ export function LoginForm({
                 <Input
                   id="password"
                   type="password"
+                  placeholder="Enter your password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -183,7 +221,9 @@ export function LoginForm({
             <div className="mt-4 text-center text-sm">
               Don&apos;t have an account?{" "}
               <Link
-                href="/auth/sign-up"
+                href={action === "heart" 
+                  ? `/auth/sign-up?action=heart&redirect=${encodeURIComponent(redirectUrl || (typeof window !== 'undefined' ? window.location.pathname : '/'))}`
+                  : "/auth/sign-up"}
                 className="underline underline-offset-4"
               >
                 Sign up
