@@ -25,7 +25,8 @@ interface Product {
   category: string;
   difficulty?: string | null;
   profiles?: {
-    full_name: string;
+    full_name?: string;
+    username?: string;
     avatar_url?: string;
   };
 }
@@ -139,7 +140,11 @@ export function ProductCard({ product, hideFavorite = false }: ProductCardProps)
           </div>
           {product.profiles && (
             <p className="text-sm text-muted-foreground mt-1">
-              by {product.profiles.full_name}
+              {product.profiles.username ? (
+                <>@{product.profiles.username}</>
+              ) : (
+                <>by {product.profiles.full_name || 'Unknown'}</>
+              )}
             </p>
           )}
         </CardHeader>

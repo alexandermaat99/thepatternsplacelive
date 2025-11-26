@@ -18,6 +18,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
       *,
       profiles:user_id (
         full_name,
+        username,
         avatar_url
       )
     `)

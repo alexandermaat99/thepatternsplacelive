@@ -14,6 +14,7 @@ export default async function MarketplacePage() {
       *,
       profiles:user_id (
         full_name,
+        username,
         avatar_url
       )
     `)

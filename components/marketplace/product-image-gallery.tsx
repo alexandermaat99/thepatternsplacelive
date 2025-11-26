@@ -45,15 +45,17 @@ export function ProductImageGallery({ images, title }: ProductImageGalleryProps)
     <>
       <div className="space-y-4">
         {/* Main Image */}
-        <div className="relative aspect-square overflow-hidden rounded-lg group">
+        <div className="relative w-full rounded-lg group flex items-center justify-center bg-muted/30">
           <Image
             src={currentImage}
             alt={title}
-            fill
-            className="object-cover cursor-pointer"
+            width={800}
+            height={800}
+            className="object-contain w-full h-auto max-w-full cursor-pointer rounded-lg"
             onClick={openFullscreen}
             sizes="(max-width: 768px) 100vw, 50vw"
             priority={selectedIndex === 0}
+            style={{ maxHeight: 'none' }}
           />
           
           {hasMultiple && (

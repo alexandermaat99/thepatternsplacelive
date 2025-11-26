@@ -24,7 +24,8 @@ interface Product {
   difficulty?: string | null;
   user_id: string;
   profiles?: {
-    full_name: string;
+    full_name?: string;
+    username?: string;
     avatar_url?: string;
   };
 }
@@ -41,7 +42,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
 
   const handleAddToCart = () => {
     setIsLoading(true);
-    
+
     try {
       addItem(product);
       // Show success feedback
@@ -57,11 +58,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-6">
-        <Button 
-          variant="ghost" 
-          onClick={() => router.back()}
-          className="flex items-center gap-2"
-        >
+        <Button variant="ghost" onClick={() => router.back()} className="flex items-center gap-2">
           <ArrowLeft className="h-4 w-4" />
           Back
         </Button>
@@ -73,8 +70,8 @@ export function ProductDetail({ product }: ProductDetailProps) {
             product.images && Array.isArray(product.images) && product.images.length > 0
               ? product.images
               : product.image_url
-              ? [product.image_url]
-              : []
+                ? [product.image_url]
+                : []
           }
           title={product.title}
         />
@@ -82,7 +79,20 @@ export function ProductDetail({ product }: ProductDetailProps) {
         {/* Product Info */}
         <div className="space-y-6">
           <div>
-            <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <p className="text-3xl font-bold text-primary">
+              {formatAmountForDisplay(product.price, product.currency)}
+            </p>
+            <h1 className="text-2xl ">{product.title}</h1>
+            {product.profiles && (
+              <p className="text-muted-foreground">
+                {product.profiles.username ? (
+                  <>@{product.profiles.username}</>
+                ) : (
+                  <>Sold by {product.profiles.full_name || 'Unknown'}</>
+                )}
+              </p>
+            )}
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
               <Badge variant="secondary">{product.category}</Badge>
               {product.difficulty && (
                 <Badge variant={getDifficultyVariant(product.difficulty)}>
@@ -90,18 +100,19 @@ export function ProductDetail({ product }: ProductDetailProps) {
                 </Badge>
               )}
             </div>
-            <h1 className="text-3xl font-bold">{product.title}</h1>
-            {product.profiles && (
-              <p className="text-muted-foreground mt-2">
-                Sold by {product.profiles.full_name}
-              </p>
-            )}
           </div>
 
           <div>
-            <p className="text-3xl font-bold text-primary">
-              {formatAmountForDisplay(product.price, product.currency)}
-            </p>
+            <Button onClick={handleAddToCart} className="w-full" size="lg" disabled={isLoading}>
+              {isLoading ? (
+                'Adding...'
+              ) : (
+                <>
+                  <ShoppingCart className="h-4 w-4 mr-2" />
+                  Add to Cart
+                </>
+              )}
+            </Button>
           </div>
 
           <div>
@@ -112,22 +123,8 @@ export function ProductDetail({ product }: ProductDetailProps) {
               ))}
             </div>
           </div>
-
-          <Button 
-            onClick={handleAddToCart} 
-            className="w-full" 
-            size="lg"
-            disabled={isLoading}
-          >
-            {isLoading ? 'Adding...' : (
-              <>
-                <ShoppingCart className="h-4 w-4 mr-2" />
-                Add to Cart
-              </>
-            )}
-          </Button>
         </div>
       </div>
     </div>
   );
-} 
+}

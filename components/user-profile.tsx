@@ -11,6 +11,7 @@ import { CheckCircle, XCircle, ExternalLink, User, CreditCard } from 'lucide-rea
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { UserProfile as UserProfileType, StripeAccountStatus } from '@/lib/auth-helpers';
+import { UsernameEditor } from '@/components/username-editor';
 
 interface UserProfileProps {
   // Optional props from server component - if provided, use these instead of useAuth
@@ -93,6 +94,40 @@ export function UserProfile({ serverUser, serverProfile, serverStripeStatus }: U
     window.location.href = '/';
   };
 
+  const handleUsernameUpdate = async (newUsername: string) => {
+    const response = await fetch('/api/profile/username', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: newUsername }),
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Failed to update username');
+    }
+
+    // Wait for database to be ready
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    // Refresh profile and get the updated profile
+    const updatedProfile = await refreshProfile();
+
+    if (updatedProfile) {
+      // Update local state immediately
+      setCurrentProfile(updatedProfile);
+      
+      // Verify the username was updated correctly
+      if (updatedProfile.username?.toLowerCase() !== newUsername.toLowerCase()) {
+        // If not matching, try one more refresh
+        await new Promise(resolve => setTimeout(resolve, 300));
+        const retryProfile = await refreshProfile();
+        if (retryProfile) {
+          setCurrentProfile(retryProfile);
+        }
+      }
+    }
+  };
+
   if (loading) {
     return (
       <Card>
@@ -150,30 +185,37 @@ export function UserProfile({ serverUser, serverProfile, serverStripeStatus }: U
             </div>
           )}
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <span className="text-sm font-medium">Name:</span>
-              <p className="text-sm text-muted-foreground">
-                {currentProfile?.full_name || 'Not set'}
-              </p>
-            </div>
-            <div>
-              <span className="text-sm font-medium">Email:</span>
-              <p className="text-sm text-muted-foreground">
-                {user?.email}
-              </p>
-            </div>
-            <div>
-              <span className="text-sm font-medium">User ID:</span>
-              <p className="text-sm text-muted-foreground font-mono">
-                {user?.id}
-              </p>
-            </div>
-            <div>
-              <span className="text-sm font-medium">Member Since:</span>
-              <p className="text-sm text-muted-foreground">
-                {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'Unknown'}
-              </p>
+          <div className="space-y-4">
+            <UsernameEditor
+              currentUsername={currentProfile?.username || profile?.username}
+              onUpdate={handleUsernameUpdate}
+            />
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <span className="text-sm font-medium">Name:</span>
+                <p className="text-sm text-muted-foreground">
+                  {currentProfile?.full_name || 'Not set'}
+                </p>
+              </div>
+              <div>
+                <span className="text-sm font-medium">Email:</span>
+                <p className="text-sm text-muted-foreground">
+                  {user?.email}
+                </p>
+              </div>
+              <div>
+                <span className="text-sm font-medium">User ID:</span>
+                <p className="text-sm text-muted-foreground font-mono">
+                  {user?.id}
+                </p>
+              </div>
+              <div>
+                <span className="text-sm font-medium">Member Since:</span>
+                <p className="text-sm text-muted-foreground">
+                  {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'Unknown'}
+                </p>
+              </div>
             </div>
           </div>
           
