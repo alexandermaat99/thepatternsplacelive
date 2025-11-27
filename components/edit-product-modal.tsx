@@ -15,6 +15,7 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { MultiImageUpload } from '@/components/marketplace/multi-image-upload';
 import { DigitalFileUpload } from '@/components/marketplace/digital-file-upload';
+import { CategoryInput, linkCategoriesToProduct } from '@/components/marketplace/category-input';
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import { DIFFICULTY_LEVELS } from '@/lib/constants';
@@ -70,18 +71,60 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
         ? (product as any).files 
         : [];
 
-      setFormData({
-        title: product.title,
-        description: product.description,
-        details: (product as any).details || '',
-        price: product.price.toString(),
-        category: product.category,
-        difficulty: product.difficulty || '',
-        images,
-        image_url: product.image_url || '',
-        files,
-        is_active: product.is_active,
-      });
+      // Load existing categories for this product
+      const loadCategories = async () => {
+        try {
+          const supabase = createClient();
+          const { data: productCategories } = await supabase
+            .from('product_categories')
+            .select(`
+              category:categories(*)
+            `)
+            .eq('product_id', product.id);
+
+          let categoryString = product.category || ''; // Fallback to old category field
+          
+          if (productCategories && productCategories.length > 0) {
+            const categoryNames = productCategories
+              .map((pc: any) => pc.category?.name)
+              .filter((name: string) => name)
+              .join(', ');
+            if (categoryNames) {
+              categoryString = categoryNames;
+            }
+          }
+
+          setFormData({
+            title: product.title,
+            description: product.description,
+            details: (product as any).details || '',
+            price: product.price.toString(),
+            category: categoryString,
+            difficulty: product.difficulty || '',
+            images,
+            image_url: product.image_url || '',
+            files,
+            is_active: product.is_active,
+          });
+        } catch (error) {
+          console.error('Error loading categories:', error);
+          // Fallback to old category field
+          setFormData({
+            title: product.title,
+            description: product.description,
+            details: (product as any).details || '',
+            price: product.price.toString(),
+            category: product.category,
+            difficulty: product.difficulty || '',
+            images,
+            image_url: product.image_url || '',
+            files,
+            is_active: product.is_active,
+          });
+        }
+      };
+
+      loadCategories();
     }
   }, [product]);
 
@@ -287,6 +330,19 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
 
       console.log('All updates successful');
 
+      // Link categories to the product (comma-separated input)
+      if (formData.category) {
+        try {
+          await linkCategoriesToProduct(product.id, formData.category);
+          console.log('Categories linked successfully');
+        } catch (categoryError) {
+          console.error('Error linking categories:', categoryError);
+          const errorMessage = categoryError instanceof Error ? categoryError.message : 'Unknown error';
+          alert(`Product updated successfully, but there was an issue linking categories: ${errorMessage}. Please check the console for details.`);
+          // Don't fail the whole operation if category linking fails
+        }
+      }
+
       // Success - close modal first, then refresh
       setIsLoading(false);
       onClose();
@@ -449,16 +505,10 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
               />
             </div>
 
-            <div>
-              <Label htmlFor="category">Category</Label>
-              <Input
-                id="category"
-                value={formData.category}
-                onChange={e => setFormData({ ...formData, category: e.target.value })}
-                required
-                placeholder="e.g., Electronics, Clothing, Books"
-              />
-            </div>
+            <CategoryInput
+              value={formData.category}
+              onChange={(value) => setFormData({ ...formData, category: value })}
+            />
 
             <div>
               <Label htmlFor="difficulty">Difficulty Level</Label>

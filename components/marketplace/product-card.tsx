@@ -15,6 +15,12 @@ import { useToast } from '@/contexts/toast-context';
 import { useAuth } from '@/contexts/auth-context';
 import { AuthPromptDialog } from '@/components/auth-prompt-dialog';
 
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 interface Product {
   id: string;
   title: string;
@@ -23,13 +29,16 @@ interface Product {
   currency: string;
   image_url?: string;
   images?: string[];
-  category: string;
+  category: string; // Keep for backward compatibility
   difficulty?: string | null;
   profiles?: {
     full_name?: string;
     username?: string;
     avatar_url?: string;
   };
+  product_categories?: Array<{
+    category: Category;
+  }>;
 }
 
 interface ProductCardProps {

@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/client';
 import { StripeConnectButton } from '@/components/marketplace/stripe-connect-button';
 import { MultiImageUpload } from '@/components/marketplace/multi-image-upload';
 import { DigitalFileUpload } from '@/components/marketplace/digital-file-upload';
+import { CategoryInput, linkCategoriesToProduct } from '@/components/marketplace/category-input';
 import { ArrowLeft } from 'lucide-react';
 import type { UserProfile, StripeAccountStatus } from '@/lib/auth-helpers';
 import { DIFFICULTY_LEVELS } from '@/lib/constants';
@@ -46,22 +47,39 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
       }
 
       const supabase = createClient();
-      const { error } = await supabase.from('products').insert({
-        title: formData.title,
-        description: formData.description,
-        details: formData.details || null,
-        price: parseFloat(formData.price),
-        currency: 'USD',
-        category: formData.category,
-        difficulty: formData.difficulty || null,
-        images: formData.images.length > 0 ? formData.images : [],
-        image_url: formData.images[0] || null,
-        files: formData.files.length > 0 ? formData.files : [],
-        user_id: user.id,
-        is_active: true,
-      });
+      const { data: product, error } = await supabase
+        .from('products')
+        .insert({
+          title: formData.title,
+          description: formData.description,
+          details: formData.details || null,
+          price: parseFloat(formData.price),
+          currency: 'USD',
+          category: formData.category, // Keep for backward compatibility
+          difficulty: formData.difficulty || null,
+          images: formData.images.length > 0 ? formData.images : [],
+          image_url: formData.images[0] || null,
+          files: formData.files.length > 0 ? formData.files : [],
+          user_id: user.id,
+          is_active: true,
+        })
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Link categories to the product (comma-separated input)
+      if (formData.category && product) {
+        try {
+          await linkCategoriesToProduct(product.id, formData.category);
+          console.log('Categories linked successfully');
+        } catch (categoryError) {
+          console.error('Error linking categories:', categoryError);
+          const errorMessage = categoryError instanceof Error ? categoryError.message : 'Unknown error';
+          alert(`Product created successfully, but there was an issue linking categories: ${errorMessage}. You can edit the product to add categories later.`);
+          // Don't fail the whole operation if category linking fails
+        }
+      }
 
       router.push('/marketplace');
     } catch (error) {
@@ -180,16 +198,10 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                 />
               </div>
 
-              <div>
-                <Label htmlFor="category">Category</Label>
-                <Input
-                  id="category"
-                  value={formData.category}
-                  onChange={e => setFormData({ ...formData, category: e.target.value })}
-                  required
-                  placeholder="e.g., Electronics, Clothing, Books"
-                />
-              </div>
+              <CategoryInput
+                value={formData.category}
+                onChange={(value) => setFormData({ ...formData, category: value })}
+              />
 
               <div>
                 <Label htmlFor="difficulty">Difficulty Level</Label>

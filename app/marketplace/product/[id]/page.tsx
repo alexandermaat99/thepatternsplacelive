@@ -21,6 +21,13 @@ export default async function ProductPage({ params }: ProductPageProps) {
         full_name,
         username,
         avatar_url
+      ),
+      product_categories (
+        category:categories (
+          id,
+          name,
+          slug
+        )
       )
     `
     )

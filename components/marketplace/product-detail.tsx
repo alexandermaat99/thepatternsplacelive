@@ -17,6 +17,12 @@ import { linkifyText } from '@/lib/text-utils';
 import { getDifficultyLabel, getDifficultyVariant } from '@/lib/constants';
 import { ProductFilesDownload } from '@/components/marketplace/product-files-download';
 
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 interface Product {
   id: string;
   title: string;
@@ -27,7 +33,7 @@ interface Product {
   image_url?: string;
   images?: string[];
   files?: string[];
-  category: string;
+  category: string; // Keep for backward compatibility
   difficulty?: string | null;
   user_id: string;
   profiles?: {
@@ -35,6 +41,9 @@ interface Product {
     username?: string;
     avatar_url?: string;
   };
+  product_categories?: Array<{
+    category: Category;
+  }>;
 }
 
 interface ProductDetailProps {
@@ -155,7 +164,26 @@ export function ProductDetail({ product }: ProductDetailProps) {
               </button>
             </div>
             <div className="flex items-center gap-2 mt-2 flex-wrap">
-              <Badge variant="secondary">{product.category}</Badge>
+              {/* Display categories from product_categories if available, otherwise fallback to old category field */}
+              {product.product_categories && product.product_categories.length > 0 ? (
+                product.product_categories.map((pc) => (
+                  <Badge key={pc.category.id} variant="secondary">
+                    {pc.category.name}
+                  </Badge>
+                ))
+              ) : (
+                product.category && (
+                  // Fallback: parse comma-separated categories from old category field
+                  product.category.split(',').map((cat, index) => {
+                    const trimmedCat = cat.trim();
+                    return trimmedCat ? (
+                      <Badge key={`${trimmedCat}-${index}`} variant="secondary">
+                        {trimmedCat}
+                      </Badge>
+                    ) : null;
+                  })
+                )
+              )}
               {product.difficulty && (
                 <Badge variant={getDifficultyVariant(product.difficulty)}>
                   {getDifficultyLabel(product.difficulty)}
