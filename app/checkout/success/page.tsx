@@ -54,7 +54,6 @@ export default function CheckoutSuccessPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
     </div>
   );
 }
