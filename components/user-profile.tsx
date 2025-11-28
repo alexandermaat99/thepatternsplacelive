@@ -20,10 +20,14 @@ interface UserProfileProps {
   serverStripeStatus?: StripeAccountStatus;
 }
 
-export function UserProfile({ serverUser, serverProfile, serverStripeStatus }: UserProfileProps = {}) {
+export function UserProfile({
+  serverUser,
+  serverProfile,
+  serverStripeStatus,
+}: UserProfileProps = {}) {
   const router = useRouter();
   const authHook = useAuth();
-  
+
   // Use server props if available, otherwise fall back to useAuth hook
   const user = serverUser || authHook.user;
   const profile = serverProfile !== undefined ? serverProfile : authHook.profile;
@@ -34,41 +38,46 @@ export function UserProfile({ serverUser, serverProfile, serverStripeStatus }: U
   const refreshStripeStatus = authHook.refreshStripeStatus;
   const refreshProfile = authHook.refreshProfile;
   const signOut = authHook.signOut;
-  
+
   const [currentProfile, setCurrentProfile] = useState(profile);
-  
+
   // Update local profile state when profile changes
   useEffect(() => {
     setCurrentProfile(profile);
   }, [profile]);
-  
+
   const handleAvatarUpload = async (avatarUrl: string | null) => {
     console.log('[AVATAR DEBUG] handleAvatarUpload called with URL:', avatarUrl);
     console.log('[AVATAR DEBUG] Current profile before refresh:', profile);
     console.log('[AVATAR DEBUG] Current profile avatar_url:', profile?.avatar_url);
-    
+
     if (!avatarUrl) {
       // Photo was removed
       await refreshProfile();
       return;
     }
-    
+
     // Wait for database to be ready
     await new Promise(resolve => setTimeout(resolve, 1000));
-    
+
     // Refresh profile and get the updated profile
     console.log('[AVATAR DEBUG] Calling refreshProfile...');
     const updatedProfile = await refreshProfile();
-    
+
     if (updatedProfile) {
       console.log('[AVATAR DEBUG] Updated profile received:', updatedProfile);
       console.log('[AVATAR DEBUG] Updated avatar_url:', updatedProfile.avatar_url);
       console.log('[AVATAR DEBUG] Expected avatar_url:', avatarUrl);
       console.log('[AVATAR DEBUG] URLs match?', updatedProfile.avatar_url === avatarUrl);
-      
+
       // Check if the URL matches
       if (updatedProfile.avatar_url !== avatarUrl) {
-        console.error('[AVATAR DEBUG] URLs don\'t match! DB has:', updatedProfile.avatar_url, 'Expected:', avatarUrl);
+        console.error(
+          "[AVATAR DEBUG] URLs don't match! DB has:",
+          updatedProfile.avatar_url,
+          'Expected:',
+          avatarUrl
+        );
         // Try one more refresh
         await new Promise(resolve => setTimeout(resolve, 500));
         const retryProfile = await refreshProfile();
@@ -84,9 +93,13 @@ export function UserProfile({ serverUser, serverProfile, serverStripeStatus }: U
       setTimeout(() => window.location.reload(), 500);
     }
   };
-  
-  const userInitials = currentProfile?.full_name 
-    ? currentProfile.full_name.split(' ').map(n => n[0]).join('').toUpperCase()
+
+  const userInitials = currentProfile?.full_name
+    ? currentProfile.full_name
+        .split(' ')
+        .map(n => n[0])
+        .join('')
+        .toUpperCase()
     : user?.email?.charAt(0).toUpperCase() || 'U';
 
   const handleSignOut = async () => {
@@ -115,7 +128,7 @@ export function UserProfile({ serverUser, serverProfile, serverStripeStatus }: U
     if (updatedProfile) {
       // Update local state immediately
       setCurrentProfile(updatedProfile);
-      
+
       // Verify the username was updated correctly
       if (updatedProfile.username?.toLowerCase() !== newUsername.toLowerCase()) {
         // If not matching, try one more refresh
@@ -151,9 +164,7 @@ export function UserProfile({ serverUser, serverProfile, serverStripeStatus }: U
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground mb-4">
-            Please log in to view your profile.
-          </p>
+          <p className="text-muted-foreground mb-4">Please log in to view your profile.</p>
           <Link href="/auth/login">
             <Button>Log In</Button>
           </Link>
@@ -184,13 +195,13 @@ export function UserProfile({ serverUser, serverProfile, serverStripeStatus }: U
               />
             </div>
           )}
-          
+
           <div className="space-y-4">
             <UsernameEditor
-              currentUsername={currentProfile?.username || profile?.username}
+              currentUsername={currentProfile?.username || profile?.username || null}
               onUpdate={handleUsernameUpdate}
             />
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <span className="text-sm font-medium">Name:</span>
@@ -200,15 +211,11 @@ export function UserProfile({ serverUser, serverProfile, serverStripeStatus }: U
               </div>
               <div>
                 <span className="text-sm font-medium">Email:</span>
-                <p className="text-sm text-muted-foreground">
-                  {user?.email}
-                </p>
+                <p className="text-sm text-muted-foreground">{user?.email}</p>
               </div>
               <div>
                 <span className="text-sm font-medium">User ID:</span>
-                <p className="text-sm text-muted-foreground font-mono">
-                  {user?.id}
-                </p>
+                <p className="text-sm text-muted-foreground font-mono">{user?.id}</p>
               </div>
               <div>
                 <span className="text-sm font-medium">Member Since:</span>
@@ -218,7 +225,7 @@ export function UserProfile({ serverUser, serverProfile, serverStripeStatus }: U
               </div>
             </div>
           </div>
-          
+
           <div className="pt-4 border-t">
             <Button variant="outline" onClick={handleSignOut}>
               Sign Out
@@ -243,17 +250,15 @@ export function UserProfile({ serverUser, serverProfile, serverStripeStatus }: U
         <CardContent className="space-y-4">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium">Status:</span>
-            <Badge variant={stripeStatus?.isOnboarded ? "default" : "destructive"}>
-              {stripeStatus?.isOnboarded ? "Connected & Ready" : "Not Connected"}
+            <Badge variant={stripeStatus?.isOnboarded ? 'default' : 'destructive'}>
+              {stripeStatus?.isOnboarded ? 'Connected & Ready' : 'Not Connected'}
             </Badge>
           </div>
-          
+
           {profile?.stripe_account_id && (
             <div>
               <span className="text-sm font-medium">Stripe Account ID:</span>
-              <p className="text-sm text-muted-foreground font-mono">
-                {profile.stripe_account_id}
-              </p>
+              <p className="text-sm text-muted-foreground font-mono">{profile.stripe_account_id}</p>
             </div>
           )}
 
@@ -266,18 +271,12 @@ export function UserProfile({ serverUser, serverProfile, serverStripeStatus }: U
 
           {profile?.stripe_account_id && (
             <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={refreshStripeStatus}
-              >
+              <Button variant="outline" size="sm" onClick={refreshStripeStatus}>
                 Refresh Status
               </Button>
               {!canSell && (
                 <Link href="/marketplace/sell">
-                  <Button size="sm">
-                    Complete Setup
-                  </Button>
+                  <Button size="sm">Complete Setup</Button>
                 </Link>
               )}
             </div>
@@ -289,9 +288,7 @@ export function UserProfile({ serverUser, serverProfile, serverStripeStatus }: U
                 Connect your Stripe account to start selling products.
               </p>
               <Link href="/marketplace/sell">
-                <Button size="sm">
-                  Connect Stripe
-                </Button>
+                <Button size="sm">Connect Stripe</Button>
               </Link>
             </div>
           )}
@@ -310,7 +307,7 @@ export function UserProfile({ serverUser, serverProfile, serverStripeStatus }: U
               Browse Marketplace
             </Button>
           </Link>
-          
+
           {canSell && (
             <Link href="/marketplace/sell" className="block">
               <Button variant="outline" className="w-full justify-start">
@@ -319,7 +316,7 @@ export function UserProfile({ serverUser, serverProfile, serverStripeStatus }: U
               </Button>
             </Link>
           )}
-          
+
           <Link href="/dashboard" className="block">
             <Button variant="outline" className="w-full justify-start">
               <ExternalLink className="h-4 w-4 mr-2" />
