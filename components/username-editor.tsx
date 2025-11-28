@@ -11,10 +11,7 @@ interface UsernameEditorProps {
   onUpdate: (newUsername: string) => Promise<void>;
 }
 
-export function UsernameEditor({
-  currentUsername,
-  onUpdate,
-}: UsernameEditorProps) {
+export function UsernameEditor({ currentUsername, onUpdate }: UsernameEditorProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [username, setUsername] = useState(currentUsername || '');
   const [isLoading, setIsLoading] = useState(false);
@@ -52,9 +49,7 @@ export function UsernameEditor({
 
     setIsChecking(true);
     try {
-      const response = await fetch(
-        `/api/profile/username?username=${encodeURIComponent(value)}`
-      );
+      const response = await fetch(`/api/profile/username?username=${encodeURIComponent(value)}`);
       const data = await response.json();
 
       if (!response.ok) {
@@ -130,7 +125,7 @@ export function UsernameEditor({
       const formatCheck = validateUsernameFormat(value);
       if (!formatCheck.valid && value.length > 0) {
         // Only show error if user has typed something
-        setError(formatCheck.error);
+        setError(formatCheck.error || null);
       }
     }
   };
@@ -144,12 +139,7 @@ export function UsernameEditor({
             {currentUsername ? `@${currentUsername}` : 'Not set'}
           </p>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleStartEdit}
-          className="h-8 w-8 p-0"
-        >
+        <Button variant="ghost" size="sm" onClick={handleStartEdit} className="h-8 w-8 p-0">
           <Edit2 className="h-4 w-4" />
         </Button>
       </div>
@@ -165,12 +155,12 @@ export function UsernameEditor({
             <span className="text-sm text-muted-foreground">@</span>
             <Input
               value={username}
-              onChange={(e) => handleInputChange(e.target.value)}
+              onChange={e => handleInputChange(e.target.value)}
               placeholder="username"
               className="flex-1"
               disabled={isLoading}
               maxLength={30}
-              onKeyDown={(e) => {
+              onKeyDown={e => {
                 if (e.key === 'Enter') {
                   handleSave();
                 } else if (e.key === 'Escape') {
@@ -179,13 +169,9 @@ export function UsernameEditor({
               }}
             />
           </div>
-          {error && (
-            <p className="text-xs text-red-500 mt-1">{error}</p>
-          )}
+          {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
           {!error && username.trim() && (
-            <p className="text-xs text-muted-foreground mt-1">
-              {username.length}/30 characters
-            </p>
+            <p className="text-xs text-muted-foreground mt-1">{username.length}/30 characters</p>
           )}
         </div>
         <div className="flex items-center gap-1 pt-6">
@@ -214,10 +200,8 @@ export function UsernameEditor({
         </div>
       </div>
       <p className="text-xs text-muted-foreground">
-        Username can contain letters, numbers, underscores, and hyphens (3-30
-        characters)
+        Username can contain letters, numbers, underscores, and hyphens (3-30 characters)
       </p>
     </div>
   );
 }
-
