@@ -2,7 +2,12 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { getCurrentUserWithProfile, getStripeAccountStatus, type UserProfile, type StripeAccountStatus } from '@/lib/auth-helpers';
+import {
+  getCurrentUserWithProfile,
+  getStripeAccountStatus,
+  type UserProfile,
+  type StripeAccountStatus,
+} from '@/lib/auth-helpers';
 
 export interface AuthState {
   user: any;
@@ -30,10 +35,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isConnected: false,
       isOnboarded: false,
       accountId: null,
-      status: 'unknown'
+      status: 'unknown',
     },
     loading: true,
-    error: null
+    error: null,
   });
 
   useEffect(() => {
@@ -46,49 +51,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (isInitializing) {
         return;
       }
-      
+
       isInitializing = true;
-      
+
       try {
         if (!mounted) return;
-        
+
         const supabase = createClient();
-        
+
         // First, try to get the session to ensure cookies are read
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
+
         // Then get the user
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser();
+
         if (!mounted) return;
-        
+
         if (authError) {
           // Only clear user if it's a clear authentication error
-          if (authError.message?.includes('JWT') || authError.message?.includes('session') || authError.message?.includes('Invalid')) {
-            setAuthState(prev => ({ 
-              ...prev, 
-              user: null, 
-              profile: null, 
-              loading: false 
+          if (
+            authError.message?.includes('JWT') ||
+            authError.message?.includes('session') ||
+            authError.message?.includes('Invalid')
+          ) {
+            setAuthState(prev => ({
+              ...prev,
+              user: null,
+              profile: null,
+              loading: false,
             }));
           } else {
             // Keep existing state on other errors (network issues, etc.)
-            setAuthState(prev => ({ 
-              ...prev, 
+            setAuthState(prev => ({
+              ...prev,
               loading: false,
-              error: authError.message || 'Auth error'
+              error: authError.message || 'Auth error',
             }));
           }
           isInitializing = false;
           return;
         }
-        
+
         if (!user) {
-          setAuthState(prev => ({ 
-            ...prev, 
-            user: null, 
-            profile: null, 
-            loading: false 
+          setAuthState(prev => ({
+            ...prev,
+            user: null,
+            profile: null,
+            loading: false,
           }));
           isInitializing = false;
           return;
@@ -102,14 +117,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             .select('*')
             .eq('id', user.id)
             .single();
-          
+
           if (!profileError && profileData) {
             profile = profileData;
           }
         } catch (error) {
           // Profile might not exist yet, that's okay - we'll show user with email initial
         }
-        
+
         // Set user immediately, even if profile is null
         if (mounted) {
           setAuthState({
@@ -119,21 +134,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               isConnected: false,
               isOnboarded: false,
               accountId: profile?.stripe_account_id || null,
-              status: 'unknown'
+              status: 'unknown',
             },
             loading: false,
-            error: null
+            error: null,
           });
         }
 
         // Check Stripe status asynchronously (non-blocking)
         if (profile?.stripe_account_id) {
           getStripeAccountStatus(profile.stripe_account_id)
-            .then((stripeStatus) => {
+            .then(stripeStatus => {
               if (mounted) {
                 setAuthState(prev => ({
                   ...prev,
-                  stripeStatus
+                  stripeStatus,
                 }));
               }
             })
@@ -144,10 +159,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (error) {
         console.error('Auth initialization error:', error);
         if (mounted) {
-          setAuthState(prev => ({ 
-            ...prev, 
-            loading: false, 
-            error: error instanceof Error ? error.message : 'Unknown error' 
+          setAuthState(prev => ({
+            ...prev,
+            loading: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
           }));
         }
       } finally {
@@ -161,10 +176,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Set a timeout (5 seconds)
     timeoutId = setTimeout(() => {
       if (mounted && isInitializing) {
-        setAuthState(prev => ({ 
-          ...prev, 
+        setAuthState(prev => ({
+          ...prev,
           loading: false,
-          error: prev.user ? null : 'Authentication timeout'
+          error: prev.user ? null : 'Authentication timeout',
         }));
         isInitializing = false;
       }
@@ -172,7 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Initialize immediately
     initializeAuth();
-    
+
     // Also check after a short delay for page reloads (using a ref to avoid stale closure)
     initTimeout = setTimeout(() => {
       if (mounted) {
@@ -189,89 +204,89 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Listen for auth changes - CRITICAL for detecting login
     const supabase = createClient();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state change event:', event, 'User ID:', session?.user?.id);
-        
-        if (event === 'SIGNED_IN' && session?.user) {
-          console.log('SIGNED_IN detected, updating state immediately');
-          isInitializing = false;
-          if (timeoutId) clearTimeout(timeoutId);
-          
-          // Get profile - but don't wait for it, set user immediately
-          const fetchProfile = async () => {
-            try {
-              const { data: profileData, error: profileError } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', session.user.id)
-                .single();
-              
-              if (!profileError && profileData && mounted) {
-                console.log('Profile loaded:', profileData);
-                setAuthState(prev => ({
-                  ...prev,
-                  profile: profileData,
-                  stripeStatus: {
-                    ...prev.stripeStatus,
-                    accountId: profileData?.stripe_account_id || null,
-                  }
-                }));
-              } else {
-                console.log('No profile found or error:', profileError);
-              }
-            } catch (error) {
-              console.log('Profile fetch error (non-critical):', error);
-            }
-          };
-          
-          // Set user IMMEDIATELY, profile can load async
-          if (mounted) {
-            console.log('Setting auth state with user:', session.user.id, session.user.email);
-            setAuthState(prev => {
-              const newState = {
-                user: session.user,
-                profile: prev.profile, // Keep existing profile if any
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state change event:', event, 'User ID:', session?.user?.id);
+
+      if (event === 'SIGNED_IN' && session?.user) {
+        console.log('SIGNED_IN detected, updating state immediately');
+        isInitializing = false;
+        if (timeoutId) clearTimeout(timeoutId);
+
+        // Get profile - but don't wait for it, set user immediately
+        const fetchProfile = async () => {
+          try {
+            const { data: profileData, error: profileError } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .single();
+
+            if (!profileError && profileData && mounted) {
+              console.log('Profile loaded:', profileData);
+              setAuthState(prev => ({
+                ...prev,
+                profile: profileData,
                 stripeStatus: {
-                  isConnected: false,
-                  isOnboarded: false,
-                  accountId: prev.profile?.stripe_account_id || null,
-                  status: 'unknown'
+                  ...prev.stripeStatus,
+                  accountId: profileData?.stripe_account_id || null,
                 },
-                loading: false,
-                error: null
-              };
-              console.log('New auth state:', newState);
-              return newState;
-            });
-            console.log('Auth state updated - user set');
-            
-            // Fetch profile in background
-            fetchProfile();
+              }));
+            } else {
+              console.log('No profile found or error:', profileError);
+            }
+          } catch (error) {
+            console.log('Profile fetch error (non-critical):', error);
           }
-        } else if (event === 'SIGNED_OUT') {
-          console.log('SIGNED_OUT detected');
-          if (mounted) {
-            setAuthState({
-              user: null,
-              profile: null,
+        };
+
+        // Set user IMMEDIATELY, profile can load async
+        if (mounted) {
+          console.log('Setting auth state with user:', session.user.id, session.user.email);
+          setAuthState(prev => {
+            const newState = {
+              user: session.user,
+              profile: prev.profile, // Keep existing profile if any
               stripeStatus: {
                 isConnected: false,
                 isOnboarded: false,
-                accountId: null,
-                status: 'unknown'
+                accountId: prev.profile?.stripe_account_id || null,
+                status: 'unknown' as const,
               },
               loading: false,
-              error: null
-            });
-          }
-        } else if (event === 'TOKEN_REFRESHED') {
-          console.log('TOKEN_REFRESHED detected');
-          isInitializing = false;
-          await initializeAuth();
+              error: null,
+            };
+            console.log('New auth state:', newState);
+            return newState;
+          });
+          console.log('Auth state updated - user set');
+
+          // Fetch profile in background
+          fetchProfile();
         }
+      } else if (event === 'SIGNED_OUT') {
+        console.log('SIGNED_OUT detected');
+        if (mounted) {
+          setAuthState({
+            user: null,
+            profile: null,
+            stripeStatus: {
+              isConnected: false,
+              isOnboarded: false,
+              accountId: null,
+              status: 'unknown',
+            },
+            loading: false,
+            error: null,
+          });
+        }
+      } else if (event === 'TOKEN_REFRESHED') {
+        console.log('TOKEN_REFRESHED detected');
+        isInitializing = false;
+        await initializeAuth();
       }
-    );
+    });
 
     return () => {
       mounted = false;
@@ -321,10 +336,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           isConnected: false,
           isOnboarded: false,
           accountId: null,
-          status: 'unknown'
+          status: 'unknown',
         },
         loading: false,
-        error: null
+        error: null,
       });
       setTimeout(() => {
         window.location.href = '/';
@@ -340,7 +355,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshProfile,
     signOut,
     isAuthenticated: !!authState.user,
-    canSell: authState.stripeStatus.isOnboarded
+    canSell: authState.stripeStatus.isOnboarded,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -353,4 +368,3 @@ export function useAuth() {
   }
   return context;
 }
-
