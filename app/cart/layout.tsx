@@ -7,7 +7,7 @@ export default function CartLayout({
 }) {
   return (
     <div className="bg-background min-h-screen">
-      <Navigation title="The Patterns Place" showMarketplaceLinks={true} />
+      <Navigation showMarketplaceLinks={true} />
       {children}
     </div>
   );
