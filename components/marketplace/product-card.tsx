@@ -54,7 +54,7 @@ export function ProductCard({ product, hideFavorite = false }: ProductCardProps)
   const [isHovered, setIsHovered] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
-  
+
   // Get the first image from images array or fallback to image_url
   const getImageUrl = () => {
     if (product.images && Array.isArray(product.images) && product.images.length > 0) {
@@ -69,20 +69,20 @@ export function ProductCard({ product, hideFavorite = false }: ProductCardProps)
   const handleFavoriteClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     if (isToggling) return;
-    
+
     // Check if user is authenticated
     if (!user) {
       setShowAuthDialog(true);
       return;
     }
-    
+
     setIsToggling(true);
     const wasFavorite = favorited;
     const isNowFavorite = await toggleFavorite(product.id);
     setIsToggling(false);
-    
+
     // Show toast notification
     if (isNowFavorite && !wasFavorite) {
       showToast('Successfully added to your favorites', 'success');
@@ -92,7 +92,7 @@ export function ProductCard({ product, hideFavorite = false }: ProductCardProps)
   };
 
   return (
-    <Card 
+    <Card
       className="overflow-hidden hover:shadow-lg transition-shadow relative group"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -118,7 +118,7 @@ export function ProductCard({ product, hideFavorite = false }: ProductCardProps)
               {formatAmountForDisplay(product.price, product.currency)}
             </span>
           </div>
-          
+
           {/* Favorite heart button - appears on hover, always visible if favorited */}
           {!hideFavorite && (
             <button
@@ -131,20 +131,21 @@ export function ProductCard({ product, hideFavorite = false }: ProductCardProps)
               aria-label={favorited ? 'Remove from favorites' : 'Add to favorites'}
               type="button"
             >
-              <Heart 
-                className={`h-5 w-5 transition-all ${favorited ? 'fill-current' : ''}`}
-              />
+              <Heart className={`h-5 w-5 transition-all ${favorited ? 'fill-current' : ''}`} />
             </button>
           )}
         </div>
-        
+
         <CardHeader className="p-4">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-0">
             <CardTitle className="text-lg font-semibold line-clamp-2 flex-1">
               {product.title}
             </CardTitle>
             {product.difficulty && (
-              <Badge variant={getDifficultyVariant(product.difficulty)} className="self-start sm:ml-2 flex-shrink-0">
+              <Badge
+                variant={getDifficultyVariant(product.difficulty)}
+                className="self-start sm:ml-2 flex-shrink-0"
+              >
                 {getDifficultyLabel(product.difficulty)}
               </Badge>
             )}
@@ -153,10 +154,12 @@ export function ProductCard({ product, hideFavorite = false }: ProductCardProps)
             <p className="text-sm text-muted-foreground mt-1">
               {product.profiles.username ? (
                 <button
-                  onClick={(e) => {
+                  onClick={e => {
                     e.stopPropagation();
                     e.preventDefault();
-                    router.push(`/marketplace/seller/${product.profiles.username}`);
+                    if (product.profiles?.username) {
+                      router.push(`/marketplace/seller/${product.profiles.username}`);
+                    }
                   }}
                   className="hover:text-primary transition-colors underline text-left"
                 >
@@ -169,11 +172,8 @@ export function ProductCard({ product, hideFavorite = false }: ProductCardProps)
           )}
         </CardHeader>
       </Link>
-      
-      <AuthPromptDialog 
-        isOpen={showAuthDialog} 
-        onClose={() => setShowAuthDialog(false)} 
-      />
+
+      <AuthPromptDialog isOpen={showAuthDialog} onClose={() => setShowAuthDialog(false)} />
     </Card>
   );
-} 
+}
