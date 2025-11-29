@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/contexts/cart-context';
-import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatAmountForDisplay } from '@/lib/utils-client';
@@ -13,22 +12,14 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 export default function CheckoutPage() {
   const router = useRouter();
   const { state } = useCart();
-  const { isAuthenticated, loading: authLoading } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
-
-  // Redirect if not authenticated
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.push('/auth/login');
-    }
-  }, [isAuthenticated, authLoading, router]);
 
   // Redirect if cart is empty
   useEffect(() => {
-    if (state.items.length === 0 && !authLoading) {
+    if (state.items.length === 0) {
       router.push('/cart');
     }
-  }, [state.items.length, authLoading, router]);
+  }, [state.items.length, router]);
 
   const handleCheckout = async () => {
     setIsProcessing(true);
@@ -69,15 +60,7 @@ export default function CheckoutPage() {
     }
   };
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <LoadingSpinner />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated || state.items.length === 0) {
+  if (state.items.length === 0) {
     return null; // Will redirect
   }
 

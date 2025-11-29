@@ -83,8 +83,15 @@ export function DigitalFileUpload({
       return;
     }
 
-    // Validate all files
+    // Validate all files - only PDFs allowed
     for (const file of selectedFiles) {
+      // Check file type - must be PDF
+      const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+      if (!isPDF) {
+        alert(`${file.name} is not a PDF file. Only PDF files are allowed.`);
+        return;
+      }
+
       const maxSizeBytes = maxFileSizeMB * 1024 * 1024;
       if (file.size > maxSizeBytes) {
         alert(`${file.name} is too large. Maximum file size is ${maxFileSizeMB}MB.`);
@@ -255,6 +262,7 @@ export function DigitalFileUpload({
         ref={fileInputRef}
         type="file"
         multiple
+        accept=".pdf,application/pdf"
         onChange={handleFileSelect}
         className="hidden"
         disabled={uploading || files.length >= maxFiles}
@@ -301,10 +309,10 @@ export function DigitalFileUpload({
         >
           <File className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
           <p className="text-sm text-muted-foreground mb-2">
-            Click to upload digital files or drag and drop
+            Click to upload PDF files or drag and drop
           </p>
           <p className="text-xs text-muted-foreground">
-            PDF, ZIP, images, documents up to {maxFileSizeMB}MB each
+            PDF files only, up to {maxFileSizeMB}MB each
           </p>
           <p className="text-xs text-muted-foreground mt-1">
             These files will be available for download after purchase

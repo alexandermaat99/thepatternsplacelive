@@ -16,15 +16,8 @@ export async function POST(request: NextRequest) {
     
     const supabase = await createClient();
     
-    // Get the current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    // Get the current user (optional for guest checkout)
+    const { data: { user } } = await supabase.auth.getUser();
 
     // Get all product details
     const productIds = items.map((item: { productId: string }) => item.productId);
@@ -169,10 +162,10 @@ export async function POST(request: NextRequest) {
       },
       success_url: `${request.nextUrl.origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${request.nextUrl.origin}/cart`,
-      customer_email: user.email || undefined,
+      customer_email: user?.email || undefined,
       metadata: {
-        buyerId: user.id,
-        buyerEmail: user.email || '',
+        ...(user?.id && { buyerId: user.id }),
+        ...(user?.email && { buyerEmail: user.email }),
         // Store cart items as JSON in metadata (we'll parse this in webhook)
         cartItems: JSON.stringify(items.map((item: { productId: string; quantity: number }) => ({
           productId: item.productId,

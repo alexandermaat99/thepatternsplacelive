@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,10 +12,14 @@ export default function CheckoutSuccessPage() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get('session_id');
   const { clearCart } = useCart();
+  const hasClearedCart = useRef(false);
 
-  // Clear cart on successful checkout
+  // Clear cart on successful checkout (only once)
   useEffect(() => {
-    clearCart();
+    if (!hasClearedCart.current) {
+      clearCart();
+      hasClearedCart.current = true;
+    }
   }, [clearCart]);
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">

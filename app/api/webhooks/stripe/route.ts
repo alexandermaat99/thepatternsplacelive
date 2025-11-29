@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getStripe } from '@/lib/stripe';
 import { createClient } from '@/lib/supabase/server';
 import { headers } from 'next/headers';
+import { deliverProductsForOrders } from '@/lib/product-delivery';
 
 export async function POST(request: NextRequest) {
   const body = await request.text();
@@ -73,12 +74,22 @@ export async function POST(request: NextRequest) {
               }).filter(Boolean);
               
               if (orders.length > 0) {
-                const { error: orderError } = await supabase
+                const { error: orderError, data: insertedOrders } = await supabase
                   .from('orders')
-                  .insert(orders);
+                  .insert(orders)
+                  .select();
                 
                 if (orderError) {
                   console.error('Error creating cart orders:', orderError);
+                } else if (insertedOrders) {
+                  console.log(`✅ Created ${insertedOrders.length} order(s) for session ${session.id}`);
+                  console.log('Orders:', insertedOrders.map(o => ({ id: o.id, product_id: o.product_id, buyer_email: o.buyer_email })));
+                  
+                  // Deliver products via email (non-blocking)
+                  deliverProductsForOrders(insertedOrders).catch((error) => {
+                    console.error('❌ Error delivering products via email:', error);
+                    // Don't throw - email delivery failures shouldn't fail the webhook
+                  });
                 }
               }
             }
@@ -94,7 +105,7 @@ export async function POST(request: NextRequest) {
             .single();
           
           if (product) {
-            const { error: orderError } = await supabase
+            const { error: orderError, data: insertedOrders } = await supabase
               .from('orders')
               .insert({
                 product_id: session.metadata?.productId,
@@ -105,10 +116,24 @@ export async function POST(request: NextRequest) {
                 amount: session.amount_total ? session.amount_total / 100 : 0,
                 currency: session.currency?.toUpperCase() || 'USD',
                 buyer_email: session.metadata?.buyerEmail || session.customer_email || null,
-              });
+              })
+              .select();
 
             if (orderError) {
               console.error('Error creating order:', orderError);
+            } else if (insertedOrders && insertedOrders.length > 0) {
+              console.log(`✅ Created order ${insertedOrders[0].id} for session ${session.id}`);
+              console.log('Order details:', { 
+                id: insertedOrders[0].id, 
+                product_id: insertedOrders[0].product_id, 
+                buyer_email: insertedOrders[0].buyer_email 
+              });
+              
+              // Deliver product via email (non-blocking)
+              deliverProductsForOrders(insertedOrders).catch((error) => {
+                console.error('❌ Error delivering product via email:', error);
+                // Don't throw - email delivery failures shouldn't fail the webhook
+              });
             }
           }
         }

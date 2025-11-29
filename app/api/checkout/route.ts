@@ -9,15 +9,8 @@ export async function POST(request: NextRequest) {
     
     const supabase = await createClient();
     
-    // Get the current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    // Get the current user (optional for guest checkout)
+    const { data: { user } } = await supabase.auth.getUser();
 
     // Get the product details
     const { data: product, error: productError } = await supabase
@@ -109,9 +102,11 @@ export async function POST(request: NextRequest) {
       },
       success_url: `${request.nextUrl.origin}/marketplace/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${request.nextUrl.origin}/marketplace/product/${productId}`,
+      customer_email: user?.email || undefined,
       metadata: {
         productId: product.id,
-        buyerId: user.id,
+        ...(user?.id && { buyerId: user.id }),
+        ...(user?.email && { buyerEmail: user.email }),
         sellerId: product.user_id,
         sellerStripeAccountId: sellerStripeAccountId,
       },
