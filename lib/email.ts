@@ -1,8 +1,5 @@
 import { Resend } from 'resend';
 
-// Initialize Resend client
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 interface ProductDeliveryEmailData {
   customerEmail: string;
   customerName?: string;
@@ -32,6 +29,9 @@ export async function sendProductDeliveryEmail(
         error: 'Email service not configured - RESEND_API_KEY is missing',
       };
     }
+    
+    // Initialize Resend client lazily (only when needed, not at module load)
+    const resend = new Resend(process.env.RESEND_API_KEY);
     
     console.log('📧 Preparing to send product delivery email...');
     console.log('Recipient:', data.customerEmail);
