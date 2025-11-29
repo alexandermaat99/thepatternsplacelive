@@ -11,14 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/auth-context';
-import { 
-  User, 
-  Settings, 
-  LogOut, 
-  ShoppingBag, 
-  Package,
-  Plus,
-} from 'lucide-react';
+import { User, Settings, LogOut, ShoppingBag, Package, Plus } from 'lucide-react';
 import Link from 'next/link';
 
 export function ProfileDropdown() {
@@ -72,9 +65,7 @@ export function ProfileDropdown() {
   // Loading state
   if (loading && !user) {
     console.log('[ProfileDropdown] Rendering LOADING state');
-    return (
-      <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
-    );
+    return <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />;
   }
 
   // Authenticated state
@@ -82,36 +73,33 @@ export function ProfileDropdown() {
     console.log('[ProfileDropdown] Rendering AUTHENTICATED state');
     const avatarUrl = getAvatarUrl();
     const initials = getInitials();
-    
-    console.log('[ProfileDropdown] Rendering authenticated state', { 
-      userId: user.id, 
+
+    console.log('[ProfileDropdown] Rendering authenticated state', {
+      userId: user.id,
       avatarUrl,
-      initials 
+      initials,
     });
 
     return (
       <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
-        <DropdownMenuTrigger 
+        <DropdownMenuTrigger
           className="h-8 w-8 rounded-full p-0 hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer"
-          onClick={(e) => {
+          onClick={e => {
             console.log('[ProfileDropdown] Trigger clicked!', e);
             e.stopPropagation();
           }}
-          onMouseDown={(e) => {
+          onMouseDown={e => {
             console.log('[ProfileDropdown] Trigger mouseDown!', e);
           }}
         >
-          <Avatar 
+          <Avatar
             className="h-8 w-8 pointer-events-none"
-            onClick={(e) => {
+            onClick={e => {
               console.log('[ProfileDropdown] Avatar clicked!', e);
               e.stopPropagation();
             }}
           >
-            <AvatarImage 
-              src={avatarUrl} 
-              alt={profile?.full_name || user.email || 'User'}
-            />
+            <AvatarImage src={avatarUrl} alt={profile?.full_name || user.email || 'User'} />
             <AvatarFallback className="text-xs bg-primary/10 text-primary">
               {initials}
             </AvatarFallback>
@@ -120,49 +108,65 @@ export function ProfileDropdown() {
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuLabel>
             <div className="flex flex-col space-y-1">
-              <p className="text-sm font-medium leading-none">
-                {profile?.full_name || 'User'}
-              </p>
-              <p className="text-xs leading-none text-muted-foreground truncate">
-                {user.email}
-              </p>
+              <p className="text-sm font-medium leading-none">{profile?.full_name || 'User'}</p>
+              <p className="text-xs leading-none text-muted-foreground truncate">{user.email}</p>
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild>
-            <Link href="/dashboard" className="flex items-center w-full" onClick={() => setIsOpen(false)}>
+            <Link
+              href="/dashboard"
+              className="flex items-center w-full"
+              onClick={() => setIsOpen(false)}
+            >
               <User className="mr-2 h-4 w-4" />
               <span>Dashboard</span>
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <Link href="/marketplace" className="flex items-center w-full" onClick={() => setIsOpen(false)}>
+            <Link
+              href="/marketplace"
+              className="flex items-center w-full"
+              onClick={() => setIsOpen(false)}
+            >
               <ShoppingBag className="mr-2 h-4 w-4" />
               <span>Marketplace</span>
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <Link href="/dashboard/my-products" className="flex items-center w-full" onClick={() => setIsOpen(false)}>
+            <Link
+              href="/dashboard/my-products"
+              className="flex items-center w-full"
+              onClick={() => setIsOpen(false)}
+            >
               <Package className="mr-2 h-4 w-4" />
               <span>My Products</span>
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <Link href="/marketplace/sell" className="flex items-center w-full" onClick={() => setIsOpen(false)}>
+            <Link
+              href="/marketplace/sell"
+              className="flex items-center w-full"
+              onClick={() => setIsOpen(false)}
+            >
               <Plus className="mr-2 h-4 w-4" />
               <span>Sell Products</span>
             </Link>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild>
-            <Link href="/dashboard" className="flex items-center w-full" onClick={() => setIsOpen(false)}>
+            <Link
+              href="/dashboard"
+              className="flex items-center w-full"
+              onClick={() => setIsOpen(false)}
+            >
               <Settings className="mr-2 h-4 w-4" />
               <span>Settings</span>
             </Link>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem 
-            onSelect={(e) => {
+          <DropdownMenuItem
+            onSelect={e => {
               console.log('[ProfileDropdown] Sign out onSelect triggered');
               e.preventDefault();
               handleSignOut();
@@ -186,13 +190,41 @@ export function ProfileDropdown() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuItem asChild>
-          <Link href="/auth/login" className="flex items-center w-full" onClick={() => setIsOpen(false)}>
+          <Link
+            href="/auth/login"
+            className="flex items-center w-full"
+            onClick={e => {
+              setIsOpen(false);
+              // Store current path in sessionStorage before navigation
+              if (typeof window !== 'undefined') {
+                const currentPath = window.location.pathname + window.location.search;
+                // Don't store auth pages
+                if (!currentPath.startsWith('/auth') && !currentPath.startsWith('/login')) {
+                  sessionStorage.setItem('auth_redirect_url', currentPath);
+                }
+              }
+            }}
+          >
             <User className="mr-2 h-4 w-4" />
             <span>Sign in</span>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <Link href="/auth/sign-up" className="flex items-center w-full" onClick={() => setIsOpen(false)}>
+          <Link
+            href="/auth/sign-up"
+            className="flex items-center w-full"
+            onClick={e => {
+              setIsOpen(false);
+              // Store current path in sessionStorage before navigation
+              if (typeof window !== 'undefined') {
+                const currentPath = window.location.pathname + window.location.search;
+                // Don't store auth pages
+                if (!currentPath.startsWith('/auth') && !currentPath.startsWith('/login')) {
+                  sessionStorage.setItem('auth_redirect_url', currentPath);
+                }
+              }
+            }}
+          >
             <User className="mr-2 h-4 w-4" />
             <span>Sign up</span>
           </Link>

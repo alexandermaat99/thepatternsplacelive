@@ -57,7 +57,6 @@ export function ProductDetail({ product }: ProductDetailProps) {
   const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
-  const [fromCart, setFromCart] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const { user, isAuthenticated } = useAuth();
   const { addItem } = useCart();
@@ -67,20 +66,12 @@ export function ProductDetail({ product }: ProductDetailProps) {
   const favorited = isFavorite(product.id);
   const isOwner = user?.id === product.user_id;
 
-  // Check if user came from cart via query parameter
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      setFromCart(params.get('from') === 'cart');
-    }
-  }, []);
-
   const handleAddToCart = () => {
     setIsLoading(true);
 
     try {
       const wasAdded = addItem(product);
-      
+
       if (wasAdded) {
         // Item was successfully added
         showToast(`${product.title} added to cart`, 'success');
@@ -88,7 +79,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
         // Item already in cart
         showToast('This item is already in your cart', 'info');
       }
-      
+
       setTimeout(() => {
         setIsLoading(false);
       }, 500);
@@ -122,14 +113,9 @@ export function ProductDetail({ product }: ProductDetailProps) {
   };
 
   const handleBackClick = () => {
-    // Check if user came from the cart page (via query parameter)
-    if (fromCart) {
-      // If coming from cart, go to marketplace instead
-      router.push('/marketplace');
-      return;
-    }
-    // Otherwise use browser back to preserve scroll position and filters
-    router.back();
+    // Always go to marketplace from product pages for predictable navigation
+    // This avoids issues with auth pages or other pages in browser history
+    router.push('/marketplace');
   };
 
   return (
@@ -141,7 +127,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
           className="flex items-center gap-2 -ml-2 sm:ml-0"
         >
           <ArrowLeft className="h-4 w-4" />
-          {fromCart ? 'Back to Marketplace' : 'Back'}
+          Back to Marketplace
         </Button>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -197,14 +183,13 @@ export function ProductDetail({ product }: ProductDetailProps) {
             </div>
             <div className="flex items-center gap-2 mt-2 flex-wrap">
               {/* Display categories from product_categories if available, otherwise fallback to old category field */}
-              {product.product_categories && product.product_categories.length > 0 ? (
-                product.product_categories.map((pc) => (
-                  <Badge key={pc.category.id} variant="secondary">
-                    {pc.category.name}
-                  </Badge>
-                ))
-              ) : (
-                product.category && (
+              {product.product_categories && product.product_categories.length > 0
+                ? product.product_categories.map(pc => (
+                    <Badge key={pc.category.id} variant="secondary">
+                      {pc.category.name}
+                    </Badge>
+                  ))
+                : product.category &&
                   // Fallback: parse comma-separated categories from old category field
                   product.category.split(',').map((cat, index) => {
                     const trimmedCat = cat.trim();
@@ -213,9 +198,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
                         {trimmedCat}
                       </Badge>
                     ) : null;
-                  })
-                )
-              )}
+                  })}
               {product.difficulty && (
                 <Badge variant={getDifficultyVariant(product.difficulty)}>
                   {getDifficultyLabel(product.difficulty)}
