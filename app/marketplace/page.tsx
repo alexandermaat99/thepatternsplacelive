@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { ProductCard } from '@/components/marketplace/product-card';
 import { MarketplaceFilters } from '@/components/marketplace/marketplace-filters';
 import { ActiveFilters } from '@/components/marketplace/active-filters';
+import { MarketplacePagination } from '@/components/marketplace/marketplace-pagination';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Suspense } from 'react';
@@ -15,35 +16,43 @@ interface MarketplacePageProps {
     minPrice?: string;
     maxPrice?: string;
     sort?: string;
+    page?: string;
   }>;
 }
+
+const PRODUCTS_PER_PAGE = 24;
 
 /**
  * Helper function to check if a product matches all search words
  */
 function productMatchesSearchWords(product: any, searchWords: string[]): boolean {
   if (searchWords.length === 0) return true;
-  
+
   const searchableText = [
     product.title?.toLowerCase() || '',
     product.description?.toLowerCase() || '',
     product.profiles?.username?.toLowerCase() || '',
-    ...(product.product_categories || []).map((pc: any) => 
-      pc?.category?.name?.toLowerCase() || ''
-    )
+    ...(product.product_categories || []).map((pc: any) => pc?.category?.name?.toLowerCase() || ''),
   ].join(' ');
-  
-  return searchWords.every(word => 
-    searchableText.includes(word.toLowerCase())
-  );
+
+  return searchWords.every(word => searchableText.includes(word.toLowerCase()));
 }
 
 async function MarketplaceContent({ searchParams }: MarketplacePageProps) {
   const params = await searchParams;
   const supabase = await createClient();
 
+  // Parse pagination
+  const currentPage = Math.max(1, parseInt(params.page || '1', 10));
+  const from = (currentPage - 1) * PRODUCTS_PER_PAGE;
+  const to = from + PRODUCTS_PER_PAGE - 1;
+
   // Tokenize search query early
-  const searchWords = params.q?.trim().split(/\s+/).filter(w => w.length > 0) || [];
+  const searchWords =
+    params.q
+      ?.trim()
+      .split(/\s+/)
+      .filter(w => w.length > 0) || [];
 
   // Execute ALL independent queries in parallel
   const [
@@ -76,39 +85,39 @@ async function MarketplaceContent({ searchParams }: MarketplacePageProps) {
 
       return (categories || []) as Category[];
     })(),
-    
+
     // Get price range
-    supabase
-      .from('products')
-      .select('price')
-      .eq('is_active', true)
-      .limit(10000),
-    
+    supabase.from('products').select('price').eq('is_active', true).limit(10000),
+
     // Get category filter product IDs (if categories filter is active)
     params.categories
       ? (async () => {
-          const categorySlugs = params.categories!.split(',').filter(Boolean).map(s => s.toLowerCase());
+          const categorySlugs = params
+            .categories!.split(',')
+            .filter(Boolean)
+            .map(s => s.toLowerCase());
           if (categorySlugs.length === 0) return null;
-          
+
           const { data: categoryData } = await supabase
             .from('categories')
             .select('id')
             .in('slug', categorySlugs)
             .eq('is_active', true);
-          
+
           const categoryIds = categoryData?.map(c => c.id) || [];
           if (categoryIds.length === 0) return [];
-          
+
           const { data: productCategoryData } = await supabase
             .from('product_categories')
             .select('product_id')
             .in('category_id', categoryIds);
-          
-          const productIds = productCategoryData?.map((pc: any) => pc.product_id).filter(Boolean) || [];
+
+          const productIds =
+            productCategoryData?.map((pc: any) => pc.product_id).filter(Boolean) || [];
           return productIds.length > 0 ? productIds : null;
         })()
       : Promise.resolve(null),
-    
+
     // Get username search IDs (if search is active)
     searchWords.length > 0
       ? supabase
@@ -117,7 +126,7 @@ async function MarketplaceContent({ searchParams }: MarketplacePageProps) {
           .or(searchWords.map(word => `username.ilike.%${word}%`).join(','))
           .then(result => result.data?.map(p => p.id) || [])
       : Promise.resolve([]),
-    
+
     // Get category search IDs (if search is active)
     searchWords.length > 0
       ? supabase
@@ -141,18 +150,21 @@ async function MarketplaceContent({ searchParams }: MarketplacePageProps) {
       .from('product_categories')
       .select('product_id')
       .in('category_id', categorySearchData);
-    
-    categorySearchProductIds = categoryProductsData?.map((cp: any) => cp.product_id).filter(Boolean) || [];
+
+    categorySearchProductIds =
+      categoryProductsData?.map((cp: any) => cp.product_id).filter(Boolean) || [];
   }
 
   // Build main product query with all filters
   let query = supabase
     .from('products')
-    .select(`
+    .select(
+      `
       *,
       profiles:user_id (full_name, username, avatar_url),
       product_categories (category:categories (id, name, slug))
-    `)
+    `
+    )
     .eq('is_active', true);
 
   // Apply category filter
@@ -219,11 +231,13 @@ async function MarketplaceContent({ searchParams }: MarketplacePageProps) {
   if (usernameSearchData && usernameSearchData.length > 0) {
     let usernameQuery = supabase
       .from('products')
-      .select(`
+      .select(
+        `
         *,
         profiles:user_id (full_name, username, avatar_url),
         product_categories (category:categories (id, name, slug))
-      `)
+      `
+      )
       .eq('is_active', true)
       .in('user_id', usernameSearchData);
 
@@ -276,11 +290,13 @@ async function MarketplaceContent({ searchParams }: MarketplacePageProps) {
   if (categorySearchProductIds.length > 0) {
     let categoryQuery = supabase
       .from('products')
-      .select(`
+      .select(
+        `
         *,
         profiles:user_id (full_name, username, avatar_url),
         product_categories (category:categories (id, name, slug))
-      `)
+      `
+      )
       .eq('is_active', true)
       .in('id', categorySearchProductIds);
 
@@ -331,7 +347,7 @@ async function MarketplaceContent({ searchParams }: MarketplacePageProps) {
 
   // Execute ALL product queries in parallel
   const productResults = await Promise.all(productQueries);
-  
+
   let products = productResults[0]?.data || [];
   if (productResults[0]?.error) {
     console.error('Product query error:', productResults[0].error.message);
@@ -357,17 +373,15 @@ async function MarketplaceContent({ searchParams }: MarketplacePageProps) {
 
   // Filter for multi-word matches
   if (searchWords.length > 1 && products) {
-    products = products.filter((product: any) => 
-      productMatchesSearchWords(product, searchWords)
-    );
+    products = products.filter((product: any) => productMatchesSearchWords(product, searchWords));
   }
 
   // Re-sort combined results if needed
   if (productResults.length > 1 && products) {
     switch (sortBy) {
       case 'oldest':
-        products.sort((a: any, b: any) => 
-          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        products.sort(
+          (a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
         );
         break;
       case 'price-low':
@@ -383,14 +397,27 @@ async function MarketplaceContent({ searchParams }: MarketplacePageProps) {
         products.sort((a: any, b: any) => b.title.localeCompare(a.title));
         break;
       default:
-        products.sort((a: any, b: any) => 
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        products.sort(
+          (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
     }
   }
 
-  const productsCount = products.length;
-  const hasFilters = !!(params.q || params.categories || params.difficulty || params.minPrice || params.maxPrice || (params.sort && params.sort !== 'newest'));
+  // Get total count before pagination
+  const totalProducts = products.length;
+  const totalPages = Math.ceil(totalProducts / PRODUCTS_PER_PAGE);
+  
+  // Apply pagination
+  const paginatedProducts = products.slice(from, to + 1);
+
+  const hasFilters = !!(
+    params.q ||
+    params.categories ||
+    params.difficulty ||
+    params.minPrice ||
+    params.maxPrice ||
+    (params.sort && params.sort !== 'newest')
+  );
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
@@ -408,10 +435,12 @@ async function MarketplaceContent({ searchParams }: MarketplacePageProps) {
         {/* Filters Sidebar */}
         <aside className="lg:col-span-1">
           <Suspense fallback={<div className="h-96 bg-muted animate-pulse rounded-lg" />}>
-            <MarketplaceFilters 
+            <MarketplaceFilters
               categories={categories}
               minPrice={minPrice}
               maxPrice={maxPrice}
+              hasFilters={hasFilters}
+              productsCount={totalProducts}
             />
           </Suspense>
         </aside>
@@ -423,20 +452,23 @@ async function MarketplaceContent({ searchParams }: MarketplacePageProps) {
             <ActiveFilters categories={categories} />
           </Suspense>
 
-          {/* Results Count */}
-          {products.length > 0 && (
-            <p className="text-sm text-muted-foreground mb-4">
-              {productsCount} {productsCount === 1 ? 'pattern' : 'patterns'} found
-            </p>
-          )}
-
           {/* Products Grid */}
-          {products.length > 0 ? (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {products.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
+          {paginatedProducts.length > 0 ? (
+            <>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {paginatedProducts.map(product => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </div>
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <MarketplacePagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  searchParams={params}
+                />
+              )}
+            </>
           ) : (
             <div className="text-center py-16">
               <div className="max-w-md mx-auto">
@@ -445,7 +477,7 @@ async function MarketplaceContent({ searchParams }: MarketplacePageProps) {
                 </h3>
                 <p className="text-muted-foreground mb-6">
                   {hasFilters
-                    ? 'Try adjusting your search or filters to find what you\'re looking for.'
+                    ? "Try adjusting your search or filters to find what you're looking for."
                     : 'The marketplace is waiting for your first pattern! Be the one to share something amazing.'}
                 </p>
                 {!hasFilters && (
@@ -464,24 +496,26 @@ async function MarketplaceContent({ searchParams }: MarketplacePageProps) {
 
 export default async function MarketplacePage(props: MarketplacePageProps) {
   return (
-    <Suspense fallback={
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <div className="animate-pulse space-y-8">
-          <div className="h-12 bg-muted rounded w-1/3"></div>
-          <div className="h-12 bg-muted rounded w-full max-w-2xl mx-auto"></div>
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            <div className="lg:col-span-1 h-96 bg-muted rounded"></div>
-            <div className="lg:col-span-3">
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <div key={i} className="h-96 bg-muted rounded"></div>
-                ))}
+    <Suspense
+      fallback={
+        <div className="container mx-auto px-4 py-8 max-w-7xl">
+          <div className="animate-pulse space-y-8">
+            <div className="h-12 bg-muted rounded w-1/3"></div>
+            <div className="h-12 bg-muted rounded w-full max-w-2xl mx-auto"></div>
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+              <div className="lg:col-span-1 h-96 bg-muted rounded"></div>
+              <div className="lg:col-span-3">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  {[1, 2, 3, 4, 5, 6].map(i => (
+                    <div key={i} className="h-96 bg-muted rounded"></div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    }>
+      }
+    >
       <MarketplaceContent {...props} />
     </Suspense>
   );

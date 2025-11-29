@@ -25,24 +25,39 @@ interface MarketplaceFiltersProps {
   categories: Category[];
   minPrice: number;
   maxPrice: number;
+  hasFilters?: boolean;
+  productsCount?: number;
 }
 
-export function MarketplaceFilters({ categories, minPrice, maxPrice }: MarketplaceFiltersProps) {
+export function MarketplaceFilters({
+  categories,
+  minPrice,
+  maxPrice,
+  hasFilters = false,
+  productsCount = 0,
+}: MarketplaceFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  
+
   // Parse current filter values from URL (applied filters)
   const appliedCategories = searchParams.get('categories')?.split(',').filter(Boolean) || [];
   const appliedDifficulties = searchParams.get('difficulty')?.split(',').filter(Boolean) || [];
-  const appliedPriceMin = searchParams.get('minPrice') ? Number(searchParams.get('minPrice')) : minPrice;
-  const appliedPriceMax = searchParams.get('maxPrice') ? Number(searchParams.get('maxPrice')) : maxPrice;
+  const appliedPriceMin = searchParams.get('minPrice')
+    ? Number(searchParams.get('minPrice'))
+    : minPrice;
+  const appliedPriceMax = searchParams.get('maxPrice')
+    ? Number(searchParams.get('maxPrice'))
+    : maxPrice;
   const appliedSort = searchParams.get('sort') || 'newest';
 
   // Local state for pending filters (not yet applied)
   const [isOpen, setIsOpen] = useState(false);
   const [localCategories, setLocalCategories] = useState<string[]>(appliedCategories);
   const [localDifficulties, setLocalDifficulties] = useState<string[]>(appliedDifficulties);
-  const [localPriceRange, setLocalPriceRange] = useState<number[]>([appliedPriceMin, appliedPriceMax]);
+  const [localPriceRange, setLocalPriceRange] = useState<number[]>([
+    appliedPriceMin,
+    appliedPriceMax,
+  ]);
   const [localSort, setLocalSort] = useState<string>(appliedSort);
 
   // Track previous applied values to avoid unnecessary updates
@@ -58,24 +73,27 @@ export function MarketplaceFilters({ categories, minPrice, maxPrice }: Marketpla
   useEffect(() => {
     const currentCategories = JSON.stringify([...appliedCategories].sort());
     const currentDifficulties = JSON.stringify([...appliedDifficulties].sort());
-    
+
     // Only update if values actually changed
     if (prevAppliedRef.current.categories !== currentCategories) {
       setLocalCategories(appliedCategories);
       prevAppliedRef.current.categories = currentCategories;
     }
-    
+
     if (prevAppliedRef.current.difficulties !== currentDifficulties) {
       setLocalDifficulties(appliedDifficulties);
       prevAppliedRef.current.difficulties = currentDifficulties;
     }
-    
-    if (prevAppliedRef.current.priceMin !== appliedPriceMin || prevAppliedRef.current.priceMax !== appliedPriceMax) {
+
+    if (
+      prevAppliedRef.current.priceMin !== appliedPriceMin ||
+      prevAppliedRef.current.priceMax !== appliedPriceMax
+    ) {
       setLocalPriceRange([appliedPriceMin, appliedPriceMax]);
       prevAppliedRef.current.priceMin = appliedPriceMin;
       prevAppliedRef.current.priceMax = appliedPriceMax;
     }
-    
+
     if (prevAppliedRef.current.sort !== appliedSort) {
       setLocalSort(appliedSort);
       prevAppliedRef.current.sort = appliedSort;
@@ -83,7 +101,7 @@ export function MarketplaceFilters({ categories, minPrice, maxPrice }: Marketpla
   }, [appliedCategories, appliedDifficulties, appliedPriceMin, appliedPriceMax, appliedSort]);
 
   // Check if there are pending changes
-  const hasPendingChanges = 
+  const hasPendingChanges =
     JSON.stringify(localCategories.sort()) !== JSON.stringify(appliedCategories.sort()) ||
     JSON.stringify(localDifficulties.sort()) !== JSON.stringify(appliedDifficulties.sort()) ||
     localPriceRange[0] !== appliedPriceMin ||
@@ -92,65 +110,64 @@ export function MarketplaceFilters({ categories, minPrice, maxPrice }: Marketpla
 
   const applyFilters = () => {
     const params = new URLSearchParams(searchParams.toString());
-    
+
     // Apply categories
     if (localCategories.length > 0) {
       params.set('categories', localCategories.join(','));
     } else {
       params.delete('categories');
     }
-    
+
     // Apply difficulties
     if (localDifficulties.length > 0) {
       params.set('difficulty', localDifficulties.join(','));
     } else {
       params.delete('difficulty');
     }
-    
+
     // Apply price range
     if (localPriceRange[0] !== minPrice) {
       params.set('minPrice', localPriceRange[0].toString());
     } else {
       params.delete('minPrice');
     }
-    
+
     if (localPriceRange[1] !== maxPrice) {
       params.set('maxPrice', localPriceRange[1].toString());
     } else {
       params.delete('maxPrice');
     }
-    
+
     // Apply sort
     if (localSort !== 'newest') {
       params.set('sort', localSort);
     } else {
       params.delete('sort');
     }
-    
+
     params.delete('page');
     router.push(`/marketplace?${params.toString()}`, { scroll: false });
   };
 
   const handleCategoryToggle = (categorySlug: string) => {
-    setLocalCategories(prev => 
-      prev.includes(categorySlug)
-        ? prev.filter(c => c !== categorySlug)
-        : [...prev, categorySlug]
+    setLocalCategories(prev =>
+      prev.includes(categorySlug) ? prev.filter(c => c !== categorySlug) : [...prev, categorySlug]
     );
   };
 
   const handleDifficultyToggle = (difficulty: string) => {
     setLocalDifficulties(prev =>
-      prev.includes(difficulty)
-        ? prev.filter(d => d !== difficulty)
-        : [...prev, difficulty]
+      prev.includes(difficulty) ? prev.filter(d => d !== difficulty) : [...prev, difficulty]
     );
   };
 
   const handlePriceRangeChange = (index: number, value: number) => {
     setLocalPriceRange(prev => {
       const newRange = [...prev];
-      newRange[index] = Math.max(minPrice, Math.min(maxPrice, value || (index === 0 ? minPrice : maxPrice)));
+      newRange[index] = Math.max(
+        minPrice,
+        Math.min(maxPrice, value || (index === 0 ? minPrice : maxPrice))
+      );
       return newRange;
     });
   };
@@ -174,7 +191,7 @@ export function MarketplaceFilters({ categories, minPrice, maxPrice }: Marketpla
     setLocalDifficulties([]);
     setLocalPriceRange([minPrice, maxPrice]);
     setLocalSort('newest');
-    
+
     // Clear URL filters
     const params = new URLSearchParams();
     const searchQuery = searchParams.get('q');
@@ -184,7 +201,7 @@ export function MarketplaceFilters({ categories, minPrice, maxPrice }: Marketpla
     router.push(`/marketplace?${params.toString()}`, { scroll: false });
   };
 
-  const hasActiveFilters = 
+  const hasActiveFilters =
     appliedCategories.length > 0 ||
     appliedDifficulties.length > 0 ||
     appliedPriceMin !== minPrice ||
@@ -204,10 +221,11 @@ export function MarketplaceFilters({ categories, minPrice, maxPrice }: Marketpla
             <Filter className="h-4 w-4" />
             Filters
             {(hasActiveFilters || hasPendingChanges) && (
-              <Badge variant={hasPendingChanges ? "default" : "secondary"} className="ml-2">
-                {appliedCategories.length + appliedDifficulties.length + 
-                 (appliedPriceMin !== minPrice || appliedPriceMax !== maxPrice ? 1 : 0) + 
-                 (appliedSort !== 'newest' ? 1 : 0)}
+              <Badge variant={hasPendingChanges ? 'default' : 'secondary'} className="ml-2">
+                {appliedCategories.length +
+                  appliedDifficulties.length +
+                  (appliedPriceMin !== minPrice || appliedPriceMax !== maxPrice ? 1 : 0) +
+                  (appliedSort !== 'newest' ? 1 : 0)}
                 {hasPendingChanges && '+'}
               </Badge>
             )}
@@ -217,13 +235,21 @@ export function MarketplaceFilters({ categories, minPrice, maxPrice }: Marketpla
       </div>
 
       {/* Filter panel */}
-      <div className={`${isOpen ? 'block' : 'hidden'} lg:block space-y-6 border rounded-lg p-6 bg-card`}>
+      <div
+        className={`${isOpen ? 'block' : 'hidden'} lg:block space-y-6 border rounded-lg p-6 bg-card`}
+      >
         {/* Search Bar */}
         <div className="space-y-2">
           <Label className="text-base font-semibold">Search</Label>
           <MarketplaceSearch />
+          {/* Results Count - Only show when filtering or searching */}
+          {hasFilters && productsCount > 0 && (
+            <p className="text-sm text-muted-foreground pt-1">
+              {productsCount} {productsCount === 1 ? 'pattern' : 'patterns'} found
+            </p>
+          )}
         </div>
-        
+
         <div className="border-t pt-6 space-y-6">
           {/* Clear filters button */}
           {hasActiveFilters && (
@@ -241,153 +267,144 @@ export function MarketplaceFilters({ categories, minPrice, maxPrice }: Marketpla
           )}
 
           {/* Sort */}
-        <div>
-          <Label className="text-base font-semibold mb-3 block">Sort by</Label>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="w-full justify-between">
-                {localSort === 'newest' && 'Newest first'}
-                {localSort === 'oldest' && 'Oldest first'}
-                {localSort === 'price-low' && 'Price: Low to High'}
-                {localSort === 'price-high' && 'Price: High to Low'}
-                {localSort === 'title-asc' && 'Title: A to Z'}
-                {localSort === 'title-desc' && 'Title: Z to A'}
-                <ChevronDown className="h-4 w-4 ml-2" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-full">
-              <DropdownMenuItem onClick={() => handleSortChange('newest')}>
-                Newest first
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleSortChange('oldest')}>
-                Oldest first
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleSortChange('price-low')}>
-                Price: Low to High
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleSortChange('price-high')}>
-                Price: High to Low
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleSortChange('title-asc')}>
-                Title: A to Z
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleSortChange('title-desc')}>
-                Title: Z to A
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+          <div>
+            <Label className="text-base font-semibold mb-3 block">Sort by</Label>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="w-full justify-between">
+                  {localSort === 'newest' && 'Newest first'}
+                  {localSort === 'oldest' && 'Oldest first'}
+                  {localSort === 'price-low' && 'Price: Low to High'}
+                  {localSort === 'price-high' && 'Price: High to Low'}
+                  {localSort === 'title-asc' && 'Title: A to Z'}
+                  {localSort === 'title-desc' && 'Title: Z to A'}
+                  <ChevronDown className="h-4 w-4 ml-2" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-full">
+                <DropdownMenuItem onClick={() => handleSortChange('newest')}>
+                  Newest first
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSortChange('oldest')}>
+                  Oldest first
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSortChange('price-low')}>
+                  Price: Low to High
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSortChange('price-high')}>
+                  Price: High to Low
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSortChange('title-asc')}>
+                  Title: A to Z
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleSortChange('title-desc')}>
+                  Title: Z to A
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
 
-        {/* Price Range */}
-        <div>
-          <Label className="text-base font-semibold mb-3 block">Price Range</Label>
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <Label htmlFor="min-price" className="text-sm text-muted-foreground">
-                Min ($)
-              </Label>
-              <Input
-                id="min-price"
-                type="number"
-                min={minPrice}
-                max={maxPrice}
-                value={localPriceRange[0]}
-                onChange={(e) => {
-                  handlePriceRangeChange(0, Number(e.target.value) || minPrice);
-                }}
-                className="mt-1"
-                placeholder={`$${minPrice}`}
-              />
-            </div>
-            <div className="flex-1">
-              <Label htmlFor="max-price" className="text-sm text-muted-foreground">
-                Max ($)
-              </Label>
-              <Input
-                id="max-price"
-                type="number"
-                min={minPrice}
-                max={maxPrice}
-                value={localPriceRange[1]}
-                onChange={(e) => {
-                  handlePriceRangeChange(1, Number(e.target.value) || maxPrice);
-                }}
-                className="mt-1"
-                placeholder={`$${maxPrice}`}
-              />
+          {/* Price Range */}
+          <div>
+            <Label className="text-base font-semibold mb-3 block">Price Range</Label>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <Label htmlFor="min-price" className="text-sm text-muted-foreground">
+                  Min ($)
+                </Label>
+                <Input
+                  id="min-price"
+                  type="number"
+                  min={minPrice}
+                  max={maxPrice}
+                  value={localPriceRange[0]}
+                  onChange={e => {
+                    handlePriceRangeChange(0, Number(e.target.value) || minPrice);
+                  }}
+                  className="mt-1"
+                  placeholder={`$${minPrice}`}
+                />
+              </div>
+              <div className="flex-1">
+                <Label htmlFor="max-price" className="text-sm text-muted-foreground">
+                  Max ($)
+                </Label>
+                <Input
+                  id="max-price"
+                  type="number"
+                  min={minPrice}
+                  max={maxPrice}
+                  value={localPriceRange[1]}
+                  onChange={e => {
+                    handlePriceRangeChange(1, Number(e.target.value) || maxPrice);
+                  }}
+                  className="mt-1"
+                  placeholder={`$${maxPrice}`}
+                />
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Categories */}
-        {categories.length > 0 && (
+          {/* Categories */}
+          {categories.length > 0 && (
+            <div>
+              <Label className="text-base font-semibold mb-3 block">Categories</Label>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {categories.map(category => (
+                  <div key={category.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`category-${category.id}`}
+                      checked={localCategories.includes(category.slug)}
+                      onCheckedChange={() => handleCategoryToggle(category.slug)}
+                    />
+                    <Label
+                      htmlFor={`category-${category.id}`}
+                      className="text-sm font-normal cursor-pointer flex-1"
+                    >
+                      {category.name}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Difficulty */}
           <div>
-            <Label className="text-base font-semibold mb-3 block">Categories</Label>
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {categories.map((category) => (
-                <div key={category.id} className="flex items-center space-x-2">
+            <Label className="text-base font-semibold mb-3 block">Difficulty</Label>
+            <div className="space-y-2">
+              {DIFFICULTY_LEVELS.map(level => (
+                <div key={level.value} className="flex items-center space-x-2">
                   <Checkbox
-                    id={`category-${category.id}`}
-                    checked={localCategories.includes(category.slug)}
-                    onCheckedChange={() => handleCategoryToggle(category.slug)}
+                    id={`difficulty-${level.value}`}
+                    checked={localDifficulties.includes(level.value)}
+                    onCheckedChange={() => handleDifficultyToggle(level.value)}
                   />
                   <Label
-                    htmlFor={`category-${category.id}`}
+                    htmlFor={`difficulty-${level.value}`}
                     className="text-sm font-normal cursor-pointer flex-1"
                   >
-                    {category.name}
+                    {level.label}
                   </Label>
                 </div>
               ))}
             </div>
           </div>
-        )}
 
-        {/* Difficulty */}
-        <div>
-          <Label className="text-base font-semibold mb-3 block">Difficulty</Label>
-          <div className="space-y-2">
-            {DIFFICULTY_LEVELS.map((level) => (
-              <div key={level.value} className="flex items-center space-x-2">
-                <Checkbox
-                  id={`difficulty-${level.value}`}
-                  checked={localDifficulties.includes(level.value)}
-                  onCheckedChange={() => handleDifficultyToggle(level.value)}
-                />
-                <Label
-                  htmlFor={`difficulty-${level.value}`}
-                  className="text-sm font-normal cursor-pointer flex-1"
-                >
-                  {level.label}
-                </Label>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Apply Filters Button */}
-        <div className="pt-4 border-t space-y-2">
-          <Button
-            onClick={applyFilters}
-            className="w-full"
-            disabled={!hasPendingChanges}
-          >
-            Apply Filters
-          </Button>
-          {hasActiveFilters && (
-            <Button
-              variant="outline"
-              onClick={handleClearFilters}
-              className="w-full"
-            >
-              <X className="h-4 w-4 mr-2" />
-              Clear All Filters
+          {/* Apply Filters Button */}
+          <div className="pt-4 border-t space-y-2">
+            <Button onClick={applyFilters} className="w-full" disabled={!hasPendingChanges}>
+              Apply Filters
             </Button>
-          )}
-        </div>
+            {hasActiveFilters && (
+              <Button variant="outline" onClick={handleClearFilters} className="w-full">
+                <X className="h-4 w-4 mr-2" />
+                Clear All Filters
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>
   );
 }
-

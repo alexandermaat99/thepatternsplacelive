@@ -57,6 +57,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
   const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
+  const [fromCart, setFromCart] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const { user, isAuthenticated } = useAuth();
   const { addItem } = useCart();
@@ -65,6 +66,14 @@ export function ProductDetail({ product }: ProductDetailProps) {
 
   const favorited = isFavorite(product.id);
   const isOwner = user?.id === product.user_id;
+
+  // Check if user came from cart or auth pages
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      setFromCart(params.get('from') === 'cart');
+    }
+  }, []);
 
   const handleAddToCart = () => {
     setIsLoading(true);
@@ -113,9 +122,39 @@ export function ProductDetail({ product }: ProductDetailProps) {
   };
 
   const handleBackClick = () => {
-    // Always go to marketplace from product pages for predictable navigation
-    // This avoids issues with auth pages or other pages in browser history
-    router.push('/marketplace');
+    if (typeof window === 'undefined') {
+      router.push('/marketplace');
+      return;
+    }
+
+    // Check if user came from the cart page (via query parameter)
+    if (fromCart) {
+      // If coming from cart, go to marketplace instead
+      router.push('/marketplace');
+      return;
+    }
+
+    // Check if previous page in history might be an auth page
+    // We check referrer to determine if we should avoid router.back()
+    const referrer = document.referrer;
+    if (referrer) {
+      try {
+        const referrerUrl = new URL(referrer);
+        const referrerPath = referrerUrl.pathname;
+
+        // If referrer is an auth page, go to marketplace instead
+        if (referrerPath.startsWith('/auth/') || referrerPath.startsWith('/login')) {
+          router.push('/marketplace');
+          return;
+        }
+      } catch (e) {
+        // Invalid referrer, continue with router.back()
+      }
+    }
+
+    // Default: use browser back to preserve scroll position and filters
+    // This is industry standard - browser automatically restores scroll position
+    router.back();
   };
 
   return (
@@ -127,7 +166,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
           className="flex items-center gap-2 -ml-2 sm:ml-0"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to Marketplace
+          {fromCart ? 'Back to Marketplace' : 'Back'}
         </Button>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
