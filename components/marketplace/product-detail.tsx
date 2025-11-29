@@ -67,13 +67,22 @@ export function ProductDetail({ product }: ProductDetailProps) {
     setIsLoading(true);
 
     try {
-      addItem(product);
-      // Show success feedback
+      const wasAdded = addItem(product);
+      
+      if (wasAdded) {
+        // Item was successfully added
+        showToast(`${product.title} added to cart`, 'success');
+      } else {
+        // Item already in cart
+        showToast('This item is already in your cart', 'info');
+      }
+      
       setTimeout(() => {
         setIsLoading(false);
       }, 500);
     } catch (error) {
       console.error('Add to cart error:', error);
+      showToast('Failed to add item to cart. Please try again.', 'error');
       setIsLoading(false);
     }
   };

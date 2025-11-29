@@ -24,9 +24,6 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     }, 3000);
   }, []);
 
-  const removeToast = useCallback((id: string) => {
-    setToasts(prev => prev.filter(toast => toast.id !== id));
-  }, []);
 
   return (
     <ToastContext.Provider value={{ showToast }}>
@@ -35,7 +32,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
         {toasts.map(toast => (
           <div key={toast.id} className="pointer-events-auto">
-            <ToastComponent toast={toast} onClose={removeToast} />
+            <ToastComponent toast={toast} />
           </div>
         ))}
       </div>

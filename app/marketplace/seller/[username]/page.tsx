@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { ProductCard } from '@/components/marketplace/product-card';
 import { notFound } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
+import { BackButton } from '@/components/back-button';
 
 interface SellerPageProps {
   params: Promise<{
@@ -48,6 +49,7 @@ export default async function SellerPage({ params }: SellerPageProps) {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
+      <BackButton />
       <div className="mb-8">
         <h1 className="text-3xl sm:text-4xl font-bold mb-2">
           {profile.username ? `@${profile.username}` : sellerName}
@@ -61,7 +63,7 @@ export default async function SellerPage({ params }: SellerPageProps) {
       </div>
 
       {products && products.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {products.map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}

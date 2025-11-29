@@ -28,7 +28,7 @@ type CartAction =
 
 interface CartContextType {
   state: CartState;
-  addItem: (product: Product) => void;
+  addItem: (product: Product) => boolean; // Returns true if added, false if already in cart
   removeItem: (productId: string) => void;
   clearCart: () => void;
 }
@@ -115,9 +115,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('cart', JSON.stringify(state.items));
   }, [state.items]);
 
-  const addItem = useCallback((product: Product) => {
+  const addItem = useCallback((product: Product): boolean => {
+    // Check if item already exists before dispatching
+    const existingItem = state.items.find(item => item.id === product.id);
+    
+    if (existingItem) {
+      // Product already in cart
+      return false;
+    }
+    
     dispatch({ type: 'ADD_ITEM', payload: product });
-  }, []);
+    return true;
+  }, [state.items]);
 
   const removeItem = useCallback((productId: string) => {
     dispatch({ type: 'REMOVE_ITEM', payload: productId });

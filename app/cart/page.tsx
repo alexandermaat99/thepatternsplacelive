@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useCart } from '@/contexts/cart-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,13 +10,27 @@ import { ShoppingCart, Trash2, ArrowLeft } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { RemoveCartItemDialog } from '@/components/remove-cart-item-dialog';
 
 export default function CartPage() {
   const { state, removeItem, clearCart } = useCart();
   const router = useRouter();
+  const [itemToRemove, setItemToRemove] = useState<{ id: string; title: string } | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const handleCheckout = () => {
     router.push('/checkout');
+  };
+
+  const handleRemoveClick = (item: { id: string; title: string }) => {
+    setItemToRemove(item);
+    setIsDialogOpen(true);
+  };
+
+  const handleConfirmRemove = () => {
+    if (itemToRemove) {
+      removeItem(itemToRemove.id);
+    }
   };
 
   if (state.items.length === 0) {
@@ -77,41 +92,52 @@ export default function CartPage() {
           {/* Cart Items */}
           <div className="lg:col-span-2 space-y-4">
             {state.items.map((item) => (
-              <Card key={item.id}>
+              <Card key={item.id} className="hover:shadow-md transition-shadow">
                 <CardContent className="p-6">
                   <div className="flex gap-4">
-                    {/* Product Image */}
-                    <div className="w-20 h-20 relative flex-shrink-0">
-                      {item.image_url ? (
-                        <Image
-                          src={item.image_url}
-                          alt={item.title}
-                          fill
-                          className="object-cover rounded-lg"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-muted rounded-lg flex items-center justify-center">
-                          <span className="text-muted-foreground text-xs">No image</span>
-                        </div>
-                      )}
-                    </div>
+                    {/* Clickable Product Area */}
+                    <Link 
+                      href={`/marketplace/product/${item.id}`}
+                      className="flex gap-4 flex-1 min-w-0 cursor-pointer"
+                    >
+                      {/* Product Image */}
+                      <div className="w-20 h-20 relative flex-shrink-0">
+                        {item.image_url ? (
+                          <Image
+                            src={item.image_url}
+                            alt={item.title}
+                            fill
+                            className="object-cover rounded-lg"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-muted rounded-lg flex items-center justify-center">
+                            <span className="text-muted-foreground text-xs">No image</span>
+                          </div>
+                        )}
+                      </div>
 
-                    {/* Product Info */}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-lg truncate">{item.title}</h3>
-                      <p className="text-muted-foreground text-sm mb-2">{item.category}</p>
-                      <p className="text-lg font-bold text-primary">
-                        {formatAmountForDisplay(item.price, item.currency)}
-                      </p>
-                    </div>
+                      {/* Product Info */}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-lg truncate">{item.title}</h3>
+                        <p className="text-muted-foreground text-sm mb-2">{item.category}</p>
+                        <p className="text-lg font-bold text-primary">
+                          {formatAmountForDisplay(item.price, item.currency)}
+                        </p>
+                      </div>
+                    </Link>
 
                     {/* Remove Button */}
                     <div className="flex items-center">
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => removeItem(item.id)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleRemoveClick({ id: item.id, title: item.title });
+                        }}
                         className="text-red-600 hover:text-red-700 h-8 w-8 p-0"
+                        aria-label={`Remove ${item.title} from cart`}
                       >
                         <Trash2 className="h-3 w-3" />
                       </Button>
@@ -170,6 +196,16 @@ export default function CartPage() {
             </Card>
           </div>
         </div>
+
+        <RemoveCartItemDialog
+          item={itemToRemove}
+          isOpen={isDialogOpen}
+          onClose={() => {
+            setIsDialogOpen(false);
+            setItemToRemove(null);
+          }}
+          onConfirm={handleConfirmRemove}
+        />
     </div>
   );
 }

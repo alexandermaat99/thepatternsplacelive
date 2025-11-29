@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { X, CheckCircle2, Info, AlertCircle } from 'lucide-react';
+import { CheckCircle2, Info, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type ToastType = 'success' | 'error' | 'info';
@@ -14,10 +14,9 @@ export interface ToastData {
 
 interface ToastProps {
   toast: ToastData;
-  onClose: (id: string) => void;
 }
 
-export function Toast({ toast, onClose }: ToastProps) {
+export function Toast({ toast }: ToastProps) {
   const icons = {
     success: CheckCircle2,
     error: AlertCircle,
@@ -41,13 +40,6 @@ export function Toast({ toast, onClose }: ToastProps) {
     >
       <Icon className="h-5 w-5 flex-shrink-0" />
       <p className="flex-1 text-sm font-medium">{toast.message}</p>
-      <button
-        onClick={() => onClose(toast.id)}
-        className="flex-shrink-0 rounded-md p-1 hover:bg-black/10 transition-colors"
-        aria-label="Close"
-      >
-        <X className="h-4 w-4" />
-      </button>
     </div>
   );
 }

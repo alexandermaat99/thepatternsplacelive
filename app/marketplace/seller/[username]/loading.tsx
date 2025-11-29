@@ -7,7 +7,7 @@ export default function SellerLoading() {
         <div className="h-10 bg-muted rounded w-48 mb-2 animate-pulse"></div>
         <div className="h-5 bg-muted rounded w-32 animate-pulse"></div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[...Array(8)].map((_, i) => (
           <Card key={i} className="animate-pulse">
             <CardContent className="p-0">
