@@ -268,17 +268,24 @@ export async function linkCategoriesToProduct(
     return;
   }
 
-  console.log('Linking categories to product:', { productId, categoryNames: categoryNameArray });
+  // Remove duplicate category names (case-insensitive, already lowercased)
+  const uniqueCategoryNames = Array.from(new Set(categoryNameArray));
+
+  console.log('Linking categories to product:', { productId, categoryNames: uniqueCategoryNames });
 
   // Find or create categories one by one to handle errors better
   const validCategories: Category[] = [];
+  const seenCategoryIds = new Set<string>(); // Track categories we've already added
   
-  for (const categoryName of categoryNameArray) {
+  for (const categoryName of uniqueCategoryNames) {
     try {
       const category = await findOrCreateCategory(categoryName);
-      if (category) {
+      if (category && !seenCategoryIds.has(category.id)) {
         validCategories.push(category);
+        seenCategoryIds.add(category.id);
         console.log('Found/created category:', category.name, category.id);
+      } else if (seenCategoryIds.has(category?.id || '')) {
+        console.log(`Skipping duplicate category: ${categoryName} (already added)`);
       } else {
         console.warn(`Failed to find or create category: ${categoryName}`);
       }
@@ -304,11 +311,18 @@ export async function linkCategoriesToProduct(
     // Continue anyway - might be first time linking
   }
 
-  // Create new category links
-  const categoryLinks = validCategories.map(category => ({
-    product_id: productId,
-    category_id: category.id,
-  }));
+  // Create new category links, ensuring no duplicates by category_id
+  const categoryLinksMap = new Map<string, { product_id: string; category_id: string }>();
+  for (const category of validCategories) {
+    const key = `${productId}-${category.id}`;
+    if (!categoryLinksMap.has(key)) {
+      categoryLinksMap.set(key, {
+        product_id: productId,
+        category_id: category.id,
+      });
+    }
+  }
+  const categoryLinks = Array.from(categoryLinksMap.values());
 
   console.log('Inserting category links:', categoryLinks);
 
@@ -320,6 +334,55 @@ export async function linkCategoriesToProduct(
   if (insertError) {
     console.error('Error linking categories to product:', insertError);
     console.error('Category links attempted:', categoryLinks);
+    
+    // If it's a duplicate key error, it's likely because categories were already linked
+    // This can happen in race conditions or if the delete didn't work
+    if (insertError.message.includes('duplicate key') || insertError.code === '23505') {
+      console.warn('Duplicate key detected - categories may already be linked. Attempting to continue...');
+      // Try to fetch existing links to verify they're correct
+      const { data: existingLinks } = await supabase
+        .from('product_categories')
+        .select('category_id')
+        .eq('product_id', productId);
+      
+      const existingCategoryIds = new Set(existingLinks?.map(link => link.category_id) || []);
+      const desiredCategoryIds = new Set(validCategories.map(cat => cat.id));
+      
+      // Check if all desired categories are already linked
+      const allLinked = Array.from(desiredCategoryIds).every(id => existingCategoryIds.has(id));
+      
+      if (allLinked) {
+        console.log('All categories are already linked correctly. Operation successful.');
+        return; // Success - categories are already linked
+      }
+      
+      // If not all are linked, try inserting one by one, skipping duplicates
+      console.log('Attempting to link categories individually, skipping duplicates...');
+      let successCount = 0;
+      for (const link of categoryLinks) {
+        const { error: linkError } = await supabase
+          .from('product_categories')
+          .insert(link)
+          .select();
+        
+        if (linkError) {
+          if (linkError.message.includes('duplicate key') || linkError.code === '23505') {
+            console.log(`Category ${link.category_id} already linked, skipping...`);
+            successCount++; // Count as success since it's already there
+          } else {
+            console.error(`Error linking category ${link.category_id}:`, linkError);
+          }
+        } else {
+          successCount++;
+        }
+      }
+      
+      if (successCount === categoryLinks.length) {
+        console.log('All categories linked successfully (some were already linked)');
+        return; // Success
+      }
+    }
+    
     throw new Error(`Failed to link categories: ${insertError.message}`);
   }
 

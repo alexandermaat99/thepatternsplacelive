@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatAmountForDisplay } from '@/lib/utils-client';
 import { ProductImageGallery } from '@/components/marketplace/product-image-gallery';
-import { ArrowLeft, ShoppingCart, Heart, ChevronDown } from 'lucide-react';
+import { ArrowLeft, ShoppingCart, Heart, ChevronDown, Edit } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { useCart } from '@/contexts/cart-context';
 import { useFavorites } from '@/hooks/useFavorites';
@@ -16,6 +16,7 @@ import { AuthPromptDialog } from '@/components/auth-prompt-dialog';
 import { linkifyText } from '@/lib/text-utils';
 import { getDifficultyLabel, getDifficultyVariant } from '@/lib/constants';
 import { ProductFilesDownload } from '@/components/marketplace/product-files-download';
+import { EditProductModal } from '@/components/edit-product-modal';
 
 interface Category {
   id: string;
@@ -56,12 +57,23 @@ export function ProductDetail({ product }: ProductDetailProps) {
   const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
+  const [fromCart, setFromCart] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const { user, isAuthenticated } = useAuth();
   const { addItem } = useCart();
   const { isFavorite, toggleFavorite } = useFavorites();
   const { showToast } = useToast();
 
   const favorited = isFavorite(product.id);
+  const isOwner = user?.id === product.user_id;
+
+  // Check if user came from cart via query parameter
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      setFromCart(params.get('from') === 'cart');
+    }
+  }, []);
 
   const handleAddToCart = () => {
     setIsLoading(true);
@@ -109,16 +121,27 @@ export function ProductDetail({ product }: ProductDetailProps) {
     }
   };
 
+  const handleBackClick = () => {
+    // Check if user came from the cart page (via query parameter)
+    if (fromCart) {
+      // If coming from cart, go to marketplace instead
+      router.push('/marketplace');
+      return;
+    }
+    // Otherwise use browser back to preserve scroll position and filters
+    router.back();
+  };
+
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-4 sm:mb-6">
         <Button
           variant="ghost"
-          onClick={() => router.back()}
+          onClick={handleBackClick}
           className="flex items-center gap-2 -ml-2 sm:ml-0"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back
+          {fromCart ? 'Back to Marketplace' : 'Back'}
         </Button>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -201,17 +224,29 @@ export function ProductDetail({ product }: ProductDetailProps) {
             </div>
           </div>
 
-          <div>
-            <Button onClick={handleAddToCart} className="w-full" size="lg" disabled={isLoading}>
-              {isLoading ? (
-                'Adding...'
-              ) : (
-                <>
-                  <ShoppingCart className="h-4 w-4 mr-2" />
-                  Add to Cart
-                </>
-              )}
-            </Button>
+          <div className="space-y-3">
+            {isOwner ? (
+              <Button
+                onClick={() => setIsEditModalOpen(true)}
+                variant="outline"
+                className="w-full"
+                size="lg"
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Edit Product
+              </Button>
+            ) : (
+              <Button onClick={handleAddToCart} className="w-full" size="lg" disabled={isLoading}>
+                {isLoading ? (
+                  'Adding...'
+                ) : (
+                  <>
+                    <ShoppingCart className="h-4 w-4 mr-2" />
+                    Add to Cart
+                  </>
+                )}
+              </Button>
+            )}
           </div>
 
           {/* Description Section */}
@@ -271,6 +306,14 @@ export function ProductDetail({ product }: ProductDetailProps) {
       </div>
 
       <AuthPromptDialog isOpen={showAuthDialog} onClose={() => setShowAuthDialog(false)} />
+
+      {isOwner && (
+        <EditProductModal
+          product={product as any}
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

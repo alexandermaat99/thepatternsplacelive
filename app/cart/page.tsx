@@ -97,7 +97,7 @@ export default function CartPage() {
                   <div className="flex gap-4">
                     {/* Clickable Product Area */}
                     <Link 
-                      href={`/marketplace/product/${item.id}`}
+                      href={`/marketplace/product/${item.id}?from=cart`}
                       className="flex gap-4 flex-1 min-w-0 cursor-pointer"
                     >
                       {/* Product Image */}
