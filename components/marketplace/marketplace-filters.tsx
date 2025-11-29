@@ -209,7 +209,7 @@ export function MarketplaceFilters({
     appliedSort !== 'newest';
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 lg:space-y-0">
       {/* Mobile filter button */}
       <div className="lg:hidden">
         <Button
@@ -236,7 +236,11 @@ export function MarketplaceFilters({
 
       {/* Filter panel */}
       <div
-        className={`${isOpen ? 'block' : 'hidden'} lg:block space-y-6 border rounded-lg p-6 bg-card`}
+        className={`space-y-6 border rounded-lg bg-card overflow-hidden transition-all duration-300 ease-in-out lg:transition-none ${
+          isOpen
+            ? 'max-h-[5000px] opacity-100 mt-4 p-6 border'
+            : 'max-h-0 opacity-0 mt-0 p-0 border-0'
+        } lg:max-h-none lg:opacity-100 lg:mt-0 lg:p-6 lg:border lg:block`}
       >
         {/* Search Bar */}
         <div className="space-y-2">
