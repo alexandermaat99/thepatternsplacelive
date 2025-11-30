@@ -84,7 +84,11 @@ export default async function EarningsPage() {
     console.error('Error fetching orders:', ordersError);
   }
 
-  const completedOrders = orders || [];
+  // Normalize orders - Supabase returns products as object but TS sees array
+  const completedOrders = (orders || []).map(order => ({
+    ...order,
+    products: Array.isArray(order.products) ? order.products[0] : order.products,
+  }));
 
   // Calculate stats
   const now = new Date();
