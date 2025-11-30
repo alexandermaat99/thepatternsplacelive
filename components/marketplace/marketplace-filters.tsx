@@ -357,8 +357,8 @@ export function MarketplaceFilters({
                         onClick={() => handleCategoryToggle(category.slug)}
                         className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
                           isSelected
-                            ? 'bg-[#E8A598] text-white border-2 border-[#E8A598]'
-                            : 'bg-background border-2 border-[#383838] text-foreground hover:bg-muted'
+                            ? 'bg-[#E8A598] text-white border-2 border-[#E8A598] shadow-md hover:bg-[#d99184] hover:shadow-lg hover:scale-105'
+                            : 'bg-background border-2 border-muted-foreground/30 text-foreground hover:border-[#E8A598] hover:text-[#E8A598] hover:bg-[#E8A598]/10 hover:scale-105 hover:shadow-sm'
                         }`}
                       >
                         {category.name}
@@ -388,7 +388,11 @@ export function MarketplaceFilters({
                   <button
                     key={level.value}
                     onClick={() => handleDifficultyToggle(level.value)}
-                    className="px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 border-2"
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 border-2 ${
+                      isSelected 
+                        ? 'shadow-md hover:shadow-lg hover:scale-105' 
+                        : 'hover:scale-105 hover:shadow-sm'
+                    }`}
                     style={
                       isSelected
                         ? {
@@ -399,9 +403,23 @@ export function MarketplaceFilters({
                         : {
                             backgroundColor: 'var(--background)',
                             color: 'var(--foreground)',
-                            borderColor: '#383838',
+                            borderColor: 'hsl(var(--muted-foreground) / 0.3)',
                           }
                     }
+                    onMouseEnter={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.borderColor = level.color;
+                        e.currentTarget.style.color = level.color;
+                        e.currentTarget.style.backgroundColor = `${level.color}15`;
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.borderColor = 'hsl(var(--muted-foreground) / 0.3)';
+                        e.currentTarget.style.color = 'var(--foreground)';
+                        e.currentTarget.style.backgroundColor = 'var(--background)';
+                      }
+                    }}
                   >
                     {level.label}
                   </button>
@@ -427,3 +445,4 @@ export function MarketplaceFilters({
     </div>
   );
 }
+
