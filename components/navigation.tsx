@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useTheme } from 'next-themes';
 import { ProfileDropdown } from '@/components/profile-dropdown';
 import { CartIcon } from '@/components/cart-icon';
 import { Button } from '@/components/ui/button';
@@ -19,6 +20,17 @@ interface NavigationProps {
 
 export function Navigation({ showMarketplaceLinks = false }: NavigationProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const { resolvedTheme } = useTheme();
+
+  // Avoid hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Use dark logo for light mode, light logo for dark mode
+  const logoSrc =
+    mounted && resolvedTheme === 'dark' ? '/logos/back_logo_light.svg' : '/logos/back_logo.svg';
 
   return (
     <nav className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
@@ -31,17 +43,8 @@ export function Navigation({ showMarketplaceLinks = false }: NavigationProps) {
                 {/* Mobile menu */}
                 <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
                   <DropdownMenuTrigger asChild>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="md:hidden"
-                      aria-label="Menu"
-                    >
-                      {isMenuOpen ? (
-                        <X className="h-5 w-5" />
-                      ) : (
-                        <Menu className="h-5 w-5" />
-                      )}
+                    <Button variant="ghost" size="icon" className="md:hidden" aria-label="Menu">
+                      {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" className="w-48">
@@ -59,7 +62,7 @@ export function Navigation({ showMarketplaceLinks = false }: NavigationProps) {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-                
+
                 {/* Desktop links */}
                 <div className="hidden md:flex items-center gap-2">
                   <Button asChild variant="ghost" size="sm">
@@ -81,15 +84,8 @@ export function Navigation({ showMarketplaceLinks = false }: NavigationProps) {
 
           {/* Center: Logo */}
           <div className="flex items-center justify-center">
-            <Link 
-              href="/" 
-              className="flex items-center hover:opacity-80 transition-opacity"
-            >
-              <img 
-                src="/logos/back_logo.svg" 
-                alt="The Patterns Place" 
-                className="h-6 sm:h-8 w-auto"
-              />
+            <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
+              <img src={logoSrc} alt="The Patterns Place" className="h-6 sm:h-8 w-auto" />
             </Link>
           </div>
 

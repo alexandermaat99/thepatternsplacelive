@@ -339,22 +339,31 @@ export function MarketplaceFilters({
             <div>
               <Label className="text-base font-semibold mb-3 block">Categories</Label>
               <div className="flex flex-wrap gap-2">
-                {categories.map(category => {
-                  const isSelected = localCategories.includes(category.slug);
-                  return (
-                    <button
-                      key={category.id}
-                      onClick={() => handleCategoryToggle(category.slug)}
-                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
-                        isSelected
-                          ? 'bg-[#E8A598] text-white border-2 border-[#E8A598]'
-                          : 'bg-background border-2 border-[#383838] text-foreground hover:bg-muted'
-                      }`}
-                    >
-                      {category.name}
-                    </button>
-                  );
-                })}
+                {/* Sort categories: applied (filtered) ones first, then unselected */}
+                {[...categories]
+                  .sort((a, b) => {
+                    const aApplied = appliedCategories.includes(a.slug);
+                    const bApplied = appliedCategories.includes(b.slug);
+                    if (aApplied && !bApplied) return -1;
+                    if (!aApplied && bApplied) return 1;
+                    return 0; // Keep original order within each group
+                  })
+                  .map(category => {
+                    const isSelected = localCategories.includes(category.slug);
+                    return (
+                      <button
+                        key={category.id}
+                        onClick={() => handleCategoryToggle(category.slug)}
+                        className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                          isSelected
+                            ? 'bg-[#E8A598] text-white border-2 border-[#E8A598]'
+                            : 'bg-background border-2 border-[#383838] text-foreground hover:bg-muted'
+                        }`}
+                      >
+                        {category.name}
+                      </button>
+                    );
+                  })}
               </div>
             </div>
           )}
