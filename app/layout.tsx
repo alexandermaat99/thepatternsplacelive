@@ -13,6 +13,15 @@ export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
   title: "The Pattern's Place",
   description: "The fastest way to build apps with Next.js and Supabase",
+  icons: {
+    icon: [
+      { url: "/icons/favicon.ico", sizes: "any" },
+      { url: "/icons/favicon.svg", type: "image/svg+xml" },
+      { url: "/icons/favicon-96x96.png", sizes: "96x96", type: "image/png" },
+    ],
+    apple: "/icons/apple-touch-icon.png",
+  },
+  manifest: "/icons/site.webmanifest",
 };
 
 const geistSans = Geist({
