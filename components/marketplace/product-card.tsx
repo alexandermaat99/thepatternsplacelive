@@ -124,7 +124,7 @@ export function ProductCard({ product, hideFavorite = false }: ProductCardProps)
           )}
 
           {/* Price overlay bubble */}
-          <div className="absolute bottom-2 right-2 bg-background/20 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-md border border-border/50">
+          <div className="absolute bottom-2 right-2 bg-background/20 backdrop-blur-sm rounded-full px-3 py-1 shadow-md border border-border/50">
             <span className="text-xs font-bold text-foreground">
               {formatAmountForDisplay(product.price, product.currency)}
             </span>
