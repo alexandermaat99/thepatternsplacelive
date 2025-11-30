@@ -15,7 +15,7 @@ import { User, Settings, LogOut, ShoppingBag, Package, Plus } from 'lucide-react
 import Link from 'next/link';
 
 export function ProfileDropdown() {
-  const { user, profile, signOut, loading } = useAuth();
+  const { user, profile, signOut, loading, openAuthModal } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
   // Debug logging
@@ -189,45 +189,25 @@ export function ProfileDropdown() {
         <User className="h-4 w-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuItem asChild>
-          <Link
-            href="/auth/login"
-            className="flex items-center w-full"
-            onClick={e => {
-              setIsOpen(false);
-              // Store current path in sessionStorage before navigation
-              if (typeof window !== 'undefined') {
-                const currentPath = window.location.pathname + window.location.search;
-                // Don't store auth pages
-                if (!currentPath.startsWith('/auth') && !currentPath.startsWith('/login')) {
-                  sessionStorage.setItem('auth_redirect_url', currentPath);
-                }
-              }
-            }}
-          >
-            <User className="mr-2 h-4 w-4" />
-            <span>Sign in</span>
-          </Link>
+        <DropdownMenuItem
+          onClick={() => {
+            setIsOpen(false);
+            openAuthModal('login');
+          }}
+          className="flex items-center w-full cursor-pointer"
+        >
+          <User className="mr-2 h-4 w-4" />
+          <span>Sign in</span>
         </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link
-            href="/auth/sign-up"
-            className="flex items-center w-full"
-            onClick={e => {
-              setIsOpen(false);
-              // Store current path in sessionStorage before navigation
-              if (typeof window !== 'undefined') {
-                const currentPath = window.location.pathname + window.location.search;
-                // Don't store auth pages
-                if (!currentPath.startsWith('/auth') && !currentPath.startsWith('/login')) {
-                  sessionStorage.setItem('auth_redirect_url', currentPath);
-                }
-              }
-            }}
-          >
-            <User className="mr-2 h-4 w-4" />
-            <span>Sign up</span>
-          </Link>
+        <DropdownMenuItem
+          onClick={() => {
+            setIsOpen(false);
+            openAuthModal('signup');
+          }}
+          className="flex items-center w-full cursor-pointer"
+        >
+          <User className="mr-2 h-4 w-4" />
+          <span>Sign up</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

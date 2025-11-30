@@ -9,7 +9,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import Image from 'next/image';
-import Link from 'next/link';
+import { useAuth } from '@/contexts/auth-context';
 
 interface AuthPromptDialogProps {
   isOpen: boolean;
@@ -17,7 +17,17 @@ interface AuthPromptDialogProps {
 }
 
 export function AuthPromptDialog({ isOpen, onClose }: AuthPromptDialogProps) {
-  const currentPath = typeof window !== 'undefined' ? window.location.pathname + window.location.search : '/';
+  const { openAuthModal } = useAuth();
+
+  const handleSignUp = () => {
+    onClose();
+    openAuthModal('signup', { action: 'heart' });
+  };
+
+  const handleSignIn = () => {
+    onClose();
+    openAuthModal('login', { action: 'heart' });
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -30,7 +40,14 @@ export function AuthPromptDialog({ isOpen, onClose }: AuthPromptDialogProps) {
               alt="The Patterns Place"
               width={120}
               height={40}
-              className="h-10 w-auto"
+              className="h-10 w-auto dark:hidden"
+            />
+            <Image
+              src="/logos/back_logo_light.svg"
+              alt="The Patterns Place"
+              width={120}
+              height={40}
+              className="h-10 w-auto hidden dark:block"
             />
           </div>
           
@@ -52,25 +69,20 @@ export function AuthPromptDialog({ isOpen, onClose }: AuthPromptDialogProps) {
         
         <DialogFooter className="!flex-col sm:!flex-col gap-3 pt-4 sm:space-x-0">
           <Button 
-            asChild
             className="w-full"
+            onClick={handleSignUp}
           >
-            <Link href={`/auth/sign-up?redirect=${encodeURIComponent(currentPath)}`} onClick={onClose}>
-              Sign Up
-            </Link>
+            Sign Up
           </Button>
           <Button 
-            asChild
             variant="secondary"
             className="w-full"
+            onClick={handleSignIn}
           >
-            <Link href={`/auth/login?redirect=${encodeURIComponent(currentPath)}`} onClick={onClose}>
-              Sign In
-            </Link>
+            Sign In
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
-

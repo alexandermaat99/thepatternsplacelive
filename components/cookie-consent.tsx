@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { X } from 'lucide-react';
 import Link from 'next/link';
 
 const COOKIE_CONSENT_KEY = 'cookie-consent';
@@ -59,13 +58,6 @@ export function CookieConsent() {
               Accept All
             </Button>
           </div>
-          <button
-            onClick={declineCookies}
-            className="absolute top-2 right-2 sm:static p-1 text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Close"
-          >
-            <X className="h-4 w-4" />
-          </button>
         </div>
       </div>
     </div>

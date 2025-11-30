@@ -38,6 +38,7 @@ export function UserProfile({
   const refreshStripeStatus = authHook.refreshStripeStatus;
   const refreshProfile = authHook.refreshProfile;
   const signOut = authHook.signOut;
+  const openAuthModal = authHook.openAuthModal;
 
   const [currentProfile, setCurrentProfile] = useState(profile);
 
@@ -165,9 +166,7 @@ export function UserProfile({
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground mb-4">Please log in to view your profile.</p>
-          <Link href="/auth/login">
-            <Button>Log In</Button>
-          </Link>
+          <Button onClick={() => openAuthModal('login')}>Log In</Button>
         </CardContent>
       </Card>
     );

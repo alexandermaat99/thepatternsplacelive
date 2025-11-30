@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import {
   getCurrentUserWithProfile,
@@ -8,6 +8,9 @@ import {
   type UserProfile,
   type StripeAccountStatus,
 } from '@/lib/auth-helpers';
+import { AuthModal } from '@/components/auth-modal';
+
+export type AuthModalView = 'login' | 'signup' | 'forgot-password';
 
 export interface AuthState {
   user: any;
@@ -17,12 +20,23 @@ export interface AuthState {
   error: string | null;
 }
 
+export interface AuthModalState {
+  isOpen: boolean;
+  view: AuthModalView;
+  action: string | null;
+  redirectUrl: string | null;
+}
+
 interface AuthContextType extends AuthState {
   refreshStripeStatus: () => Promise<void>;
   refreshProfile: () => Promise<UserProfile | null>;
   signOut: () => Promise<void>;
   isAuthenticated: boolean;
   canSell: boolean;
+  // Auth modal state and methods
+  authModal: AuthModalState;
+  openAuthModal: (view?: AuthModalView, options?: { action?: string; redirectUrl?: string }) => void;
+  closeAuthModal: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -40,6 +54,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading: true,
     error: null,
   });
+
+  // Auth modal state
+  const [authModal, setAuthModal] = useState<AuthModalState>({
+    isOpen: false,
+    view: 'login',
+    action: null,
+    redirectUrl: null,
+  });
+
+  const openAuthModal = useCallback((
+    view: AuthModalView = 'login',
+    options?: { action?: string; redirectUrl?: string }
+  ) => {
+    setAuthModal({
+      isOpen: true,
+      view,
+      action: options?.action || null,
+      redirectUrl: options?.redirectUrl || null,
+    });
+  }, []);
+
+  const closeAuthModal = useCallback(() => {
+    setAuthModal(prev => ({
+      ...prev,
+      isOpen: false,
+    }));
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -356,9 +397,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signOut,
     isAuthenticated: !!authState.user,
     canSell: authState.stripeStatus.isOnboarded,
+    // Auth modal
+    authModal,
+    openAuthModal,
+    closeAuthModal,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+      <AuthModal
+        isOpen={authModal.isOpen}
+        onClose={closeAuthModal}
+        defaultView={authModal.view}
+        action={authModal.action}
+        redirectUrl={authModal.redirectUrl}
+      />
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth() {
