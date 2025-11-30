@@ -49,12 +49,12 @@ export default async function ProductPage({ params }: ProductPageProps) {
   // Record the product view (don't await - fire and forget for performance)
   // Only track if viewer is not the product owner
   if (userId !== product.user_id) {
-    supabase.rpc('record_product_view', {
-      p_product_id: id,
-      p_viewer_id: userId,
-    }).then(() => {
-      // View recorded successfully (or rate-limited)
-    }).catch(() => {
+    Promise.resolve(
+      supabase.rpc('record_product_view', {
+        p_product_id: id,
+        p_viewer_id: userId,
+      })
+    ).catch(() => {
       // Silently fail - view tracking shouldn't break the page
     });
   }
