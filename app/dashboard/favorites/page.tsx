@@ -2,7 +2,6 @@ import { createClient } from '@/lib/supabase/server';
 import { ProductCard } from '@/components/marketplace/product-card';
 import { Card, CardContent } from '@/components/ui/card';
 import { Heart } from 'lucide-react';
-import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
@@ -10,10 +9,12 @@ export default async function FavoritesPage() {
   const supabase = await createClient();
   
   // Get the current user
+  // Auth is handled by the layout, so user should exist
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   
+  // If no user (shouldn't happen due to layout protection), return null
   if (authError || !user) {
-    redirect(`/auth/login?redirect=${encodeURIComponent('/dashboard/favorites')}`);
+    return null;
   }
 
   // Fetch user's favorite product IDs

@@ -1,16 +1,14 @@
-import { redirect } from 'next/navigation';
 import { getCurrentUserWithProfileServer, getStripeAccountStatusServer } from '@/lib/auth-helpers-server';
 import { SellForm } from '@/components/marketplace/sell-form';
-import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 
 export default async function SellPage() {
   // Fetch user and profile on the server (faster)
+  // Auth is handled by the layout, so user should exist
   const authData = await getCurrentUserWithProfileServer();
   
+  // If no auth data (shouldn't happen due to layout protection), return null
   if (!authData || !authData.user) {
-    redirect(`/auth/login?redirect=${encodeURIComponent('/marketplace/sell')}`);
+    return null;
   }
 
   const { user, profile } = authData;

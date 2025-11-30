@@ -1,4 +1,7 @@
+'use client';
+
 import { Navigation } from '@/components/navigation';
+import { RequireAuth } from '@/components/require-auth';
 
 export default function DashboardLayout({
   children,
@@ -8,7 +11,9 @@ export default function DashboardLayout({
   return (
     <div className="bg-background min-h-screen">
       <Navigation showMarketplaceLinks={true} />
-      {children}
+      <RequireAuth>
+        {children}
+      </RequireAuth>
     </div>
   );
 }

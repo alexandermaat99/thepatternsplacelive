@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { ThemeSwitcher } from '@/components/theme-switcher';
 import { COMPANY_INFO, getCopyrightText } from '@/lib/company-info';
 import { useAuth } from '@/contexts/auth-context';
+import { AuthLink } from '@/components/auth-link';
 
 export function Footer() {
   const [mounted, setMounted] = useState(false);
@@ -44,12 +45,12 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link
+                <AuthLink
                   href="/marketplace/sell"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Sell Your Patterns
-                </Link>
+                </AuthLink>
               </li>
               <li>
                 <Link

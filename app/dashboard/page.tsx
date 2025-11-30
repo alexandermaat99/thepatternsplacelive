@@ -5,16 +5,17 @@ import { StripeConnectButton } from '@/components/marketplace/stripe-connect-but
 import { UserProfile } from '@/components/user-profile';
 import { SignOutButton } from '@/components/sign-out-button';
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
 import { CheckCircle, XCircle, ExternalLink, Package, Heart } from 'lucide-react';
 import { getCurrentUserWithProfileServer, getStripeAccountStatusServer } from '@/lib/auth-helpers-server';
 
 export default async function DashboardPage() {
   // Fetch user and profile on the server (faster)
+  // Auth is handled by the layout, so user should exist
   const authData = await getCurrentUserWithProfileServer();
   
+  // If no auth data (shouldn't happen due to layout protection), return null
   if (!authData || !authData.user) {
-    redirect(`/auth/login?redirect=${encodeURIComponent('/dashboard')}`);
+    return null;
   }
 
   const { user, profile } = authData;

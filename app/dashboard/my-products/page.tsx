@@ -3,22 +3,23 @@ import { ProductCard } from '@/components/marketplace/product-card';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Package, Plus, Edit, Trash2 } from 'lucide-react';
+import { Package, Plus } from 'lucide-react';
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
 import { ProductActions } from '@/components/product-actions';
 
 export default async function MyProductsPage() {
   const supabase = await createClient();
 
   // Get the current user
+  // Auth is handled by the layout, so user should exist
   const {
     data: { user },
     error: authError,
   } = await supabase.auth.getUser();
 
+  // If no user (shouldn't happen due to layout protection), return null
   if (authError || !user) {
-    redirect(`/auth/login?redirect=${encodeURIComponent('/dashboard/my-products')}`);
+    return null;
   }
 
   // Fetch user's products from the database with separate queries for better performance

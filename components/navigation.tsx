@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useTheme } from 'next-themes';
 import { ProfileDropdown } from '@/components/profile-dropdown';
 import { CartIcon } from '@/components/cart-icon';
+import { AuthLink } from '@/components/auth-link';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -55,10 +56,10 @@ export function Navigation({ showMarketplaceLinks = false }: NavigationProps) {
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild onClick={() => setIsMenuOpen(false)}>
-                      <Link href="/marketplace/sell" className="flex items-center">
+                      <AuthLink href="/marketplace/sell" className="flex items-center">
                         <Package className="mr-2 h-4 w-4" />
                         <span>Sell</span>
-                      </Link>
+                      </AuthLink>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -72,10 +73,10 @@ export function Navigation({ showMarketplaceLinks = false }: NavigationProps) {
                     </Link>
                   </Button>
                   <Button asChild variant="ghost" size="sm">
-                    <Link href="/marketplace/sell" className="flex items-center gap-2">
+                    <AuthLink href="/marketplace/sell" className="flex items-center gap-2">
                       <Package className="h-4 w-4" />
                       <span>Sell</span>
-                    </Link>
+                    </AuthLink>
                   </Button>
                 </div>
               </>
