@@ -164,71 +164,21 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
     }
   };
 
+  // Check if a path requires authentication
+  const isProtectedRoute = (path: string): boolean => {
+    const protectedPaths = ['/dashboard', '/marketplace/sell', '/protected', '/checkout'];
+    return protectedPaths.some(p => path.startsWith(p));
+  };
+
   const handleBack = () => {
-    if (typeof window === 'undefined') {
-      router.push('/');
-      return;
-    }
-
-    // Check multiple sources for redirect URL (in priority order)
-    // 1. Query parameter redirect
-    // 2. sessionStorage (most reliable, set before navigation)
-    // 3. Component state redirectUrl (from referrer)
-    // 4. document.referrer as last resort
-    let finalRedirectUrl = redirectUrlFromParams;
-
-    // Always check sessionStorage (set when clicking login links)
-    if (!finalRedirectUrl) {
-      const storedRedirect = sessionStorage.getItem('auth_redirect_url');
-      if (
-        storedRedirect &&
-        !storedRedirect.startsWith('/auth') &&
-        !storedRedirect.startsWith('/login') &&
-        storedRedirect.startsWith('/')
-      ) {
-        finalRedirectUrl = storedRedirect;
-      }
-    }
-
-    // Use component state redirectUrl as fallback
-    if (!finalRedirectUrl && redirectUrl) {
-      finalRedirectUrl = redirectUrl;
-    }
-
-    // Last resort: try to extract from referrer
-    if (!finalRedirectUrl) {
-      const referrer = document.referrer;
-      if (referrer) {
-        try {
-          const referrerUrlObj = new URL(referrer);
-          const currentUrlObj = new URL(window.location.href);
-          if (referrerUrlObj.origin === currentUrlObj.origin) {
-            const referrerPath = referrerUrlObj.pathname + referrerUrlObj.search;
-            if (
-              !referrerPath.startsWith('/auth') &&
-              !referrerPath.startsWith('/login') &&
-              referrerPath !== '/'
-            ) {
-              finalRedirectUrl = referrerPath;
-            }
-          }
-        } catch (e) {
-          // Invalid URL, ignore
-        }
-      }
-    }
-
-    // Navigate to redirect URL if we have one
-    if (finalRedirectUrl) {
-      // Clear sessionStorage after using it
+    // Clear sessionStorage to prevent stale redirects
+    if (typeof window !== 'undefined') {
       sessionStorage.removeItem('auth_redirect_url');
-      // Use replace instead of push to avoid adding auth page to history
-      // This prevents the auth page from appearing when user clicks back
-      router.replace(finalRedirectUrl);
-    } else {
-      // Fallback to home instead of router.back() to avoid going to wrong page
-      router.replace('/');
     }
+
+    // Always go to marketplace - simple and reliable
+    // This avoids redirect loops when coming from protected routes
+    router.replace('/marketplace');
   };
 
   return (

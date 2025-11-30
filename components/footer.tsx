@@ -5,10 +5,12 @@ import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
 import { ThemeSwitcher } from '@/components/theme-switcher';
 import { COMPANY_INFO, getCopyrightText } from '@/lib/company-info';
+import { useAuth } from '@/contexts/auth-context';
 
 export function Footer() {
   const [mounted, setMounted] = useState(false);
   const { resolvedTheme } = useTheme();
+  const { user } = useAuth();
 
   useEffect(() => {
     setMounted(true);
@@ -60,36 +62,38 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Account */}
-          <div>
-            <h3 className="font-semibold mb-4">Account</h3>
-            <ul className="space-y-2 text-sm">
-              <li>
-                <Link
-                  href="/dashboard"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Dashboard
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/dashboard/my-products"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  My Products
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/dashboard/favorites"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Favorites
-                </Link>
-              </li>
-            </ul>
-          </div>
+          {/* Account - only show when logged in */}
+          {user && (
+            <div>
+              <h3 className="font-semibold mb-4">Account</h3>
+              <ul className="space-y-2 text-sm">
+                <li>
+                  <Link
+                    href="/dashboard"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Dashboard
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/dashboard/my-products"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    My Products
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/dashboard/favorites"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Favorites
+                  </Link>
+                </li>
+              </ul>
+            </div>
+          )}
 
           {/* Settings */}
           <div>
