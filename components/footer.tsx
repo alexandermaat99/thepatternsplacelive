@@ -5,13 +5,12 @@ import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
 import { ThemeSwitcher } from '@/components/theme-switcher';
 import { COMPANY_INFO, getCopyrightText } from '@/lib/company-info';
-import { useAuth } from '@/contexts/auth-context';
 import { AuthLink } from '@/components/auth-link';
+import { Instagram } from 'lucide-react';
 
 export function Footer() {
   const [mounted, setMounted] = useState(false);
   const { resolvedTheme } = useTheme();
-  const { user } = useAuth();
 
   useEffect(() => {
     setMounted(true);
@@ -63,38 +62,23 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Account - only show when logged in */}
-          {user && (
-            <div>
-              <h3 className="font-semibold mb-4">Account</h3>
-              <ul className="space-y-2 text-sm">
-                <li>
-                  <Link
-                    href="/dashboard"
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    Dashboard
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/dashboard/my-products"
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    My Products
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/dashboard/favorites"
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    Favorites
-                  </Link>
-                </li>
-              </ul>
+          {/* Connect */}
+          <div>
+            <h3 className="font-semibold mb-4">Connect</h3>
+            <div className="flex items-center gap-3">
+              {COMPANY_INFO.social.instagram && (
+                <a
+                  href={COMPANY_INFO.social.instagram}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Follow us on Instagram"
+                >
+                  <Instagram className="h-5 w-5" />
+                </a>
+              )}
             </div>
-          )}
+          </div>
 
           {/* Settings */}
           <div>

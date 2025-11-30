@@ -202,26 +202,32 @@ async function MarketplaceContent({ searchParams }: MarketplacePageProps) {
     query = query.lte('price', params.maxPrice);
   }
 
-  // Apply sorting
-  const sortBy = params.sort || 'newest';
-  switch (sortBy) {
-    case 'oldest':
-      query = query.order('created_at', { ascending: true });
-      break;
-    case 'price-low':
-      query = query.order('price', { ascending: true });
-      break;
-    case 'price-high':
-      query = query.order('price', { ascending: false });
-      break;
-    case 'title-asc':
-      query = query.order('title', { ascending: true });
-      break;
-    case 'title-desc':
-      query = query.order('title', { ascending: false });
-      break;
-    default:
-      query = query.order('created_at', { ascending: false });
+  // Apply sorting (for non-popular sorts, we can sort in the query)
+  const sortBy = params.sort || 'popular';
+  if (sortBy !== 'popular') {
+    switch (sortBy) {
+      case 'oldest':
+        query = query.order('created_at', { ascending: true });
+        break;
+      case 'newest':
+        query = query.order('created_at', { ascending: false });
+        break;
+      case 'price-low':
+        query = query.order('price', { ascending: true });
+        break;
+      case 'price-high':
+        query = query.order('price', { ascending: false });
+        break;
+      case 'title-asc':
+        query = query.order('title', { ascending: true });
+        break;
+      case 'title-desc':
+        query = query.order('title', { ascending: false });
+        break;
+    }
+  } else {
+    // For popular sort, we'll sort after fetching all data
+    query = query.order('created_at', { ascending: false });
   }
 
   // Execute main query AND additional queries in parallel
@@ -263,24 +269,29 @@ async function MarketplaceContent({ searchParams }: MarketplacePageProps) {
       usernameQuery = usernameQuery.lte('price', params.maxPrice);
     }
 
-    switch (sortBy) {
-      case 'oldest':
-        usernameQuery = usernameQuery.order('created_at', { ascending: true });
-        break;
-      case 'price-low':
-        usernameQuery = usernameQuery.order('price', { ascending: true });
-        break;
-      case 'price-high':
-        usernameQuery = usernameQuery.order('price', { ascending: false });
-        break;
-      case 'title-asc':
-        usernameQuery = usernameQuery.order('title', { ascending: true });
-        break;
-      case 'title-desc':
-        usernameQuery = usernameQuery.order('title', { ascending: false });
-        break;
-      default:
-        usernameQuery = usernameQuery.order('created_at', { ascending: false });
+    if (sortBy !== 'popular') {
+      switch (sortBy) {
+        case 'oldest':
+          usernameQuery = usernameQuery.order('created_at', { ascending: true });
+          break;
+        case 'newest':
+          usernameQuery = usernameQuery.order('created_at', { ascending: false });
+          break;
+        case 'price-low':
+          usernameQuery = usernameQuery.order('price', { ascending: true });
+          break;
+        case 'price-high':
+          usernameQuery = usernameQuery.order('price', { ascending: false });
+          break;
+        case 'title-asc':
+          usernameQuery = usernameQuery.order('title', { ascending: true });
+          break;
+        case 'title-desc':
+          usernameQuery = usernameQuery.order('title', { ascending: false });
+          break;
+      }
+    } else {
+      usernameQuery = usernameQuery.order('created_at', { ascending: false });
     }
 
     productQueries.push(usernameQuery);
@@ -322,24 +333,29 @@ async function MarketplaceContent({ searchParams }: MarketplacePageProps) {
       categoryQuery = categoryQuery.lte('price', params.maxPrice);
     }
 
-    switch (sortBy) {
-      case 'oldest':
-        categoryQuery = categoryQuery.order('created_at', { ascending: true });
-        break;
-      case 'price-low':
-        categoryQuery = categoryQuery.order('price', { ascending: true });
-        break;
-      case 'price-high':
-        categoryQuery = categoryQuery.order('price', { ascending: false });
-        break;
-      case 'title-asc':
-        categoryQuery = categoryQuery.order('title', { ascending: true });
-        break;
-      case 'title-desc':
-        categoryQuery = categoryQuery.order('title', { ascending: false });
-        break;
-      default:
-        categoryQuery = categoryQuery.order('created_at', { ascending: false });
+    if (sortBy !== 'popular') {
+      switch (sortBy) {
+        case 'oldest':
+          categoryQuery = categoryQuery.order('created_at', { ascending: true });
+          break;
+        case 'newest':
+          categoryQuery = categoryQuery.order('created_at', { ascending: false });
+          break;
+        case 'price-low':
+          categoryQuery = categoryQuery.order('price', { ascending: true });
+          break;
+        case 'price-high':
+          categoryQuery = categoryQuery.order('price', { ascending: false });
+          break;
+        case 'title-asc':
+          categoryQuery = categoryQuery.order('title', { ascending: true });
+          break;
+        case 'title-desc':
+          categoryQuery = categoryQuery.order('title', { ascending: false });
+          break;
+      }
+    } else {
+      categoryQuery = categoryQuery.order('created_at', { ascending: false });
     }
 
     productQueries.push(categoryQuery);
@@ -376,12 +392,81 @@ async function MarketplaceContent({ searchParams }: MarketplacePageProps) {
     products = products.filter((product: any) => productMatchesSearchWords(product, searchWords));
   }
 
-  // Re-sort combined results if needed
-  if (productResults.length > 1 && products) {
+  // For popular sort, fetch engagement data and calculate scores
+  let popularityScores: Map<string, number> = new Map();
+  if (sortBy === 'popular' && products && products.length > 0) {
+    const productIds = products.map((p: any) => p.id);
+    
+    // Fetch favorites, orders, and views counts in parallel
+    const [favoritesData, ordersData, viewsData] = await Promise.all([
+      supabase
+        .from('favorites')
+        .select('product_id')
+        .in('product_id', productIds),
+      supabase
+        .from('orders')
+        .select('product_id')
+        .in('product_id', productIds)
+        .eq('status', 'completed'),
+      supabase
+        .from('product_views')
+        .select('product_id')
+        .in('product_id', productIds)
+        .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
+    ]);
+
+    // Count occurrences for each product
+    const favoriteCounts: Map<string, number> = new Map();
+    const orderCounts: Map<string, number> = new Map();
+    const viewCounts: Map<string, number> = new Map();
+
+    (favoritesData.data || []).forEach((f: any) => {
+      favoriteCounts.set(f.product_id, (favoriteCounts.get(f.product_id) || 0) + 1);
+    });
+
+    (ordersData.data || []).forEach((o: any) => {
+      orderCounts.set(o.product_id, (orderCounts.get(o.product_id) || 0) + 1);
+    });
+
+    (viewsData.data || []).forEach((v: any) => {
+      viewCounts.set(v.product_id, (viewCounts.get(v.product_id) || 0) + 1);
+    });
+
+    // Calculate popularity score for each product
+    // Formula: views × 0.1 + favorites × 2 + purchases × 5 + freshness_bonus
+    const now = Date.now();
+    products.forEach((product: any) => {
+      const views = viewCounts.get(product.id) || 0;
+      const favorites = favoriteCounts.get(product.id) || 0;
+      const orders = orderCounts.get(product.id) || 0;
+      
+      // Freshness bonus: 10 points at 0 days, decaying to 0 over 30 days
+      const ageInDays = (now - new Date(product.created_at).getTime()) / (1000 * 60 * 60 * 24);
+      const freshnessBonus = Math.max(0, 10 - (ageInDays / 3));
+      
+      const score = (views * 0.1) + (favorites * 2) + (orders * 5) + freshnessBonus;
+      popularityScores.set(product.id, score);
+    });
+  }
+
+  // Re-sort combined results
+  if (products && (productResults.length > 1 || sortBy === 'popular')) {
     switch (sortBy) {
+      case 'popular':
+        products.sort((a: any, b: any) => {
+          const scoreA = popularityScores.get(a.id) || 0;
+          const scoreB = popularityScores.get(b.id) || 0;
+          return scoreB - scoreA;
+        });
+        break;
       case 'oldest':
         products.sort(
           (a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+        break;
+      case 'newest':
+        products.sort(
+          (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
         break;
       case 'price-low':
@@ -396,10 +481,6 @@ async function MarketplaceContent({ searchParams }: MarketplacePageProps) {
       case 'title-desc':
         products.sort((a: any, b: any) => b.title.localeCompare(a.title));
         break;
-      default:
-        products.sort(
-          (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
     }
   }
 
@@ -416,7 +497,7 @@ async function MarketplaceContent({ searchParams }: MarketplacePageProps) {
     params.difficulty ||
     params.minPrice ||
     params.maxPrice ||
-    (params.sort && params.sort !== 'newest')
+    (params.sort && params.sort !== 'popular')
   );
 
   return (

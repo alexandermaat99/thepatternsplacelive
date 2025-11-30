@@ -34,7 +34,7 @@ export const COMPANY_INFO = {
 
   // Social Media Links
   social: {
-    instagram: '', // e.g., 'https://instagram.com/thepatternsplace'
+    instagram: 'https://instagram.com/thepatternsplace',
     facebook: '',
     pinterest: '',
     twitter: '',

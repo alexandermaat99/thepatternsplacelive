@@ -48,7 +48,7 @@ export function MarketplaceFilters({
   const appliedPriceMax = searchParams.get('maxPrice')
     ? Number(searchParams.get('maxPrice'))
     : maxPrice;
-  const appliedSort = searchParams.get('sort') || 'newest';
+  const appliedSort = searchParams.get('sort') || 'popular';
 
   // Local state for pending filters (not yet applied)
   const [isOpen, setIsOpen] = useState(false);
@@ -139,7 +139,7 @@ export function MarketplaceFilters({
     }
 
     // Apply sort
-    if (localSort !== 'newest') {
+    if (localSort !== 'popular') {
       params.set('sort', localSort);
     } else {
       params.delete('sort');
@@ -176,7 +176,7 @@ export function MarketplaceFilters({
     setLocalSort(sort);
     // Sort can be applied immediately since it's a single selection
     const params = new URLSearchParams(searchParams.toString());
-    if (sort !== 'newest') {
+    if (sort !== 'popular') {
       params.set('sort', sort);
     } else {
       params.delete('sort');
@@ -190,7 +190,7 @@ export function MarketplaceFilters({
     setLocalCategories([]);
     setLocalDifficulties([]);
     setLocalPriceRange([minPrice, maxPrice]);
-    setLocalSort('newest');
+    setLocalSort('popular');
 
     // Clear URL filters
     const params = new URLSearchParams();
@@ -206,7 +206,7 @@ export function MarketplaceFilters({
     appliedDifficulties.length > 0 ||
     appliedPriceMin !== minPrice ||
     appliedPriceMax !== maxPrice ||
-    appliedSort !== 'newest';
+    appliedSort !== 'popular';
 
   return (
     <div className="space-y-4 lg:space-y-0">
@@ -262,6 +262,7 @@ export function MarketplaceFilters({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="w-full justify-between">
+                  {localSort === 'popular' && 'Popular'}
                   {localSort === 'newest' && 'Newest first'}
                   {localSort === 'oldest' && 'Oldest first'}
                   {localSort === 'price-low' && 'Price: Low to High'}
@@ -272,6 +273,9 @@ export function MarketplaceFilters({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-full">
+                <DropdownMenuItem onClick={() => handleSortChange('popular')}>
+                  Popular
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleSortChange('newest')}>
                   Newest first
                 </DropdownMenuItem>

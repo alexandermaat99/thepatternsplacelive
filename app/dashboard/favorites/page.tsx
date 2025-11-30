@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Heart } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { BackButton } from '@/components/back-button';
 
 export default async function FavoritesPage() {
   const supabase = await createClient();
@@ -33,6 +34,7 @@ export default async function FavoritesPage() {
   if (favoriteProductIds.length === 0) {
     return (
       <div className="container mx-auto px-4 py-8 max-w-6xl">
+        <BackButton />
         <div className="mb-8">
           <h1 className="text-3xl font-bold">My Favorites</h1>
           <p className="text-muted-foreground">
@@ -84,6 +86,7 @@ export default async function FavoritesPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
+      <BackButton />
       <div className="mb-10">
         <h1 className="text-3xl sm:text-4xl font-bold mb-2">My Favorites</h1>
         <p className="text-muted-foreground">

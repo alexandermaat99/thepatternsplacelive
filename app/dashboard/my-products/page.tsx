@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Package, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { ProductActions } from '@/components/product-actions';
+import { BackButton } from '@/components/back-button';
 
 export default async function MyProductsPage() {
   const supabase = await createClient();
@@ -52,6 +53,7 @@ export default async function MyProductsPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
+      <BackButton />
       <div className="mb-8 flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2">
