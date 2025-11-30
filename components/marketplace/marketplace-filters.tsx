@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
@@ -255,21 +254,6 @@ export function MarketplaceFilters({
         </div>
 
         <div className="border-t pt-6 space-y-6">
-          {/* Clear filters button */}
-          {hasActiveFilters && (
-            <div className="flex justify-end">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleClearFilters}
-                className="text-muted-foreground"
-              >
-                <X className="h-4 w-4 mr-1" />
-                Clear all
-              </Button>
-            </div>
-          )}
-
           {/* Sort */}
           <div>
             <Label className="text-base font-semibold mb-3 block">Sort by</Label>
@@ -353,22 +337,23 @@ export function MarketplaceFilters({
           {categories.length > 0 && (
             <div>
               <Label className="text-base font-semibold mb-3 block">Categories</Label>
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {categories.map(category => (
-                  <div key={category.id} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`category-${category.id}`}
-                      checked={localCategories.includes(category.slug)}
-                      onCheckedChange={() => handleCategoryToggle(category.slug)}
-                    />
-                    <Label
-                      htmlFor={`category-${category.id}`}
-                      className="text-sm font-normal cursor-pointer flex-1"
+              <div className="flex flex-wrap gap-2">
+                {categories.map(category => {
+                  const isSelected = localCategories.includes(category.slug);
+                  return (
+                    <button
+                      key={category.id}
+                      onClick={() => handleCategoryToggle(category.slug)}
+                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                        isSelected
+                          ? 'bg-[#E8A598] text-white border-2 border-[#E8A598]'
+                          : 'bg-background border-2 border-[#383838] text-foreground hover:bg-muted'
+                      }`}
                     >
                       {category.name}
-                    </Label>
-                  </div>
-                ))}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -376,22 +361,23 @@ export function MarketplaceFilters({
           {/* Difficulty */}
           <div>
             <Label className="text-base font-semibold mb-3 block">Difficulty</Label>
-            <div className="space-y-2">
-              {DIFFICULTY_LEVELS.map(level => (
-                <div key={level.value} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`difficulty-${level.value}`}
-                    checked={localDifficulties.includes(level.value)}
-                    onCheckedChange={() => handleDifficultyToggle(level.value)}
-                  />
-                  <Label
-                    htmlFor={`difficulty-${level.value}`}
-                    className="text-sm font-normal cursor-pointer flex-1"
+            <div className="flex flex-wrap gap-2">
+              {DIFFICULTY_LEVELS.map(level => {
+                const isSelected = localDifficulties.includes(level.value);
+                return (
+                  <button
+                    key={level.value}
+                    onClick={() => handleDifficultyToggle(level.value)}
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                      isSelected
+                        ? 'bg-[#E8A598] text-white border-2 border-[#E8A598]'
+                        : 'bg-background border-2 border-[#383838] text-foreground hover:bg-muted'
+                    }`}
                   >
                     {level.label}
-                  </Label>
-                </div>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
