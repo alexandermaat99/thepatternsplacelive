@@ -44,6 +44,8 @@ export function MarketplacePagination({
   const handlePageChange = (page: number) => {
     if (page < 1 || page > totalPages) return;
     router.push(buildUrl(page), { scroll: false });
+    // Scroll to top of page
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Calculate which page numbers to show

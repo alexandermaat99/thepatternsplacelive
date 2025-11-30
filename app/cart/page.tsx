@@ -82,7 +82,7 @@ export default function CartPage() {
           <Button 
             variant="outline" 
             onClick={clearCart}
-            className="text-red-600 hover:text-red-700"
+            className="hidden sm:flex text-red-600 hover:text-red-700"
           >
             Clear Cart
           </Button>

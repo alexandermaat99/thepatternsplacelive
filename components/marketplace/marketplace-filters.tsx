@@ -246,6 +246,7 @@ export function MarketplaceFilters({
         <div className="space-y-2">
           <Label className="text-base font-semibold">Search</Label>
           <MarketplaceSearch />
+          <p className="text-sm text-muted-foreground">search by pattern, creator, or category</p>
           {/* Results Count - Only show when filtering or searching */}
           {hasFilters && productsCount > 0 && (
             <p className="text-sm text-muted-foreground pt-1">

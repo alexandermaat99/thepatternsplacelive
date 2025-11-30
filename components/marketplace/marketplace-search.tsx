@@ -21,13 +21,13 @@ export function MarketplaceSearch() {
 
   const handleSearch = () => {
     const params = new URLSearchParams(searchParams.toString());
-    
+
     if (searchQuery.trim()) {
       params.set('q', searchQuery.trim());
     } else {
       params.delete('q');
     }
-    
+
     params.delete('page');
     router.push(`/marketplace?${params.toString()}`, { scroll: false });
   };
@@ -53,9 +53,9 @@ export function MarketplaceSearch() {
       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
       <Input
         type="text"
-        placeholder="Search patterns..."
+        placeholder="Search"
         value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
+        onChange={e => setSearchQuery(e.target.value)}
         onKeyDown={handleKeyDown}
         className="pl-10 pr-24 h-10 text-sm"
       />
