@@ -389,8 +389,8 @@ export function MarketplaceFilters({
                     key={level.value}
                     onClick={() => handleDifficultyToggle(level.value)}
                     className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 border-2 ${
-                      isSelected 
-                        ? 'shadow-md hover:shadow-lg hover:scale-105' 
+                      isSelected
+                        ? 'shadow-md hover:shadow-lg hover:scale-105'
                         : 'hover:scale-105 hover:shadow-sm'
                     }`}
                     style={
@@ -406,14 +406,14 @@ export function MarketplaceFilters({
                             borderColor: 'hsl(var(--muted-foreground) / 0.3)',
                           }
                     }
-                    onMouseEnter={(e) => {
+                    onMouseEnter={e => {
                       if (!isSelected) {
                         e.currentTarget.style.borderColor = level.color;
                         e.currentTarget.style.color = level.color;
                         e.currentTarget.style.backgroundColor = `${level.color}15`;
                       }
                     }}
-                    onMouseLeave={(e) => {
+                    onMouseLeave={e => {
                       if (!isSelected) {
                         e.currentTarget.style.borderColor = 'hsl(var(--muted-foreground) / 0.3)';
                         e.currentTarget.style.color = 'var(--foreground)';
@@ -445,4 +445,3 @@ export function MarketplaceFilters({
     </div>
   );
 }
-
