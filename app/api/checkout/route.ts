@@ -2,15 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getStripe } from '@/lib/stripe';
 import { createClient } from '@/lib/supabase/server';
 import { formatAmountForStripe } from '@/lib/stripe';
+import { COMPANY_INFO } from '@/lib/company-info';
 
 export async function POST(request: NextRequest) {
   try {
     const { productId } = await request.json();
-    
+
     const supabase = await createClient();
-    
+
     // Get the current user (optional for guest checkout)
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     // Get the product details
     const { data: product, error: productError } = await supabase
@@ -21,10 +24,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (productError || !product) {
-      return NextResponse.json(
-        { error: 'Product not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Product not found' }, { status: 404 });
     }
 
     // Get seller's profile with Stripe account ID
@@ -35,10 +35,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (sellerError || !sellerProfile) {
-      return NextResponse.json(
-        { error: 'Seller profile not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Seller profile not found' }, { status: 404 });
     }
 
     // Get seller's Stripe account ID
@@ -57,22 +54,31 @@ export async function POST(request: NextRequest) {
     try {
       sellerAccount = await stripe.accounts.retrieve(sellerStripeAccountId);
       if (!sellerAccount.charges_enabled || !sellerAccount.details_submitted) {
-        return NextResponse.json(
-          { error: 'Seller account is not fully set up' },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: 'Seller account is not fully set up' }, { status: 400 });
       }
     } catch (error) {
       console.error('Error retrieving seller account:', error);
-      return NextResponse.json(
-        { error: 'Invalid seller Stripe account' },
-        { status: 400 }
+      return NextResponse.json({ error: 'Invalid seller Stripe account' }, { status: 400 });
+    }
+
+    // Calculate platform fee from centralized config (lib/company-info.ts)
+    const priceInCents = Math.round(product.price * 100);
+
+    // Platform transaction fee (e.g., 6%)
+    const platformFee = Math.round(priceInCents * COMPANY_INFO.fees.platformFeePercent);
+
+    // Optionally pass Stripe's processing fees to the seller (like Etsy does)
+    let stripeFeePassthrough = 0;
+    if (COMPANY_INFO.fees.passStripeFeesToSeller) {
+      // Estimate Stripe's fee: 2.9% + $0.30
+      stripeFeePassthrough = Math.round(
+        priceInCents * COMPANY_INFO.fees.stripePercentFee + COMPANY_INFO.fees.stripeFlatFeeCents
       );
     }
 
-    // Calculate platform fee (optional - set to 0 or a percentage)
-    // For example, 5% platform fee: Math.round(product.price * 0.05 * 100)
-    const platformFeeAmount = 0; // Change this to your desired platform fee
+    // Total application fee = platform fee + stripe passthrough (if enabled)
+    const totalFee = platformFee + stripeFeePassthrough;
+    const platformFeeAmount = Math.max(totalFee, COMPANY_INFO.fees.minimumFeeCents);
 
     // Create Stripe checkout session with Connect transfer
     const session = await stripe.checkout.sessions.create({
@@ -97,8 +103,8 @@ export async function POST(request: NextRequest) {
         transfer_data: {
           destination: sellerStripeAccountId,
         },
-        // Optional: Add platform fee (uncomment if you want to charge a fee)
-        // application_fee_amount: platformFeeAmount,
+        // Platform fee - goes to The Pattern's Place
+        ...(platformFeeAmount > 0 && { application_fee_amount: platformFeeAmount }),
       },
       success_url: `${request.nextUrl.origin}/marketplace/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${request.nextUrl.origin}/marketplace/product/${productId}`,
@@ -115,9 +121,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ sessionId: session.id });
   } catch (error) {
     console.error('Checkout error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-} 
+}

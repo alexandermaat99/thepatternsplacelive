@@ -56,6 +56,28 @@ export const COMPANY_INFO = {
     terms: '/terms',
     marketplace: '/marketplace',
   },
+
+  // Platform Fees & Revenue
+  // This is how The Pattern's Place makes money - a percentage of each sale
+  fees: {
+    // Platform transaction fee percentage (like Etsy's 6.5%, we charge 6%)
+    // This is taken from the seller's payout
+    platformFeePercent: 0.056, // 5.5% transaction fee
+
+    // Whether to pass Stripe's processing fees to the seller
+    // true = Seller pays Stripe fees (like Etsy) - you keep more
+    // false = Platform absorbs Stripe fees - seller-friendly
+    passStripeFeesToSeller: true,
+
+    // Stripe's approximate fees (used for calculation when passing to seller)
+    // These are estimates - actual Stripe fees may vary slightly
+    stripePercentFee: 0.029, // 2.9%
+    stripeFlatFeeCents: 30, // $0.30
+
+    // Minimum platform fee in cents (optional floor)
+    // e.g., 50 = $0.50 minimum fee per transaction
+    minimumFeeCents: 50,
+  },
 } as const;
 
 // Helper function to get full copyright text
