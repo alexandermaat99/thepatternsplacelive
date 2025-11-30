@@ -2,9 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatAmountForDisplay } from '@/lib/utils-client';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -112,9 +110,22 @@ export function ProductCard({ product, hideFavorite = false }: ProductCardProps)
               <span className="text-muted-foreground">No image</span>
             </div>
           )}
+          {/* Difficulty badge - top left */}
+          {product.difficulty && (
+            <div
+              className="absolute top-2 left-2 px-3 py-1 rounded-full text-xs font-semibold shadow-lg"
+              style={{
+                backgroundColor: getDifficultyColor(product.difficulty).bg,
+                color: getDifficultyColor(product.difficulty).text,
+              }}
+            >
+              {getDifficultyLabel(product.difficulty)}
+            </div>
+          )}
+
           {/* Price overlay bubble */}
-          <div className="absolute bottom-2 left-2 bg-background/90 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-lg border border-border/50">
-            <span className="text-sm font-bold text-foreground">
+          <div className="absolute bottom-2 right-2 bg-background/20 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-md border border-border/50">
+            <span className="text-xs font-bold text-foreground">
               {formatAmountForDisplay(product.price, product.currency)}
             </span>
           </div>
@@ -137,23 +148,7 @@ export function ProductCard({ product, hideFavorite = false }: ProductCardProps)
         </div>
 
         <CardHeader className="p-4">
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-0">
-            <CardTitle className="text-lg font-semibold line-clamp-2 flex-1">
-              {product.title}
-            </CardTitle>
-            {product.difficulty && (
-              <Badge
-                className="self-start sm:ml-2 flex-shrink-0"
-                style={{
-                  backgroundColor: getDifficultyColor(product.difficulty).bg,
-                  color: getDifficultyColor(product.difficulty).text,
-                  borderColor: getDifficultyColor(product.difficulty).bg,
-                }}
-              >
-                {getDifficultyLabel(product.difficulty)}
-              </Badge>
-            )}
-          </div>
+          <CardTitle className="text-sm font-semibold line-clamp-2">{product.title}</CardTitle>
           {product.profiles && (
             <p className="text-sm text-muted-foreground mt-1">
               {product.profiles.username ? (
