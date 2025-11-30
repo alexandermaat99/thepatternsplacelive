@@ -12,7 +12,8 @@ import { StripeConnectButton } from '@/components/marketplace/stripe-connect-but
 import { MultiImageUpload } from '@/components/marketplace/multi-image-upload';
 import { DigitalFileUpload } from '@/components/marketplace/digital-file-upload';
 import { CategoryInput, linkCategoriesToProduct } from '@/components/marketplace/category-input';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Info } from 'lucide-react';
+import Link from 'next/link';
 import type { UserProfile, StripeAccountStatus } from '@/lib/auth-helpers';
 import { DIFFICULTY_LEVELS } from '@/lib/constants';
 
@@ -75,8 +76,11 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
           console.log('Categories linked successfully');
         } catch (categoryError) {
           console.error('Error linking categories:', categoryError);
-          const errorMessage = categoryError instanceof Error ? categoryError.message : 'Unknown error';
-          alert(`Product created successfully, but there was an issue linking categories: ${errorMessage}. You can edit the product to add categories later.`);
+          const errorMessage =
+            categoryError instanceof Error ? categoryError.message : 'Unknown error';
+          alert(
+            `Product created successfully, but there was an issue linking categories: ${errorMessage}. You can edit the product to add categories later.`
+          );
           // Don't fail the whole operation if category linking fails
         }
       }
@@ -200,11 +204,21 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
 
               <CategoryInput
                 value={formData.category}
-                onChange={(value) => setFormData({ ...formData, category: value })}
+                onChange={value => setFormData({ ...formData, category: value })}
               />
 
               <div>
-                <Label htmlFor="difficulty">Difficulty Level</Label>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="difficulty">Difficulty Level</Label>
+                  <Link
+                    href="/marketplace/difficulty-levels"
+                    target="_blank"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    title="Learn about difficulty levels"
+                  >
+                    <Info className="h-4 w-4" />
+                  </Link>
+                </div>
                 <select
                   id="difficulty"
                   value={formData.difficulty}

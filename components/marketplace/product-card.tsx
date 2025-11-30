@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { formatAmountForDisplay } from '@/lib/utils-client';
 import Link from 'next/link';
 import Image from 'next/image';
-import { getDifficultyLabel, getDifficultyVariant } from '@/lib/constants';
+import { getDifficultyLabel, getDifficultyColor } from '@/lib/constants';
 import { Heart } from 'lucide-react';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useToast } from '@/contexts/toast-context';
@@ -143,8 +143,12 @@ export function ProductCard({ product, hideFavorite = false }: ProductCardProps)
             </CardTitle>
             {product.difficulty && (
               <Badge
-                variant={getDifficultyVariant(product.difficulty)}
                 className="self-start sm:ml-2 flex-shrink-0"
+                style={{
+                  backgroundColor: getDifficultyColor(product.difficulty).bg,
+                  color: getDifficultyColor(product.difficulty).text,
+                  borderColor: getDifficultyColor(product.difficulty).bg,
+                }}
               >
                 {getDifficultyLabel(product.difficulty)}
               </Badge>

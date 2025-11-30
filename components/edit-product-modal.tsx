@@ -19,6 +19,8 @@ import { CategoryInput, linkCategoriesToProduct } from '@/components/marketplace
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import { DIFFICULTY_LEVELS } from '@/lib/constants';
+import { Info } from 'lucide-react';
+import Link from 'next/link';
 
 interface Product {
   id: string;
@@ -67,9 +69,10 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
       }
 
       // Handle files array
-      const files = (product as any).files && Array.isArray((product as any).files) 
-        ? (product as any).files 
-        : [];
+      const files =
+        (product as any).files && Array.isArray((product as any).files)
+          ? (product as any).files
+          : [];
 
       // Load existing categories for this product
       const loadCategories = async () => {
@@ -77,13 +80,15 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
           const supabase = createClient();
           const { data: productCategories } = await supabase
             .from('product_categories')
-            .select(`
+            .select(
+              `
               category:categories(*)
-            `)
+            `
+            )
             .eq('product_id', product.id);
 
           let categoryString = product.category || ''; // Fallback to old category field
-          
+
           if (productCategories && productCategories.length > 0) {
             const categoryNames = productCategories
               .map((pc: any) => pc.category?.name)
@@ -198,7 +203,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
 
       // Sanitize details field (same process as description)
       let sanitizedDetails = formData.details || '';
-      
+
       // Detect and preserve URLs
       const detailsUrlPattern = /(https?:\/\/[^\s]+)/g;
       const detailsUrls: string[] = [];
@@ -210,10 +215,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
       });
 
       // Remove non-printable characters
-      sanitizedDetails = sanitizedDetails.replace(
-        /[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F-\x9F]/g,
-        ''
-      );
+      sanitizedDetails = sanitizedDetails.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F-\x9F]/g, '');
 
       // Normalize line breaks
       sanitizedDetails = sanitizedDetails.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -337,8 +339,11 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
           console.log('Categories linked successfully');
         } catch (categoryError) {
           console.error('Error linking categories:', categoryError);
-          const errorMessage = categoryError instanceof Error ? categoryError.message : 'Unknown error';
-          alert(`Product updated successfully, but there was an issue linking categories: ${errorMessage}. Please check the console for details.`);
+          const errorMessage =
+            categoryError instanceof Error ? categoryError.message : 'Unknown error';
+          alert(
+            `Product updated successfully, but there was an issue linking categories: ${errorMessage}. Please check the console for details.`
+          );
           // Don't fail the whole operation if category linking fails
         }
       }
@@ -484,8 +489,8 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
             />
             {formData.details.length > 9000 && (
               <p className="text-sm text-orange-600 mt-1">
-                Warning: Details is getting long ({formData.details.length} characters).
-                Very long details may cause slow updates.
+                Warning: Details is getting long ({formData.details.length} characters). Very long
+                details may cause slow updates.
               </p>
             )}
           </div>
@@ -507,11 +512,21 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
 
             <CategoryInput
               value={formData.category}
-              onChange={(value) => setFormData({ ...formData, category: value })}
+              onChange={value => setFormData({ ...formData, category: value })}
             />
 
             <div>
-              <Label htmlFor="difficulty">Difficulty Level</Label>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="difficulty">Difficulty Level</Label>
+                <Link
+                  href="/marketplace/difficulty-levels"
+                  target="_blank"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  title="Learn about difficulty levels"
+                >
+                  <Info className="h-4 w-4" />
+                </Link>
+              </div>
               <select
                 id="difficulty"
                 value={formData.difficulty}

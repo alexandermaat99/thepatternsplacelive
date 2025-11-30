@@ -14,7 +14,7 @@ import { useFavorites } from '@/hooks/useFavorites';
 import { useToast } from '@/contexts/toast-context';
 import { AuthPromptDialog } from '@/components/auth-prompt-dialog';
 import { linkifyText } from '@/lib/text-utils';
-import { getDifficultyLabel, getDifficultyVariant } from '@/lib/constants';
+import { getDifficultyLabel, getDifficultyColor } from '@/lib/constants';
 import { ProductFilesDownload } from '@/components/marketplace/product-files-download';
 import { EditProductModal } from '@/components/edit-product-modal';
 
@@ -239,7 +239,13 @@ export function ProductDetail({ product }: ProductDetailProps) {
                     ) : null;
                   })}
               {product.difficulty && (
-                <Badge variant={getDifficultyVariant(product.difficulty)}>
+                <Badge
+                  style={{
+                    backgroundColor: getDifficultyColor(product.difficulty).bg,
+                    color: getDifficultyColor(product.difficulty).text,
+                    borderColor: getDifficultyColor(product.difficulty).bg,
+                  }}
+                >
                   {getDifficultyLabel(product.difficulty)}
                 </Badge>
               )}

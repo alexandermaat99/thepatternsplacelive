@@ -15,7 +15,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 // Price range will use Input fields instead of Slider
-import { Filter, X, ChevronDown } from 'lucide-react';
+import { Filter, X, ChevronDown, Info } from 'lucide-react';
+import Link from 'next/link';
 import { DIFFICULTY_LEVELS } from '@/lib/constants';
 import type { Category } from '@/lib/types/categories';
 import { MarketplaceSearch } from './marketplace-search';
@@ -360,7 +361,16 @@ export function MarketplaceFilters({
 
           {/* Difficulty */}
           <div>
-            <Label className="text-base font-semibold mb-3 block">Difficulty</Label>
+            <div className="flex items-center gap-2 mb-3">
+              <Label className="text-base font-semibold">Difficulty</Label>
+              <Link
+                href="/marketplace/difficulty-levels"
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                title="Learn about difficulty levels"
+              >
+                <Info className="h-4 w-4" />
+              </Link>
+            </div>
             <div className="flex flex-wrap gap-2">
               {DIFFICULTY_LEVELS.map(level => {
                 const isSelected = localDifficulties.includes(level.value);
@@ -368,11 +378,20 @@ export function MarketplaceFilters({
                   <button
                     key={level.value}
                     onClick={() => handleDifficultyToggle(level.value)}
-                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                    className="px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 border-2"
+                    style={
                       isSelected
-                        ? 'bg-[#E8A598] text-white border-2 border-[#E8A598]'
-                        : 'bg-background border-2 border-[#383838] text-foreground hover:bg-muted'
-                    }`}
+                        ? {
+                            backgroundColor: level.color,
+                            color: level.textColor,
+                            borderColor: level.color,
+                          }
+                        : {
+                            backgroundColor: 'var(--background)',
+                            color: 'var(--foreground)',
+                            borderColor: '#383838',
+                          }
+                    }
                   >
                     {level.label}
                   </button>
