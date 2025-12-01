@@ -29,8 +29,19 @@ export async function getCurrentUserWithProfileServer(): Promise<{
   return { user, profile };
 }
 
+// Extended Stripe account status with more details
+export interface ExtendedStripeAccountStatus extends StripeAccountStatus {
+  detailsSubmitted?: boolean;
+  chargesEnabled?: boolean;
+  payoutsEnabled?: boolean;
+  requiresMoreInfo?: boolean;
+  pendingVerification?: boolean;
+  requirementsDue?: string[];
+  accountType?: 'standard' | 'express' | 'custom';
+}
+
 // Server-side helper to get Stripe account status
-export async function getStripeAccountStatusServer(accountId: string | null): Promise<StripeAccountStatus> {
+export async function getStripeAccountStatusServer(accountId: string | null): Promise<ExtendedStripeAccountStatus> {
   if (!accountId) {
     return {
       isConnected: false,
@@ -43,13 +54,44 @@ export async function getStripeAccountStatusServer(accountId: string | null): Pr
   try {
     const stripe = getStripe();
     const account = await stripe.accounts.retrieve(accountId);
-    const isOnboarded = account.details_submitted && account.charges_enabled;
+    
+    const detailsSubmitted = account.details_submitted ?? false;
+    const chargesEnabled = account.charges_enabled ?? false;
+    const payoutsEnabled = account.payouts_enabled ?? false;
+    const isOnboarded = detailsSubmitted && chargesEnabled;
+    
+    // Check if there are pending requirements
+    const currentlyDue = account.requirements?.currently_due || [];
+    const pendingVerification = account.requirements?.pending_verification || [];
+    const requiresMoreInfo = currentlyDue.length > 0;
+    const isPendingVerification = pendingVerification.length > 0;
+    
+    // Determine status
+    let status: 'unknown' | 'pending' | 'onboarded' | 'error' | 'pending_verification' | 'requires_info';
+    if (isOnboarded) {
+      status = 'onboarded';
+    } else if (isPendingVerification) {
+      status = 'pending_verification';
+    } else if (requiresMoreInfo) {
+      status = 'requires_info';
+    } else if (detailsSubmitted) {
+      status = 'pending';
+    } else {
+      status = 'pending';
+    }
     
     return {
       isConnected: true,
       isOnboarded,
       accountId,
-      status: isOnboarded ? 'onboarded' : 'pending'
+      status,
+      detailsSubmitted,
+      chargesEnabled,
+      payoutsEnabled,
+      requiresMoreInfo,
+      pendingVerification: isPendingVerification,
+      requirementsDue: currentlyDue as string[],
+      accountType: account.type as 'standard' | 'express' | 'custom'
     };
   } catch (error) {
     console.error('Error checking Stripe account status:', error);

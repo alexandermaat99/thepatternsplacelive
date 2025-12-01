@@ -14,7 +14,14 @@ export interface StripeAccountStatus {
   isConnected: boolean;
   isOnboarded: boolean;
   accountId: string | null;
-  status: 'unknown' | 'pending' | 'onboarded' | 'error';
+  status: 'unknown' | 'pending' | 'onboarded' | 'error' | 'pending_verification' | 'requires_info';
+  detailsSubmitted?: boolean;
+  chargesEnabled?: boolean;
+  payoutsEnabled?: boolean;
+  requiresMoreInfo?: boolean;
+  pendingVerification?: boolean;
+  requirementsDue?: string[];
+  accountType?: 'standard' | 'express' | 'custom';
 }
 
 // Client-side helper to get current user and profile

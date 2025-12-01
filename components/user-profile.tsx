@@ -3,11 +3,9 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
 import { AvatarUpload } from '@/components/avatar-upload';
-import { createClient } from '@/lib/supabase/client';
-import { CheckCircle, XCircle, ExternalLink, User, CreditCard } from 'lucide-react';
+import { ExternalLink, User } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { UserProfile as UserProfileType, StripeAccountStatus } from '@/lib/auth-helpers';
@@ -230,67 +228,6 @@ export function UserProfile({
               Sign Out
             </Button>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Stripe Connection Status */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CreditCard className="h-5 w-5" />
-            Stripe Connection
-            {stripeStatus?.isOnboarded ? (
-              <CheckCircle className="h-5 w-5 text-green-500" />
-            ) : (
-              <XCircle className="h-5 w-5 text-red-500" />
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">Status:</span>
-            <Badge variant={stripeStatus?.isOnboarded ? 'default' : 'destructive'}>
-              {stripeStatus?.isOnboarded ? 'Connected & Ready' : 'Not Connected'}
-            </Badge>
-          </div>
-
-          {profile?.stripe_account_id && (
-            <div>
-              <span className="text-sm font-medium">Stripe Account ID:</span>
-              <p className="text-sm text-muted-foreground font-mono">{profile.stripe_account_id}</p>
-            </div>
-          )}
-
-          <div>
-            <span className="text-sm font-medium">Can Sell Products:</span>
-            <p className="text-sm text-muted-foreground">
-              {canSell ? 'Yes' : 'No - Complete Stripe setup first'}
-            </p>
-          </div>
-
-          {profile?.stripe_account_id && (
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={refreshStripeStatus}>
-                Refresh Status
-              </Button>
-              {!canSell && (
-                <Link href="/marketplace/sell">
-                  <Button size="sm">Complete Setup</Button>
-                </Link>
-              )}
-            </div>
-          )}
-
-          {!profile?.stripe_account_id && (
-            <div>
-              <p className="text-sm text-muted-foreground mb-2">
-                Connect your Stripe account to start selling products.
-              </p>
-              <Link href="/marketplace/sell">
-                <Button size="sm">Connect Stripe</Button>
-              </Link>
-            </div>
-          )}
         </CardContent>
       </Card>
 

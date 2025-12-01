@@ -1,45 +1,32 @@
 "use client";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
 interface StripeConnectButtonProps {
   userId: string;
+  forceMigrate?: boolean;
+  variant?: "default" | "outline" | "secondary";
+  label?: string;
 }
 
-export function StripeConnectButton({ userId }: StripeConnectButtonProps) {
-  const [loading, setLoading] = useState(false);
+export function StripeConnectButton({ 
+  userId, 
+  forceMigrate = false,
+  variant = "default",
+  label
+}: StripeConnectButtonProps) {
+  const router = useRouter();
 
-  const handleConnectStripe = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/connect/onboard", {
-        method: "POST",
-        body: JSON.stringify({ userId }),
-        headers: { "Content-Type": "application/json" },
-      });
-      
-      const data = await res.json();
-      
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to start Stripe onboarding');
-      }
-      
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        throw new Error('No onboarding URL received');
-      }
-    } catch (err) {
-      console.error('Stripe onboarding error:', err);
-      alert(`Failed to start Stripe onboarding: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    } finally {
-      setLoading(false);
-    }
+  const handleConnectStripe = () => {
+    // Navigate to the embedded onboarding page
+    router.push("/dashboard/stripe-setup");
   };
 
+  const buttonLabel = label || (forceMigrate ? "Upgrade to Express" : "Connect with Stripe");
+
   return (
-    <Button onClick={handleConnectStripe} disabled={loading}>
-      {loading ? "Redirecting..." : "Connect with Stripe"}
+    <Button onClick={handleConnectStripe} variant={variant} className="w-full">
+      {buttonLabel}
     </Button>
   );
 } 
