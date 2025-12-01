@@ -17,6 +17,7 @@
 ## 2. STRIPE PRODUCTION SETUP
 
 ### Switch to Live Mode
+
 ```
 [ ] Toggle Stripe Dashboard from "Test" to "Live" mode
 [ ] Complete Stripe account verification
@@ -24,17 +25,19 @@
 ```
 
 ### Create Production Webhook
+
 ```
 [ ] Go to: Stripe Dashboard → Developers → Webhooks
 [ ] Add endpoint URL: https://thepatternsplace.com/api/webhooks/stripe
 [ ] Select these events:
     [ ] checkout.session.completed
-    [ ] checkout.session.expired  
+    [ ] checkout.session.expired
     [ ] charge.succeeded
 [ ] Copy webhook signing secret (starts with whsec_)
 ```
 
 ### Connect Settings
+
 ```
 [ ] Configure Connect settings (Stripe → Connect → Settings)
 [ ] Set platform branding
@@ -43,17 +46,18 @@
 
 **Write down your Stripe keys:**
 
-| Key | Value |
-|-----|-------|
-| Live Secret Key (sk_live_...) | _________________________________ |
-| Live Publishable Key (pk_live_...) | _________________________________ |
-| Webhook Secret (whsec_...) | _________________________________ |
+| Key                                | Value                              |
+| ---------------------------------- | ---------------------------------- |
+| Live Secret Key (sk*live*...)      | ****************\_**************** |
+| Live Publishable Key (pk*live*...) | ****************\_**************** |
+| Webhook Secret (whsec\_...)        | ****************\_**************** |
 
 ---
 
 ## 3. RESEND EMAIL SETUP
 
 ### Domain Verification
+
 ```
 [ ] Go to: resend.com/domains
 [ ] Add domain: thepatternsplace.com
@@ -66,23 +70,25 @@
 
 **Write down your Resend settings:**
 
-| Setting | Value |
-|---------|-------|
-| API Key (re_...) | _________________________________ |
-| From Email | noreply@thepatternsplace.com |
-| From Name | The Patterns Place |
+| Setting           | Value                              |
+| ----------------- | ---------------------------------- |
+| API Key (re\_...) | ****************\_**************** |
+| From Email        | noreply@thepatternsplace.com       |
+| From Name         | The Patterns Place                 |
 
 ---
 
 ## 4. SUPABASE PRODUCTION SETTINGS
 
 ### API Keys
+
 ```
 [ ] Go to: Supabase Dashboard → Project Settings → API
 [ ] Copy production URL and keys
 ```
 
 ### Auth Configuration
+
 ```
 [ ] Go to: Supabase → Auth → URL Configuration
 [ ] Set Site URL: https://thepatternsplace.com
@@ -90,6 +96,7 @@
 ```
 
 ### Security
+
 ```
 [ ] Verify RLS (Row Level Security) enabled on all tables
 [ ] Test RLS policies
@@ -98,11 +105,11 @@
 
 **Write down your Supabase keys:**
 
-| Key | Value |
-|-----|-------|
-| Project URL | _________________________________ |
-| Anon Key | _________________________________ |
-| Service Role Key | _________________________________ |
+| Key              | Value                              |
+| ---------------- | ---------------------------------- |
+| Project URL      | ****************\_**************** |
+| Anon Key         | ****************\_**************** |
+| Service Role Key | ****************\_**************** |
 
 ---
 
@@ -111,6 +118,7 @@
 **Add ALL of these to Vercel → Project Settings → Environment Variables:**
 
 ### Supabase Variables
+
 ```
 [ ] NEXT_PUBLIC_SUPABASE_URL = (your Supabase URL)
 [ ] NEXT_PUBLIC_SUPABASE_ANON_KEY = (your anon key)
@@ -118,6 +126,7 @@
 ```
 
 ### Stripe Variables (USE LIVE KEYS!)
+
 ```
 [ ] STRIPE_SECRET_KEY = sk_live_...
 [ ] NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY = pk_live_...
@@ -125,6 +134,7 @@
 ```
 
 ### Resend Variables
+
 ```
 [ ] RESEND_API_KEY = re_...
 [ ] RESEND_FROM_EMAIL = noreply@thepatternsplace.com
@@ -160,6 +170,7 @@
 ## 8. PRE-LAUNCH TESTING
 
 ### Full Purchase Flow
+
 ```
 [ ] Create a test product as a seller
 [ ] Purchase the product with a real card
@@ -169,6 +180,7 @@
 ```
 
 ### Seller Onboarding
+
 ```
 [ ] Test new seller signup
 [ ] Complete Stripe Express onboarding
@@ -176,6 +188,7 @@
 ```
 
 ### General Testing
+
 ```
 [ ] Test on mobile (iPhone & Android)
 [ ] Test signup flow
@@ -191,14 +204,15 @@
 
 **Bookmark these dashboards:**
 
-| Service | URL | Check Daily |
-|---------|-----|-------------|
-| Vercel | vercel.com/dashboard | [ ] |
-| Stripe | dashboard.stripe.com | [ ] |
-| Supabase | supabase.com/dashboard | [ ] |
-| Resend | resend.com/emails | [ ] |
+| Service  | URL                    | Check Daily |
+| -------- | ---------------------- | ----------- |
+| Vercel   | vercel.com/dashboard   | [ ]         |
+| Stripe   | dashboard.stripe.com   | [ ]         |
+| Supabase | supabase.com/dashboard | [ ]         |
+| Resend   | resend.com/emails      | [ ]         |
 
 ### Set Up Monitoring (Optional but Recommended)
+
 ```
 [ ] Error tracking (Sentry or similar)
 [ ] Uptime monitoring (Better Uptime, Pingdom)
@@ -222,23 +236,22 @@
 
 ### Your Production URLs
 
-| Purpose | URL |
-|---------|-----|
-| Live Site | https://thepatternsplace.com |
+| Purpose        | URL                                              |
+| -------------- | ------------------------------------------------ |
+| Live Site      | https://thepatternsplace.com                     |
 | Stripe Webhook | https://thepatternsplace.com/api/webhooks/stripe |
 
 ### Emergency Contacts
 
-| Service | Support |
-|---------|---------|
-| Stripe | support.stripe.com |
+| Service  | Support              |
+| -------- | -------------------- |
+| Stripe   | support.stripe.com   |
 | Supabase | supabase.com/support |
-| Resend | resend.com/support |
-| Vercel | vercel.com/support |
+| Resend   | resend.com/support   |
+| Vercel   | vercel.com/support   |
 
 ---
 
-**Date Completed: ____________________**
+**Date Completed: ********\_\_\_\_**********
 
-**Launched By: ____________________**
-
+**Launched By: ********\_\_\_\_**********
