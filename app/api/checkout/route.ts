@@ -105,6 +105,14 @@ export async function POST(request: NextRequest) {
         },
         // Platform fee - goes to The Pattern's Place
         ...(platformFeeAmount > 0 && { application_fee_amount: platformFeeAmount }),
+        // Store metadata on PaymentIntent for webhook processing
+        metadata: {
+          productId: product.id,
+          ...(user?.id && { buyerId: user.id }),
+          ...(user?.email && { buyerEmail: user.email }),
+          sellerId: product.user_id,
+          sellerStripeAccountId: sellerStripeAccountId,
+        },
       },
       success_url: `${request.nextUrl.origin}/marketplace/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${request.nextUrl.origin}/marketplace/product/${productId}`,

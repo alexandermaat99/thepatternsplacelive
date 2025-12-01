@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, ShoppingBag, Home } from 'lucide-react';
+import { CheckCircle, ShoppingBag, Home, Loader2 } from 'lucide-react';
 import { useCart } from '@/contexts/cart-context';
 import Link from 'next/link';
 
@@ -12,15 +12,66 @@ export default function CheckoutSuccessPage() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get('session_id');
   const { clearCart } = useCart();
-  const hasClearedCart = useRef(false);
+  const hasProcessed = useRef(false);
+  const [isProcessing, setIsProcessing] = useState(true);
+  const [orderCreated, setOrderCreated] = useState(false);
 
-  // Clear cart on successful checkout (only once)
+  // Process order and clear cart on successful checkout (only once)
   useEffect(() => {
-    if (!hasClearedCart.current) {
-      clearCart();
-      hasClearedCart.current = true;
+    async function processOrder() {
+      if (hasProcessed.current || !sessionId) {
+        setIsProcessing(false);
+        return;
+      }
+      
+      hasProcessed.current = true;
+      
+      try {
+        // Call API to process the order
+        const response = await fetch('/api/process-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId }),
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          console.log('Order processed:', data);
+          setOrderCreated(true);
+        } else {
+          console.error('Order processing failed:', data.error);
+        }
+      } catch (error) {
+        console.error('Error processing order:', error);
+      } finally {
+        setIsProcessing(false);
+        clearCart();
+      }
     }
-  }, [clearCart]);
+    
+    processOrder();
+  }, [sessionId, clearCart]);
+  if (isProcessing) {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-2xl">
+        <Card>
+          <CardContent className="text-center py-12">
+            <Loader2 className="h-16 w-16 text-primary mx-auto mb-6 animate-spin" />
+            <CardHeader>
+              <CardTitle className="text-2xl">
+                Processing your order...
+              </CardTitle>
+            </CardHeader>
+            <p className="text-muted-foreground">
+              Please wait while we confirm your purchase.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
         <Card>

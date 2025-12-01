@@ -39,10 +39,13 @@ export async function POST(request: NextRequest) {
 
   const supabase = await createClient();
 
+  console.log('🔔 Webhook received:', event.type);
+  
   try {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object;
+        console.log('✅ Processing checkout.session.completed:', session.id);
 
         // Check if this is a cart checkout (multiple products) or single product checkout
         const cartItems = session.metadata?.cartItems;
@@ -184,8 +187,140 @@ export async function POST(request: NextRequest) {
         break;
       }
 
+      // Handle charge.succeeded for Connect payments (backup for checkout.session.completed)
+      case 'charge.succeeded': {
+        const charge = event.data.object;
+        console.log('💳 Processing charge.succeeded:', charge.id);
+        
+        // Get metadata from payment intent
+        const metadata = charge.metadata || {};
+        
+        // Skip if no metadata (not our checkout)
+        if (!metadata.cartItems && !metadata.productId) {
+          console.log('⏭️ Skipping charge.succeeded - no relevant metadata');
+          break;
+        }
+
+        // Check if order already exists (from checkout.session.completed)
+        const paymentIntentId = typeof charge.payment_intent === 'string' 
+          ? charge.payment_intent 
+          : charge.payment_intent?.id;
+        
+        if (paymentIntentId) {
+          const { data: existingOrder } = await supabase
+            .from('orders')
+            .select('id')
+            .eq('stripe_session_id', paymentIntentId)
+            .limit(1);
+          
+          if (existingOrder && existingOrder.length > 0) {
+            console.log('⏭️ Order already exists for this payment');
+            break;
+          }
+        }
+
+        // Cart checkout
+        if (metadata.cartItems) {
+          try {
+            const items = JSON.parse(metadata.cartItems);
+            const productIds = items.map((item: { productId: string }) => item.productId);
+            const { data: products } = await supabase
+              .from('products')
+              .select('id, user_id, price, currency')
+              .in('id', productIds);
+
+            if (products) {
+              const orders = items
+                .map((item: { productId: string; quantity: number }) => {
+                  const product = products.find(p => p.id === item.productId);
+                  if (!product) return null;
+
+                  const orderAmount = product.price * item.quantity;
+                  const fees = calculateFees(orderAmount);
+
+                  return {
+                    product_id: item.productId,
+                    buyer_id: metadata.buyerId || null,
+                    seller_id: product.user_id,
+                    stripe_session_id: paymentIntentId || charge.id,
+                    status: 'completed',
+                    amount: orderAmount,
+                    currency: product.currency || 'USD',
+                    buyer_email: metadata.buyerEmail || charge.billing_details?.email || null,
+                    platform_fee: fees.platformFee,
+                    stripe_fee: fees.stripeFee,
+                    net_amount: fees.netAmount,
+                  };
+                })
+                .filter(Boolean);
+
+              if (orders.length > 0) {
+                const { error: orderError, data: insertedOrders } = await supabase
+                  .from('orders')
+                  .insert(orders)
+                  .select();
+
+                if (orderError) {
+                  console.error('Error creating cart orders from charge:', orderError);
+                } else if (insertedOrders) {
+                  console.log(`✅ Created ${insertedOrders.length} order(s) from charge ${charge.id}`);
+                  
+                  deliverProductsForOrders(insertedOrders).catch(error => {
+                    console.error('❌ Error delivering products via email:', error);
+                  });
+                }
+              }
+            }
+          } catch (parseError) {
+            console.error('Error parsing cart items from charge:', parseError);
+          }
+        }
+        // Single product checkout
+        else if (metadata.productId) {
+          const { data: product } = await supabase
+            .from('products')
+            .select('user_id, price, currency')
+            .eq('id', metadata.productId)
+            .single();
+
+          if (product) {
+            const orderAmount = charge.amount / 100;
+            const fees = calculateFees(orderAmount);
+
+            const { error: orderError, data: insertedOrders } = await supabase
+              .from('orders')
+              .insert({
+                product_id: metadata.productId,
+                buyer_id: metadata.buyerId || null,
+                seller_id: product.user_id,
+                stripe_session_id: paymentIntentId || charge.id,
+                status: 'completed',
+                amount: orderAmount,
+                currency: (charge.currency || 'usd').toUpperCase(),
+                buyer_email: metadata.buyerEmail || charge.billing_details?.email || null,
+                platform_fee: fees.platformFee,
+                stripe_fee: fees.stripeFee,
+                net_amount: fees.netAmount,
+              })
+              .select();
+
+            if (orderError) {
+              console.error('Error creating order from charge:', orderError);
+            } else if (insertedOrders && insertedOrders.length > 0) {
+              console.log(`✅ Created order ${insertedOrders[0].id} from charge ${charge.id}`);
+              
+              deliverProductsForOrders(insertedOrders).catch(error => {
+                console.error('❌ Error delivering product via email:', error);
+              });
+            }
+          }
+        }
+
+        break;
+      }
+
       default:
-        console.log(`Unhandled event type: ${event.type}`);
+        console.log(`⚠️ Unhandled event type: ${event.type}`, JSON.stringify(event.data.object, null, 2).substring(0, 500));
     }
 
     return NextResponse.json({ received: true });

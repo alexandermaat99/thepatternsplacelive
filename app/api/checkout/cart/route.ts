@@ -164,6 +164,19 @@ export async function POST(request: NextRequest) {
         },
         // Platform fee - goes to The Pattern's Place
         ...(platformFeeAmount > 0 && { application_fee_amount: platformFeeAmount }),
+        // Store metadata on PaymentIntent for webhook processing
+        metadata: {
+          ...(user?.id && { buyerId: user.id }),
+          ...(user?.email && { buyerEmail: user.email }),
+          cartItems: JSON.stringify(
+            items.map((item: { productId: string; quantity: number }) => ({
+              productId: item.productId,
+              quantity: item.quantity,
+            }))
+          ),
+          sellerAccountIds: JSON.stringify(sellerAccountIds),
+          primarySellerAccountId: primarySellerAccountId,
+        },
       },
       success_url: `${request.nextUrl.origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${request.nextUrl.origin}/cart`,
