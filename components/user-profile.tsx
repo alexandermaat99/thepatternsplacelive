@@ -230,37 +230,6 @@ export function UserProfile({
           </div>
         </CardContent>
       </Card>
-
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <Link href="/marketplace" className="block">
-            <Button variant="outline" className="w-full justify-start">
-              <ExternalLink className="h-4 w-4 mr-2" />
-              Browse Marketplace
-            </Button>
-          </Link>
-
-          {canSell && (
-            <Link href="/marketplace/sell" className="block">
-              <Button variant="outline" className="w-full justify-start">
-                <ExternalLink className="h-4 w-4 mr-2" />
-                List New Product
-              </Button>
-            </Link>
-          )}
-
-          <Link href="/dashboard" className="block">
-            <Button variant="outline" className="w-full justify-start">
-              <ExternalLink className="h-4 w-4 mr-2" />
-              Dashboard
-            </Button>
-          </Link>
-        </CardContent>
-      </Card>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { BackButton } from '@/components/back-button';
+import Link from 'next/link';
 import {
   DollarSign,
   TrendingUp,
@@ -304,7 +305,11 @@ export default async function EarningsPage() {
             {topProducts.length > 0 ? (
               <div className="space-y-4">
                 {topProducts.map((item, index) => (
-                  <div key={item.product?.id || index} className="flex items-center gap-4">
+                  <Link
+                    key={item.product?.id || index}
+                    href={`/marketplace/product/${item.product?.id}`}
+                    className="flex items-center gap-4 p-2 -mx-2 rounded-lg hover:bg-muted transition-colors"
+                  >
                     <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
                       {index + 1}
                     </div>
@@ -324,7 +329,7 @@ export default async function EarningsPage() {
                         {formatCurrency(item.netEarnings)} earned
                       </p>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             ) : (
