@@ -67,7 +67,7 @@ export const COMPANY_INFO = {
     // Whether to pass Stripe's processing fees to the seller
     // true = Seller pays Stripe fees (like Etsy) - you keep more
     // false = Platform absorbs Stripe fees - seller-friendly
-    passStripeFeesToSeller: true,
+    passStripeFeesToSeller: false, // Platform absorbs Stripe fees
 
     // Stripe's approximate fees (used for calculation when passing to seller)
     // These are estimates - actual Stripe fees may vary slightly
@@ -77,6 +77,10 @@ export const COMPANY_INFO = {
     // Minimum platform fee in cents (optional floor)
     // e.g., 50 = $0.50 minimum fee per transaction
     minimumFeeCents: 50,
+
+    // Minimum product price in dollars
+    // Products must be priced at least this amount
+    minimumProductPrice: 1.0,
   },
 } as const;
 

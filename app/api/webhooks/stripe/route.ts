@@ -9,10 +9,10 @@ import { COMPANY_INFO } from '@/lib/company-info';
 function calculateFees(amount: number) {
   // Convert to cents for calculation
   const amountInCents = Math.round(amount * 100);
-  
+
   // Platform transaction fee
   const platformFeeCents = Math.round(amountInCents * COMPANY_INFO.fees.platformFeePercent);
-  
+
   // Stripe fee passthrough (if enabled)
   let stripeFeePassthroughCents = 0;
   if (COMPANY_INFO.fees.passStripeFeesToSeller) {
@@ -20,27 +20,27 @@ function calculateFees(amount: number) {
       amountInCents * COMPANY_INFO.fees.stripePercentFee + COMPANY_INFO.fees.stripeFlatFeeCents
     );
   }
-  
+
   // Total application fee (what we actually take from Stripe)
   const totalFeeCents = platformFeeCents + stripeFeePassthroughCents;
   const applicationFeeCents = Math.max(totalFeeCents, COMPANY_INFO.fees.minimumFeeCents);
-  
+
   // Convert back to dollars
   const applicationFee = applicationFeeCents / 100;
   const netAmount = (amountInCents - applicationFeeCents) / 100;
-  
+
   // For database storage:
-  // - platform_fee: The actual application fee charged (includes minimum)
-  // - stripe_fee: The stripe passthrough portion (for reporting)
+  // - platform_fee: The actual application fee charged (platform fee only, since we absorb Stripe fees)
+  // - stripe_fee: 0 (platform absorbs Stripe fees, not passed to seller)
   // - net_amount: What seller actually receives
-  const platformFee = applicationFeeCents / 100; // Total fee we charge
-  const stripeFee = stripeFeePassthroughCents / 100; // Stripe portion (for reporting)
-  
-  return { 
-    platformFee, // This is the total application fee ($0.50 minimum)
-    stripeFee,   // Stripe passthrough portion (for breakdown)
-    netAmount,   // Seller's net
-    applicationFee // Same as platformFee (for reference)
+  const platformFee = applicationFeeCents / 100; // Platform fee only (we absorb Stripe fees)
+  const stripeFee = 0; // Platform absorbs Stripe fees, so this is always 0
+
+  return {
+    platformFee, // Platform fee only ($0.50 minimum) - Stripe fees absorbed by platform
+    stripeFee, // Always 0 - platform absorbs Stripe fees
+    netAmount, // Seller's net (amount - platform fee)
+    applicationFee, // Same as platformFee (for reference)
   };
 }
 
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
   const supabase = await createClient();
 
   console.log('🔔 Webhook received:', event.type);
-  
+
   try {
     switch (event.type) {
       case 'checkout.session.completed': {
@@ -229,14 +229,19 @@ export async function POST(request: NextRequest) {
       // NOTE: We use checkout.session.completed as primary, so this is just a backup
       // Skip this entirely to prevent duplicates - checkout.session.completed handles everything
       case 'charge.succeeded': {
-        console.log('💳 charge.succeeded received, but skipping - handled by checkout.session.completed');
+        console.log(
+          '💳 charge.succeeded received, but skipping - handled by checkout.session.completed'
+        );
         // Skip entirely - checkout.session.completed is our primary handler
         // This prevents duplicate order creation
         break;
       }
 
       default:
-        console.log(`⚠️ Unhandled event type: ${event.type}`, JSON.stringify(event.data.object, null, 2).substring(0, 500));
+        console.log(
+          `⚠️ Unhandled event type: ${event.type}`,
+          JSON.stringify(event.data.object, null, 2).substring(0, 500)
+        );
     }
 
     return NextResponse.json({ received: true });

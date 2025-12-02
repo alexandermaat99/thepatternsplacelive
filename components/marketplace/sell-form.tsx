@@ -47,6 +47,11 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
         throw new Error('You must be logged in to list a product');
       }
 
+      const price = parseFloat(formData.price);
+      if (isNaN(price) || price < 1.00) {
+        throw new Error('Price must be at least $1.00');
+      }
+
       const supabase = createClient();
       const { data: product, error } = await supabase
         .from('products')
@@ -54,7 +59,7 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
           title: formData.title,
           description: formData.description,
           details: formData.details || null,
-          price: parseFloat(formData.price),
+          price: price,
           currency: 'USD',
           category: formData.category, // Keep for backward compatibility
           difficulty: formData.difficulty || null,
@@ -189,16 +194,16 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
               </div>
 
               <div>
-                <Label htmlFor="price">Price (USD)</Label>
+                <Label htmlFor="price">Price (USD) - Minimum $1.00</Label>
                 <Input
                   id="price"
                   type="number"
                   step="0.01"
-                  min="0"
+                  min="1.00"
                   value={formData.price}
                   onChange={e => setFormData({ ...formData, price: e.target.value })}
                   required
-                  placeholder="0.00"
+                  placeholder="1.00"
                 />
               </div>
 

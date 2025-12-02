@@ -138,6 +138,11 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
     setIsLoading(true);
 
     try {
+      const price = parseFloat(formData.price);
+      if (isNaN(price) || price < 1.00) {
+        throw new Error('Price must be at least $1.00');
+      }
+
       const supabase = createClient();
 
       console.log('Updating product:', product.id);
@@ -252,7 +257,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
         title: formData.title.trim(),
         description: sanitizedDescription || null, // Always include, even if empty
         details: sanitizedDetails || null,
-        price: parseFloat(formData.price),
+        price: price,
         category: formData.category.trim(),
         difficulty: formData.difficulty || null,
         images: validImages.length > 0 ? validImages : [],
@@ -497,16 +502,16 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="price">Price (USD)</Label>
+              <Label htmlFor="price">Price (USD) - Minimum $1.00</Label>
               <Input
                 id="price"
                 type="number"
                 step="0.01"
-                min="0"
+                min="1.00"
                 value={formData.price}
                 onChange={e => setFormData({ ...formData, price: e.target.value })}
                 required
-                placeholder="0.00"
+                placeholder="1.00"
               />
             </div>
 
