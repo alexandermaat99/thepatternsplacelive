@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
 
               if (orders.length > 0) {
                 // Check for duplicates before inserting
-                const sessionIds = orders.map(o => o.stripe_session_id);
+                const sessionIds = orders.map((o: { stripe_session_id: string }) => o.stripe_session_id);
                 const { data: existingOrders } = await supabase
                   .from('orders')
                   .select('stripe_session_id')
@@ -305,7 +305,7 @@ export async function POST(request: NextRequest) {
 
               if (orders.length > 0) {
                 // Check for duplicates before inserting
-                const sessionIds = orders.map(o => o.stripe_session_id);
+                const sessionIds = orders.map((o: { stripe_session_id: string }) => o.stripe_session_id);
                 const { data: existingOrders } = await supabase
                   .from('orders')
                   .select('stripe_session_id')
