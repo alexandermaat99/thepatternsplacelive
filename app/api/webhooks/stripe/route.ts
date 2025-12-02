@@ -5,17 +5,41 @@ import { headers } from 'next/headers';
 import { deliverProductsForOrders } from '@/lib/product-delivery';
 import { COMPANY_INFO } from '@/lib/company-info';
 
-// Calculate fees for an order
+// Calculate fees for an order (matches checkout calculation)
 function calculateFees(amount: number) {
-  const platformFeePercent = COMPANY_INFO.fees.platformFeePercent;
-  const stripePercent = COMPANY_INFO.fees.stripePercentFee;
-  const stripeFlatFee = COMPANY_INFO.fees.stripeFlatFeeCents / 100;
-
-  const platformFee = Math.round(amount * platformFeePercent * 100) / 100;
-  const stripeFee = Math.round((amount * stripePercent + stripeFlatFee) * 100) / 100;
-  const netAmount = Math.round((amount - platformFee - stripeFee) * 100) / 100;
-
-  return { platformFee, stripeFee, netAmount };
+  // Convert to cents for calculation
+  const amountInCents = Math.round(amount * 100);
+  
+  // Platform transaction fee
+  const platformFeeCents = Math.round(amountInCents * COMPANY_INFO.fees.platformFeePercent);
+  
+  // Stripe fee passthrough (if enabled)
+  let stripeFeePassthroughCents = 0;
+  if (COMPANY_INFO.fees.passStripeFeesToSeller) {
+    stripeFeePassthroughCents = Math.round(
+      amountInCents * COMPANY_INFO.fees.stripePercentFee + COMPANY_INFO.fees.stripeFlatFeeCents
+    );
+  }
+  
+  // Total application fee (what we actually take from Stripe)
+  const totalFeeCents = platformFeeCents + stripeFeePassthroughCents;
+  const applicationFeeCents = Math.max(totalFeeCents, COMPANY_INFO.fees.minimumFeeCents);
+  
+  // Convert back to dollars
+  const applicationFee = applicationFeeCents / 100;
+  const netAmount = (amountInCents - applicationFeeCents) / 100;
+  
+  // For database storage, break down the application fee
+  // The application fee includes both platform fee and stripe passthrough
+  const platformFee = platformFeeCents / 100;
+  const stripeFee = stripeFeePassthroughCents / 100;
+  
+  return { 
+    platformFee, 
+    stripeFee, 
+    netAmount,
+    applicationFee // Total fee actually charged
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -89,6 +113,18 @@ export async function POST(request: NextRequest) {
                 .filter(Boolean);
 
               if (orders.length > 0) {
+                // Check for duplicates before inserting
+                const sessionIds = orders.map(o => o.stripe_session_id);
+                const { data: existingOrders } = await supabase
+                  .from('orders')
+                  .select('stripe_session_id')
+                  .in('stripe_session_id', sessionIds);
+
+                if (existingOrders && existingOrders.length > 0) {
+                  console.log('⏭️ Orders already exist for this session, skipping duplicate creation');
+                  break;
+                }
+
                 const { error: orderError, data: insertedOrders } = await supabase
                   .from('orders')
                   .insert(orders)
@@ -202,19 +238,32 @@ export async function POST(request: NextRequest) {
         }
 
         // Check if order already exists (from checkout.session.completed)
+        // Check by charge ID first, then by payment intent
+        const { data: existingOrderByCharge } = await supabase
+          .from('orders')
+          .select('id')
+          .eq('stripe_session_id', charge.id)
+          .limit(1);
+        
+        if (existingOrderByCharge && existingOrderByCharge.length > 0) {
+          console.log('⏭️ Order already exists for this charge');
+          break;
+        }
+
         const paymentIntentId = typeof charge.payment_intent === 'string' 
           ? charge.payment_intent 
           : charge.payment_intent?.id;
         
         if (paymentIntentId) {
-          const { data: existingOrder } = await supabase
+          // Also check by payment intent ID (in case session ID was used)
+          const { data: existingOrderByPI } = await supabase
             .from('orders')
             .select('id')
             .eq('stripe_session_id', paymentIntentId)
             .limit(1);
           
-          if (existingOrder && existingOrder.length > 0) {
-            console.log('⏭️ Order already exists for this payment');
+          if (existingOrderByPI && existingOrderByPI.length > 0) {
+            console.log('⏭️ Order already exists for this payment intent');
             break;
           }
         }
@@ -255,6 +304,18 @@ export async function POST(request: NextRequest) {
                 .filter(Boolean);
 
               if (orders.length > 0) {
+                // Check for duplicates before inserting
+                const sessionIds = orders.map(o => o.stripe_session_id);
+                const { data: existingOrders } = await supabase
+                  .from('orders')
+                  .select('stripe_session_id')
+                  .in('stripe_session_id', sessionIds);
+
+                if (existingOrders && existingOrders.length > 0) {
+                  console.log('⏭️ Orders already exist for these sessions, skipping duplicate creation');
+                  break;
+                }
+
                 const { error: orderError, data: insertedOrders } = await supabase
                   .from('orders')
                   .insert(orders)

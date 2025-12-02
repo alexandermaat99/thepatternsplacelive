@@ -55,11 +55,53 @@ export async function POST() {
         .update({ stripe_account_id: accountId })
         .eq('id', user.id);
     } else {
-      // Check if existing account is Standard - if so, create new Express account
-      const existingAccount = await stripe.accounts.retrieve(accountId);
-      
-      if (existingAccount.type === 'standard') {
+      // Check if existing account exists and is Standard - if so, create new Express account
+      try {
+        const existingAccount = await stripe.accounts.retrieve(accountId);
+        
+        if (existingAccount.type === 'standard') {
         // Migrate to Express
+        const newAccount = await stripe.accounts.create({
+          type: 'express',
+          country: 'US',
+          email: user.email,
+          metadata: { 
+            userId: user.id,
+            migratedFrom: accountId,
+            migratedAt: new Date().toISOString()
+          },
+          capabilities: {
+            card_payments: { requested: true },
+            transfers: { requested: true },
+          },
+          business_type: 'individual',
+          business_profile: {
+            url: 'https://thepatternsplace.com',
+            mcc: '5999',
+            product_description: 'Digital products and services sold through ThePatternsPlace marketplace'
+          },
+          settings: {
+            payouts: {
+              schedule: {
+                interval: 'daily',
+              },
+            },
+          },
+        });
+
+        accountId = newAccount.id;
+
+        // Update profile with new account ID
+        await supabase
+          .from('profiles')
+          .update({ stripe_account_id: accountId })
+          .eq('id', user.id);
+        }
+      } catch (retrieveError: any) {
+        // Account doesn't exist (likely created in test mode, now using live keys)
+        // Create a new Express account
+        console.log('Existing account not found, creating new Express account:', retrieveError.message);
+        
         const newAccount = await stripe.accounts.create({
           type: 'express',
           country: 'US',

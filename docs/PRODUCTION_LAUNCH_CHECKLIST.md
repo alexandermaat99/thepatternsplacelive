@@ -39,18 +39,19 @@
 ### Connect Settings
 
 ```
-[ ] Configure Connect settings (Stripe → Connect → Settings)
-[ ] Set platform branding
-[ ] Verify Express account settings
+[ ] Go to: Settings (gear icon) → Connect
+[ ] Or direct URL: dashboard.stripe.com/settings/connect
+[ ] Set platform branding (Settings → Connect → Branding)
+[ ] Verify Express account settings (Settings → Connect → Account types)
 ```
 
 **Write down your Stripe keys:**
 
-| Key                                | Value                              |
-| ---------------------------------- | ---------------------------------- |
-| Live Secret Key (sk*live*...)      | ****************\_**************** |
-| Live Publishable Key (pk*live*...) | ****************\_**************** |
-| Webhook Secret (whsec\_...)        | ****************\_**************** |
+| Key                                | Value                                              |
+| ---------------------------------- | -------------------------------------------------- |
+| Live Secret Key (sk*live*...)      | **\*\***\*\*\*\***\*\***\_**\*\***\*\*\*\***\*\*** |
+| Live Publishable Key (pk*live*...) | **\*\***\*\*\*\***\*\***\_**\*\***\*\*\*\***\*\*** |
+| Webhook Secret (whsec\_...)        | **\*\***\*\*\*\***\*\***\_**\*\***\*\*\*\***\*\*** |
 
 ---
 
@@ -70,11 +71,11 @@
 
 **Write down your Resend settings:**
 
-| Setting           | Value                              |
-| ----------------- | ---------------------------------- |
-| API Key (re\_...) | ****************\_**************** |
-| From Email        | noreply@thepatternsplace.com       |
-| From Name         | The Patterns Place                 |
+| Setting           | Value                                              |
+| ----------------- | -------------------------------------------------- |
+| API Key (re\_...) | **\*\***\*\*\*\***\*\***\_**\*\***\*\*\*\***\*\*** |
+| From Email        | noreply@thepatternsplace.com                       |
+| From Name         | The Patterns Place                                 |
 
 ---
 
@@ -105,11 +106,11 @@
 
 **Write down your Supabase keys:**
 
-| Key              | Value                              |
-| ---------------- | ---------------------------------- |
-| Project URL      | ****************\_**************** |
-| Anon Key         | ****************\_**************** |
-| Service Role Key | ****************\_**************** |
+| Key              | Value                                              |
+| ---------------- | -------------------------------------------------- |
+| Project URL      | **\*\***\*\*\*\***\*\***\_**\*\***\*\*\*\***\*\*** |
+| Anon Key         | **\*\***\*\*\*\***\*\***\_**\*\***\*\*\*\***\*\*** |
+| Service Role Key | **\*\***\*\*\*\***\*\***\_**\*\***\*\*\*\***\*\*** |
 
 ---
 
@@ -252,6 +253,6 @@
 
 ---
 
-**Date Completed: ********\_\_\_\_**********
+**Date Completed: **\*\*\***\*\_\_\_\_\*\***\*\*\*\*\*\*
 
-**Launched By: ********\_\_\_\_**********
+**Launched By: **\*\*\***\*\_\_\_\_\*\***\*\*\*\*\*\*
