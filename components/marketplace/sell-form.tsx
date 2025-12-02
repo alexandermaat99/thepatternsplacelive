@@ -16,6 +16,8 @@ import { ArrowLeft, Info } from 'lucide-react';
 import Link from 'next/link';
 import type { UserProfile, StripeAccountStatus } from '@/lib/auth-helpers';
 import { DIFFICULTY_LEVELS } from '@/lib/constants';
+import { COMPANY_INFO } from '@/lib/company-info';
+import { FeesInfoModal } from '@/components/marketplace/fees-info-modal';
 
 interface SellFormProps {
   user: any;
@@ -27,6 +29,7 @@ interface SellFormProps {
 export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [showFeesModal, setShowFeesModal] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -100,7 +103,9 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-2xl">
+    <>
+      <FeesInfoModal isOpen={showFeesModal} onClose={() => setShowFeesModal(false)} />
+      <div className="container mx-auto px-4 py-8 max-w-2xl">
       <div className="mb-6">
         <Button variant="ghost" onClick={() => router.back()} className="flex items-center gap-2">
           <ArrowLeft className="h-4 w-4" />
@@ -205,6 +210,44 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                   required
                   placeholder="1.00"
                 />
+                {formData.price && !isNaN(parseFloat(formData.price)) && parseFloat(formData.price) >= 1.0 && (
+                  <div className="mt-2 text-xs text-muted-foreground space-y-1">
+                    <div className="flex justify-between">
+                      <span>Customer pays:</span>
+                      <span className="font-medium">${parseFloat(formData.price).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="flex items-center gap-1">
+                        Platform fee ({(COMPANY_INFO.fees.platformFeePercent * 100).toFixed(1)}%, min ${(COMPANY_INFO.fees.minimumFeeCents / 100).toFixed(2)}):
+                        <button
+                          type="button"
+                          onClick={() => setShowFeesModal(true)}
+                          className="text-muted-foreground hover:text-primary"
+                        >
+                          <Info className="h-3 w-3" />
+                        </button>
+                      </span>
+                      <span className="font-medium text-orange-600">
+                        -${Math.max(
+                          parseFloat(formData.price) * COMPANY_INFO.fees.platformFeePercent,
+                          COMPANY_INFO.fees.minimumFeeCents / 100
+                        ).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between pt-1 border-t">
+                      <span className="font-medium">You receive:</span>
+                      <span className="font-bold text-green-600">
+                        ${(
+                          parseFloat(formData.price) -
+                          Math.max(
+                            parseFloat(formData.price) * COMPANY_INFO.fees.platformFeePercent,
+                            COMPANY_INFO.fees.minimumFeeCents / 100
+                          )
+                        ).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <CategoryInput
@@ -267,5 +310,6 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
         </CardContent>
       </Card>
     </div>
+    </>
   );
 }

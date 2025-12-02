@@ -19,8 +19,10 @@ import { CategoryInput, linkCategoriesToProduct } from '@/components/marketplace
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import { DIFFICULTY_LEVELS } from '@/lib/constants';
+import { COMPANY_INFO } from '@/lib/company-info';
 import { Info } from 'lucide-react';
 import Link from 'next/link';
+import { FeesInfoModal } from '@/components/marketplace/fees-info-modal';
 
 interface Product {
   id: string;
@@ -44,6 +46,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [showFeesModal, setShowFeesModal] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -139,7 +142,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
 
     try {
       const price = parseFloat(formData.price);
-      if (isNaN(price) || price < 1.00) {
+      if (isNaN(price) || price < 1.0) {
         throw new Error('Price must be at least $1.00');
       }
 
@@ -375,229 +378,279 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
   };
 
   return (
-    <Dialog
-      open={isOpen}
-      onOpenChange={open => {
-        if (!open && !isLoading) {
-          onClose();
-        }
-      }}
-    >
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Edit Product</DialogTitle>
-        </DialogHeader>
+    <>
+      <FeesInfoModal isOpen={showFeesModal} onClose={() => setShowFeesModal(false)} />
+      <Dialog
+        open={isOpen}
+        onOpenChange={open => {
+          if (!open && !isLoading) {
+            onClose();
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Product</DialogTitle>
+          </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="title">Product Title</Label>
-            <Input
-              id="title"
-              value={formData.title}
-              onChange={e => setFormData({ ...formData, title: e.target.value })}
-              required
-              placeholder="Enter product title"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="description">
-              Description
-              <span className="text-muted-foreground text-sm font-normal ml-2">
-                ({formData.description.length}/10000 characters)
-              </span>
-            </Label>
-            <Textarea
-              id="description"
-              value={formData.description}
-              onChange={e => {
-                // Clean pasted content immediately
-                let cleaned = e.target.value;
-                // Remove any non-printable characters except newlines and tabs
-                cleaned = cleaned.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
-                setFormData({ ...formData, description: cleaned });
-              }}
-              onPaste={e => {
-                // Handle paste event to clean content while preserving URLs
-                e.preventDefault();
-                const pastedText = e.clipboardData.getData('text/plain');
-                // Remove non-printable characters but preserve URLs and links
-                // URLs contain :, /, ?, &, =, etc. which are all printable ASCII
-                const cleaned = pastedText.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
-                // Get current cursor position or append to end
-                const textarea = e.currentTarget;
-                const start = textarea.selectionStart;
-                const end = textarea.selectionEnd;
-                const currentText = formData.description;
-                const newText =
-                  currentText.substring(0, start) + cleaned + currentText.substring(end);
-                setFormData({ ...formData, description: newText });
-              }}
-              required
-              placeholder="Describe your product"
-              rows={6}
-              maxLength={10000}
-              className="resize-y min-h-[120px] max-h-[300px] overflow-y-auto"
-            />
-            {formData.description.length > 9000 && (
-              <p className="text-sm text-orange-600 mt-1">
-                Warning: Description is getting long ({formData.description.length} characters).
-                Very long descriptions may cause slow updates.
-              </p>
-            )}
-          </div>
-
-          <div>
-            <Label htmlFor="details">
-              Details (Optional)
-              <span className="text-muted-foreground text-sm font-normal ml-2">
-                ({formData.details.length}/10000 characters)
-              </span>
-            </Label>
-            <Textarea
-              id="details"
-              value={formData.details}
-              onChange={e => {
-                // Clean pasted content immediately
-                let cleaned = e.target.value;
-                // Remove any non-printable characters except newlines and tabs
-                cleaned = cleaned.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
-                // Limit to 10000 characters
-                if (cleaned.length <= 10000) {
-                  setFormData({ ...formData, details: cleaned });
-                }
-              }}
-              onPaste={e => {
-                // Handle paste event to clean content while preserving URLs
-                e.preventDefault();
-                const pastedText = e.clipboardData.getData('text/plain');
-                // Remove non-printable characters but preserve URLs and links
-                const cleaned = pastedText.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
-                // Get current cursor position or append to end
-                const textarea = e.currentTarget;
-                const start = textarea.selectionStart;
-                const end = textarea.selectionEnd;
-                const currentText = formData.details;
-                const newText =
-                  currentText.substring(0, start) + cleaned + currentText.substring(end);
-                // Limit to 10000 characters
-                if (newText.length <= 10000) {
-                  setFormData({ ...formData, details: newText });
-                } else {
-                  setFormData({ ...formData, details: newText.substring(0, 10000) });
-                }
-              }}
-              placeholder="Additional product details, specifications, or information"
-              rows={4}
-              maxLength={10000}
-              className="resize-y min-h-[120px] max-h-[300px] overflow-y-auto"
-            />
-            {formData.details.length > 9000 && (
-              <p className="text-sm text-orange-600 mt-1">
-                Warning: Details is getting long ({formData.details.length} characters). Very long
-                details may cause slow updates.
-              </p>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label htmlFor="price">Price (USD) - Minimum $1.00</Label>
+              <Label htmlFor="title">Product Title</Label>
               <Input
-                id="price"
-                type="number"
-                step="0.01"
-                min="1.00"
-                value={formData.price}
-                onChange={e => setFormData({ ...formData, price: e.target.value })}
+                id="title"
+                value={formData.title}
+                onChange={e => setFormData({ ...formData, title: e.target.value })}
                 required
-                placeholder="1.00"
+                placeholder="Enter product title"
               />
             </div>
-
-            <CategoryInput
-              value={formData.category}
-              onChange={value => setFormData({ ...formData, category: value })}
-            />
 
             <div>
-              <div className="flex items-center gap-2">
-                <Label htmlFor="difficulty">Difficulty Level</Label>
-                <Link
-                  href="/marketplace/difficulty-levels"
-                  target="_blank"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                  title="Learn about difficulty levels"
-                >
-                  <Info className="h-4 w-4" />
-                </Link>
-              </div>
-              <select
-                id="difficulty"
-                value={formData.difficulty}
-                onChange={e => setFormData({ ...formData, difficulty: e.target.value })}
+              <Label htmlFor="description">
+                Description
+                <span className="text-muted-foreground text-sm font-normal ml-2">
+                  ({formData.description.length}/10000 characters)
+                </span>
+              </Label>
+              <Textarea
+                id="description"
+                value={formData.description}
+                onChange={e => {
+                  // Clean pasted content immediately
+                  let cleaned = e.target.value;
+                  // Remove any non-printable characters except newlines and tabs
+                  cleaned = cleaned.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
+                  setFormData({ ...formData, description: cleaned });
+                }}
+                onPaste={e => {
+                  // Handle paste event to clean content while preserving URLs
+                  e.preventDefault();
+                  const pastedText = e.clipboardData.getData('text/plain');
+                  // Remove non-printable characters but preserve URLs and links
+                  // URLs contain :, /, ?, &, =, etc. which are all printable ASCII
+                  const cleaned = pastedText.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
+                  // Get current cursor position or append to end
+                  const textarea = e.currentTarget;
+                  const start = textarea.selectionStart;
+                  const end = textarea.selectionEnd;
+                  const currentText = formData.description;
+                  const newText =
+                    currentText.substring(0, start) + cleaned + currentText.substring(end);
+                  setFormData({ ...formData, description: newText });
+                }}
                 required
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
-              >
-                <option value="" disabled>Select difficulty level</option>
-                {DIFFICULTY_LEVELS.map(level => (
-                  <option key={level.value} value={level.value}>
-                    {level.label}
-                  </option>
-                ))}
-              </select>
+                placeholder="Describe your product"
+                rows={6}
+                maxLength={10000}
+                className="resize-y min-h-[120px] max-h-[300px] overflow-y-auto"
+              />
+              {formData.description.length > 9000 && (
+                <p className="text-sm text-orange-600 mt-1">
+                  Warning: Description is getting long ({formData.description.length} characters).
+                  Very long descriptions may cause slow updates.
+                </p>
+              )}
             </div>
-          </div>
 
-          {!authLoading && user && (
-            <>
-              <MultiImageUpload
-                value={formData.images}
-                onChange={urls => setFormData({ ...formData, images: urls })}
-                userId={user.id}
-                maxImages={10}
+            <div>
+              <Label htmlFor="details">
+                Details (Optional)
+                <span className="text-muted-foreground text-sm font-normal ml-2">
+                  ({formData.details.length}/10000 characters)
+                </span>
+              </Label>
+              <Textarea
+                id="details"
+                value={formData.details}
+                onChange={e => {
+                  // Clean pasted content immediately
+                  let cleaned = e.target.value;
+                  // Remove any non-printable characters except newlines and tabs
+                  cleaned = cleaned.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
+                  // Limit to 10000 characters
+                  if (cleaned.length <= 10000) {
+                    setFormData({ ...formData, details: cleaned });
+                  }
+                }}
+                onPaste={e => {
+                  // Handle paste event to clean content while preserving URLs
+                  e.preventDefault();
+                  const pastedText = e.clipboardData.getData('text/plain');
+                  // Remove non-printable characters but preserve URLs and links
+                  const cleaned = pastedText.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
+                  // Get current cursor position or append to end
+                  const textarea = e.currentTarget;
+                  const start = textarea.selectionStart;
+                  const end = textarea.selectionEnd;
+                  const currentText = formData.details;
+                  const newText =
+                    currentText.substring(0, start) + cleaned + currentText.substring(end);
+                  // Limit to 10000 characters
+                  if (newText.length <= 10000) {
+                    setFormData({ ...formData, details: newText });
+                  } else {
+                    setFormData({ ...formData, details: newText.substring(0, 10000) });
+                  }
+                }}
+                placeholder="Additional product details, specifications, or information"
+                rows={4}
+                maxLength={10000}
+                className="resize-y min-h-[120px] max-h-[300px] overflow-y-auto"
+              />
+              {formData.details.length > 9000 && (
+                <p className="text-sm text-orange-600 mt-1">
+                  Warning: Details is getting long ({formData.details.length} characters). Very long
+                  details may cause slow updates.
+                </p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="price">Price (USD) - Minimum $1.00</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  step="0.01"
+                  min="1.00"
+                  value={formData.price}
+                  onChange={e => setFormData({ ...formData, price: e.target.value })}
+                  required
+                  placeholder="1.00"
+                />
+                {formData.price &&
+                  !isNaN(parseFloat(formData.price)) &&
+                  parseFloat(formData.price) >= 1.0 && (
+                    <div className="mt-2 text-xs text-muted-foreground space-y-1">
+                      <div className="flex justify-between">
+                        <span>Customer pays:</span>
+                        <span className="font-medium">
+                          ${parseFloat(formData.price).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="flex items-center gap-1">
+                          Platform fee ({(COMPANY_INFO.fees.platformFeePercent * 100).toFixed(1)}%,
+                          min ${(COMPANY_INFO.fees.minimumFeeCents / 100).toFixed(2)}):
+                          <button
+                            type="button"
+                            onClick={() => setShowFeesModal(true)}
+                            className="text-muted-foreground hover:text-primary"
+                          >
+                            <Info className="h-3 w-3" />
+                          </button>
+                        </span>
+                        <span className="font-medium text-orange-600">
+                          -$
+                          {Math.max(
+                            parseFloat(formData.price) * COMPANY_INFO.fees.platformFeePercent,
+                            COMPANY_INFO.fees.minimumFeeCents / 100
+                          ).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between pt-1 border-t">
+                        <span className="font-medium">You receive:</span>
+                        <span className="font-bold text-green-600">
+                          $
+                          {(
+                            parseFloat(formData.price) -
+                            Math.max(
+                              parseFloat(formData.price) * COMPANY_INFO.fees.platformFeePercent,
+                              COMPANY_INFO.fees.minimumFeeCents / 100
+                            )
+                          ).toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+              </div>
+
+              <CategoryInput
+                value={formData.category}
+                onChange={value => setFormData({ ...formData, category: value })}
               />
 
-              <DigitalFileUpload
-                value={formData.files}
-                onChange={paths => setFormData({ ...formData, files: paths })}
-                userId={user.id}
-                maxFiles={10}
-                maxFileSizeMB={100}
+              <div>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="difficulty">Difficulty Level</Label>
+                  <Link
+                    href="/marketplace/difficulty-levels"
+                    target="_blank"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    title="Learn about difficulty levels"
+                  >
+                    <Info className="h-4 w-4" />
+                  </Link>
+                </div>
+                <select
+                  id="difficulty"
+                  value={formData.difficulty}
+                  onChange={e => setFormData({ ...formData, difficulty: e.target.value })}
+                  required
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+                >
+                  <option value="" disabled>
+                    Select difficulty level
+                  </option>
+                  {DIFFICULTY_LEVELS.map(level => (
+                    <option key={level.value} value={level.value}>
+                      {level.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {!authLoading && user && (
+              <>
+                <MultiImageUpload
+                  value={formData.images}
+                  onChange={urls => setFormData({ ...formData, images: urls })}
+                  userId={user.id}
+                  maxImages={10}
+                />
+
+                <DigitalFileUpload
+                  value={formData.files}
+                  onChange={paths => setFormData({ ...formData, files: paths })}
+                  userId={user.id}
+                  maxFiles={10}
+                  maxFileSizeMB={100}
+                />
+              </>
+            )}
+            {authLoading && (
+              <div className="text-sm text-muted-foreground">Loading upload components...</div>
+            )}
+
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="is_active"
+                checked={formData.is_active}
+                onChange={e => setFormData({ ...formData, is_active: e.target.checked })}
+                className="rounded border-gray-300"
               />
-            </>
-          )}
-          {authLoading && (
-            <div className="text-sm text-muted-foreground">Loading upload components...</div>
-          )}
+              <Label htmlFor="is_active">Product is active (visible in marketplace)</Label>
+            </div>
 
-          <div className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              id="is_active"
-              checked={formData.is_active}
-              onChange={e => setFormData({ ...formData, is_active: e.target.checked })}
-              className="rounded border-gray-300"
-            />
-            <Label htmlFor="is_active">Product is active (visible in marketplace)</Label>
-          </div>
-
-          <DialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={isLoading}
-              className="w-full sm:w-auto"
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isLoading} className="w-full sm:w-auto">
-              {isLoading ? 'Updating...' : 'Update Product'}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+            <DialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                disabled={isLoading}
+                className="w-full sm:w-auto"
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isLoading} className="w-full sm:w-auto">
+                {isLoading ? 'Updating...' : 'Update Product'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
