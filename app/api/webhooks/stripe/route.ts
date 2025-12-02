@@ -29,16 +29,18 @@ function calculateFees(amount: number) {
   const applicationFee = applicationFeeCents / 100;
   const netAmount = (amountInCents - applicationFeeCents) / 100;
   
-  // For database storage, break down the application fee
-  // The application fee includes both platform fee and stripe passthrough
-  const platformFee = platformFeeCents / 100;
-  const stripeFee = stripeFeePassthroughCents / 100;
+  // For database storage:
+  // - platform_fee: The actual application fee charged (includes minimum)
+  // - stripe_fee: The stripe passthrough portion (for reporting)
+  // - net_amount: What seller actually receives
+  const platformFee = applicationFeeCents / 100; // Total fee we charge
+  const stripeFee = stripeFeePassthroughCents / 100; // Stripe portion (for reporting)
   
   return { 
-    platformFee, 
-    stripeFee, 
-    netAmount,
-    applicationFee // Total fee actually charged
+    platformFee, // This is the total application fee ($0.50 minimum)
+    stripeFee,   // Stripe passthrough portion (for breakdown)
+    netAmount,   // Seller's net
+    applicationFee // Same as platformFee (for reference)
   };
 }
 
@@ -70,6 +72,18 @@ export async function POST(request: NextRequest) {
       case 'checkout.session.completed': {
         const session = event.data.object;
         console.log('✅ Processing checkout.session.completed:', session.id);
+
+        // Check if orders already exist for this session (prevent duplicates)
+        const { data: existingSessionOrders } = await supabase
+          .from('orders')
+          .select('id')
+          .eq('stripe_session_id', session.id)
+          .limit(1);
+
+        if (existingSessionOrders && existingSessionOrders.length > 0) {
+          console.log('⏭️ Orders already exist for session', session.id, '- skipping duplicate');
+          break;
+        }
 
         // Check if this is a cart checkout (multiple products) or single product checkout
         const cartItems = session.metadata?.cartItems;
@@ -113,18 +127,6 @@ export async function POST(request: NextRequest) {
                 .filter(Boolean);
 
               if (orders.length > 0) {
-                // Check for duplicates before inserting
-                const sessionIds = orders.map((o: { stripe_session_id: string }) => o.stripe_session_id);
-                const { data: existingOrders } = await supabase
-                  .from('orders')
-                  .select('stripe_session_id')
-                  .in('stripe_session_id', sessionIds);
-
-                if (existingOrders && existingOrders.length > 0) {
-                  console.log('⏭️ Orders already exist for this session, skipping duplicate creation');
-                  break;
-                }
-
                 const { error: orderError, data: insertedOrders } = await supabase
                   .from('orders')
                   .insert(orders)
@@ -224,159 +226,12 @@ export async function POST(request: NextRequest) {
       }
 
       // Handle charge.succeeded for Connect payments (backup for checkout.session.completed)
+      // NOTE: We use checkout.session.completed as primary, so this is just a backup
+      // Skip this entirely to prevent duplicates - checkout.session.completed handles everything
       case 'charge.succeeded': {
-        const charge = event.data.object;
-        console.log('💳 Processing charge.succeeded:', charge.id);
-        
-        // Get metadata from payment intent
-        const metadata = charge.metadata || {};
-        
-        // Skip if no metadata (not our checkout)
-        if (!metadata.cartItems && !metadata.productId) {
-          console.log('⏭️ Skipping charge.succeeded - no relevant metadata');
-          break;
-        }
-
-        // Check if order already exists (from checkout.session.completed)
-        // Check by charge ID first, then by payment intent
-        const { data: existingOrderByCharge } = await supabase
-          .from('orders')
-          .select('id')
-          .eq('stripe_session_id', charge.id)
-          .limit(1);
-        
-        if (existingOrderByCharge && existingOrderByCharge.length > 0) {
-          console.log('⏭️ Order already exists for this charge');
-          break;
-        }
-
-        const paymentIntentId = typeof charge.payment_intent === 'string' 
-          ? charge.payment_intent 
-          : charge.payment_intent?.id;
-        
-        if (paymentIntentId) {
-          // Also check by payment intent ID (in case session ID was used)
-          const { data: existingOrderByPI } = await supabase
-            .from('orders')
-            .select('id')
-            .eq('stripe_session_id', paymentIntentId)
-            .limit(1);
-          
-          if (existingOrderByPI && existingOrderByPI.length > 0) {
-            console.log('⏭️ Order already exists for this payment intent');
-            break;
-          }
-        }
-
-        // Cart checkout
-        if (metadata.cartItems) {
-          try {
-            const items = JSON.parse(metadata.cartItems);
-            const productIds = items.map((item: { productId: string }) => item.productId);
-            const { data: products } = await supabase
-              .from('products')
-              .select('id, user_id, price, currency')
-              .in('id', productIds);
-
-            if (products) {
-              const orders = items
-                .map((item: { productId: string; quantity: number }) => {
-                  const product = products.find(p => p.id === item.productId);
-                  if (!product) return null;
-
-                  const orderAmount = product.price * item.quantity;
-                  const fees = calculateFees(orderAmount);
-
-                  return {
-                    product_id: item.productId,
-                    buyer_id: metadata.buyerId || null,
-                    seller_id: product.user_id,
-                    stripe_session_id: paymentIntentId || charge.id,
-                    status: 'completed',
-                    amount: orderAmount,
-                    currency: product.currency || 'USD',
-                    buyer_email: metadata.buyerEmail || charge.billing_details?.email || null,
-                    platform_fee: fees.platformFee,
-                    stripe_fee: fees.stripeFee,
-                    net_amount: fees.netAmount,
-                  };
-                })
-                .filter(Boolean);
-
-              if (orders.length > 0) {
-                // Check for duplicates before inserting
-                const sessionIds = orders.map((o: { stripe_session_id: string }) => o.stripe_session_id);
-                const { data: existingOrders } = await supabase
-                  .from('orders')
-                  .select('stripe_session_id')
-                  .in('stripe_session_id', sessionIds);
-
-                if (existingOrders && existingOrders.length > 0) {
-                  console.log('⏭️ Orders already exist for these sessions, skipping duplicate creation');
-                  break;
-                }
-
-                const { error: orderError, data: insertedOrders } = await supabase
-                  .from('orders')
-                  .insert(orders)
-                  .select();
-
-                if (orderError) {
-                  console.error('Error creating cart orders from charge:', orderError);
-                } else if (insertedOrders) {
-                  console.log(`✅ Created ${insertedOrders.length} order(s) from charge ${charge.id}`);
-                  
-                  deliverProductsForOrders(insertedOrders).catch(error => {
-                    console.error('❌ Error delivering products via email:', error);
-                  });
-                }
-              }
-            }
-          } catch (parseError) {
-            console.error('Error parsing cart items from charge:', parseError);
-          }
-        }
-        // Single product checkout
-        else if (metadata.productId) {
-          const { data: product } = await supabase
-            .from('products')
-            .select('user_id, price, currency')
-            .eq('id', metadata.productId)
-            .single();
-
-          if (product) {
-            const orderAmount = charge.amount / 100;
-            const fees = calculateFees(orderAmount);
-
-            const { error: orderError, data: insertedOrders } = await supabase
-              .from('orders')
-              .insert({
-                product_id: metadata.productId,
-                buyer_id: metadata.buyerId || null,
-                seller_id: product.user_id,
-                stripe_session_id: paymentIntentId || charge.id,
-                status: 'completed',
-                amount: orderAmount,
-                currency: (charge.currency || 'usd').toUpperCase(),
-                buyer_email: metadata.buyerEmail || charge.billing_details?.email || null,
-                platform_fee: fees.platformFee,
-                stripe_fee: fees.stripeFee,
-                net_amount: fees.netAmount,
-              })
-              .select();
-
-            if (orderError) {
-              console.error('Error creating order from charge:', orderError);
-            } else if (insertedOrders && insertedOrders.length > 0) {
-              console.log(`✅ Created order ${insertedOrders[0].id} from charge ${charge.id}`);
-              
-              deliverProductsForOrders(insertedOrders).catch(error => {
-                console.error('❌ Error delivering product via email:', error);
-              });
-            }
-          }
-        }
-
+        console.log('💳 charge.succeeded received, but skipping - handled by checkout.session.completed');
+        // Skip entirely - checkout.session.completed is our primary handler
+        // This prevents duplicate order creation
         break;
       }
 
