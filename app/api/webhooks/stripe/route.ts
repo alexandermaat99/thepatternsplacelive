@@ -143,13 +143,48 @@ export async function POST(request: NextRequest) {
                     insertedOrders.map(o => ({
                       id: o.id,
                       product_id: o.product_id,
-                      buyer_email: o.buyer_email,
+                      buyer_email: o.buyer_email || 'MISSING',
+                      buyer_id: o.buyer_id || 'N/A',
                     }))
                   );
 
+                  // Verify buyer_email is set, and update if missing
+                  const ordersWithoutEmail = insertedOrders.filter(o => !o.buyer_email);
+                  if (ordersWithoutEmail.length > 0) {
+                    console.error('❌ WARNING: Some orders have no buyer_email! Attempting to fix...');
+                    console.error('Session customer_email:', session.customer_email);
+                    console.error('Session metadata:', session.metadata);
+                    
+                    // Try to update orders with customer_email from session if available
+                    if (session.customer_email) {
+                      console.log(`🔧 Updating ${ordersWithoutEmail.length} order(s) with customer_email from session...`);
+                      const orderIdsToUpdate = ordersWithoutEmail.map(o => o.id);
+                      const { error: updateError } = await supabase
+                        .from('orders')
+                        .update({ buyer_email: session.customer_email })
+                        .in('id', orderIdsToUpdate);
+                      
+                      if (updateError) {
+                        console.error('❌ Failed to update orders with customer_email:', updateError);
+                      } else {
+                        console.log('✅ Successfully updated orders with customer_email');
+                        // Update the local array so delivery can proceed
+                        insertedOrders.forEach(order => {
+                          if (!order.buyer_email) {
+                            order.buyer_email = session.customer_email;
+                          }
+                        });
+                      }
+                    } else {
+                      console.error('❌ Session has no customer_email either! Email delivery will fail.');
+                    }
+                  }
+
                   // Deliver products via email (non-blocking)
+                  console.log('📧 Triggering email delivery for orders...');
                   deliverProductsForOrders(insertedOrders).catch(error => {
-                    console.error('❌ Error delivering products via email:', error);
+                    console.error('❌ FATAL ERROR in email delivery:', error);
+                    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
                     // Don't throw - email delivery failures shouldn't fail the webhook
                   });
                 }
@@ -194,12 +229,40 @@ export async function POST(request: NextRequest) {
               console.log('Order details:', {
                 id: insertedOrders[0].id,
                 product_id: insertedOrders[0].product_id,
-                buyer_email: insertedOrders[0].buyer_email,
+                buyer_email: insertedOrders[0].buyer_email || 'MISSING',
+                buyer_id: insertedOrders[0].buyer_id || 'N/A',
               });
 
+              // Verify buyer_email is set, and update if missing
+              if (!insertedOrders[0].buyer_email) {
+                console.error('❌ WARNING: Order has no buyer_email! Attempting to fix...');
+                console.error('Session customer_email:', session.customer_email);
+                console.error('Session metadata:', session.metadata);
+                
+                // Try to update order with customer_email from session if available
+                if (session.customer_email) {
+                  console.log('🔧 Updating order with customer_email from session...');
+                  const { error: updateError } = await supabase
+                    .from('orders')
+                    .update({ buyer_email: session.customer_email })
+                    .eq('id', insertedOrders[0].id);
+                  
+                  if (updateError) {
+                    console.error('❌ Failed to update order with customer_email:', updateError);
+                  } else {
+                    console.log('✅ Successfully updated order with customer_email');
+                    insertedOrders[0].buyer_email = session.customer_email;
+                  }
+                } else {
+                  console.error('❌ Session has no customer_email either! Email delivery will fail.');
+                }
+              }
+
               // Deliver product via email (non-blocking)
+              console.log('📧 Triggering email delivery for order...');
               deliverProductsForOrders(insertedOrders).catch(error => {
-                console.error('❌ Error delivering product via email:', error);
+                console.error('❌ FATAL ERROR in email delivery:', error);
+                console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
                 // Don't throw - email delivery failures shouldn't fail the webhook
               });
             }

@@ -198,6 +198,14 @@ export async function deliverProductToCustomer(
 export async function deliverProductsForOrders(
   orders: DeliveryOrder[]
 ): Promise<void> {
+  console.log('📦 deliverProductsForOrders called with', orders.length, 'order(s)');
+  console.log('Orders:', orders.map(o => ({
+    id: o.id,
+    product_id: o.product_id,
+    buyer_email: o.buyer_email || 'MISSING',
+    buyer_id: o.buyer_id || 'N/A'
+  })));
+  
   const supabase = await createClient();
 
   // Group orders by buyer email
@@ -211,12 +219,24 @@ export async function deliverProductsForOrders(
       }
       ordersByEmail.get(email)!.push(order);
     } else {
-      console.warn(`Order ${order.id} has no buyer_email - skipping delivery`);
+      console.error(`❌ Order ${order.id} has no buyer_email - SKIPPING DELIVERY`);
+      console.error('Order details:', JSON.stringify(order, null, 2));
+      console.error('This order will NOT receive an email!');
     }
   }
+  
+  if (ordersByEmail.size === 0) {
+    console.error('❌ CRITICAL: No orders have buyer_email. Email delivery cannot proceed.');
+    console.error('All orders:', JSON.stringify(orders, null, 2));
+    return;
+  }
+  
+  console.log(`📧 Processing delivery for ${ordersByEmail.size} unique buyer email(s)`);
 
   // Process each buyer's orders
   for (const [buyerEmail, buyerOrders] of ordersByEmail.entries()) {
+    console.log(`📬 Processing ${buyerOrders.length} order(s) for ${buyerEmail}`);
+    
     // Get all product IDs for this buyer
     const productIds = buyerOrders.map((o) => o.product_id);
 
@@ -227,9 +247,12 @@ export async function deliverProductsForOrders(
       .in('id', productIds);
 
     if (productsError || !products) {
-      console.error('Error fetching products for delivery:', productsError);
+      console.error(`❌ Error fetching products for delivery to ${buyerEmail}:`, productsError);
+      console.error('Product IDs requested:', productIds);
       continue;
     }
+
+    console.log(`✅ Fetched ${products.length} product(s) for ${buyerEmail}`);
 
     // Create a map for quick product lookup
     const productMap = new Map(products.map((p) => [p.id, p]));
@@ -238,20 +261,31 @@ export async function deliverProductsForOrders(
     for (const order of buyerOrders) {
       const product = productMap.get(order.product_id);
       if (!product) {
-        console.error(`Product ${order.product_id} not found`);
+        console.error(`❌ Product ${order.product_id} not found for order ${order.id}`);
         continue;
       }
 
       // Use buyer_email from order (should be set from Stripe session)
       const email = order.buyer_email;
       if (!email) {
-        console.error(`No email found for order ${order.id} - buyer_email is required`);
+        console.error(`❌ No email found for order ${order.id} - buyer_email is required`);
         continue;
       }
 
-      // Deliver product (non-blocking - errors are logged but don't stop other deliveries)
-      await deliverProductToCustomer(order, product, email);
+      console.log(`🚀 Starting delivery for order ${order.id}, product: ${product.title}, email: ${email}`);
+      
+      // Deliver product (errors are logged but don't stop other deliveries)
+      const deliveryResult = await deliverProductToCustomer(order, product, email);
+      
+      if (!deliveryResult.success) {
+        console.error(`❌ Delivery failed for order ${order.id}:`, deliveryResult.error);
+      } else {
+        console.log(`✅ Delivery completed successfully for order ${order.id}`);
+      }
     }
   }
+  
+  console.log('📦 deliverProductsForOrders completed');
 }
+
 
