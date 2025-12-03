@@ -5,15 +5,50 @@ import { headers } from 'next/headers';
 import { sendPurchaseEmail } from '@/lib/send-purchase-email';
 import { COMPANY_INFO } from '@/lib/company-info';
 
-// Calculate fees for an order (matches checkout calculation)
-function calculateFees(amount: number) {
+// Calculate fees for an order
+// When tax is included, we maintain the seller's net amount by scaling the fee proportionally
+function calculateFees(amount: number, originalSubtotal?: number) {
   // Convert to cents for calculation
   const amountInCents = Math.round(amount * 100);
 
-  // Platform transaction fee
-  const platformFeeCents = Math.round(amountInCents * COMPANY_INFO.fees.platformFeePercent);
+  // If we have the original subtotal, maintain seller's net amount
+  // This ensures that when tax is added, the seller gets the same net as before
+  if (originalSubtotal && originalSubtotal !== amount) {
+    // Calculate what the fee was on the original subtotal
+    const originalSubtotalCents = Math.round(originalSubtotal * 100);
+    const originalFeeCents = Math.round(
+      originalSubtotalCents * COMPANY_INFO.fees.platformFeePercent
+    );
+    const originalStripeFeeCents = COMPANY_INFO.fees.passStripeFeesToSeller
+      ? Math.round(
+          originalSubtotalCents * COMPANY_INFO.fees.stripePercentFee +
+            COMPANY_INFO.fees.stripeFlatFeeCents
+        )
+      : 0;
+    const originalTotalFeeCents = originalFeeCents + originalStripeFeeCents;
+    const originalFeeWithMin = Math.max(originalTotalFeeCents, COMPANY_INFO.fees.minimumFeeCents);
 
-  // Stripe fee passthrough (if enabled)
+    // Calculate original seller net
+    const originalSellerNetCents = originalSubtotalCents - originalFeeWithMin;
+
+    // Maintain the same seller net, so new fee = new total - original seller net
+    const applicationFeeCents = amountInCents - originalSellerNetCents;
+
+    // Convert back to dollars
+    const platformFee = applicationFeeCents / 100; // Platform fee (scaled to maintain seller net)
+    const stripeFee = 0; // Platform absorbs Stripe fees
+    const netAmount = originalSellerNetCents / 100; // Seller's net (same as before tax)
+
+    return {
+      platformFee,
+      stripeFee,
+      netAmount,
+      applicationFee: platformFee,
+    };
+  }
+
+  // No original subtotal or amounts are the same - calculate normally
+  const platformFeeCents = Math.round(amountInCents * COMPANY_INFO.fees.platformFeePercent);
   let stripeFeePassthroughCents = 0;
   if (COMPANY_INFO.fees.passStripeFeesToSeller) {
     stripeFeePassthroughCents = Math.round(
@@ -21,26 +56,18 @@ function calculateFees(amount: number) {
     );
   }
 
-  // Total application fee (what we actually take from Stripe)
   const totalFeeCents = platformFeeCents + stripeFeePassthroughCents;
   const applicationFeeCents = Math.max(totalFeeCents, COMPANY_INFO.fees.minimumFeeCents);
 
-  // Convert back to dollars
-  const applicationFee = applicationFeeCents / 100;
+  const platformFee = applicationFeeCents / 100;
+  const stripeFee = 0;
   const netAmount = (amountInCents - applicationFeeCents) / 100;
 
-  // For database storage:
-  // - platform_fee: The actual application fee charged (platform fee only, since we absorb Stripe fees)
-  // - stripe_fee: 0 (platform absorbs Stripe fees, not passed to seller)
-  // - net_amount: What seller actually receives
-  const platformFee = applicationFeeCents / 100; // Platform fee only (we absorb Stripe fees)
-  const stripeFee = 0; // Platform absorbs Stripe fees, so this is always 0
-
   return {
-    platformFee, // Platform fee only ($0.50 minimum) - Stripe fees absorbed by platform
-    stripeFee, // Always 0 - platform absorbs Stripe fees
-    netAmount, // Seller's net (amount - platform fee)
-    applicationFee, // Same as platformFee (for reference)
+    platformFee,
+    stripeFee,
+    netAmount,
+    applicationFee: platformFee,
   };
 }
 
@@ -127,7 +154,8 @@ export async function POST(request: NextRequest) {
                   // Allocate tax proportionally based on item's share of subtotal
                   const orderTotalAmount =
                     totalSubtotal > 0 ? orderAmount * (1 + taxRate) : orderAmount; // Fallback if no subtotal
-                  const fees = calculateFees(orderAmount);
+                  // Calculate fees on total amount, passing original subtotal to maintain seller net
+                  const fees = calculateFees(orderTotalAmount, orderAmount);
                   // Net amount should be total_amount (with tax) minus fees
                   const netAmount = orderTotalAmount - fees.platformFee - fees.stripeFee;
 
@@ -284,14 +312,12 @@ export async function POST(request: NextRequest) {
             .single();
 
           if (product) {
-            // For single product checkout, use amount_subtotal for fee calculations (pre-tax)
-            // and amount_total for total_amount (includes tax, matches Stripe dashboard)
+            // For single product checkout, calculate fees on total amount (including tax)
+            // This ensures seller net stays consistent regardless of tax
             const orderSubtotal = session.amount_subtotal ? session.amount_subtotal / 100 : 0;
             const orderTotal = session.amount_total ? session.amount_total / 100 : 0;
-            // Use subtotal for fee calculations (fees calculated on pre-tax amount)
-            // If subtotal is not available, use total as fallback (for backwards compatibility)
-            const amountForFees = orderSubtotal > 0 ? orderSubtotal : orderTotal;
-            const fees = calculateFees(amountForFees);
+            // Calculate fees on total amount, passing original subtotal to maintain seller net
+            const fees = calculateFees(orderTotal, orderSubtotal || orderTotal);
             // Net amount should be total_amount (with tax) minus fees
             const netAmount = orderTotal - fees.platformFee - fees.stripeFee;
 
@@ -303,7 +329,7 @@ export async function POST(request: NextRequest) {
                 seller_id: product.user_id,
                 stripe_session_id: session.id,
                 status: 'completed',
-                amount: amountForFees, // Subtotal for fee calculations (pre-tax)
+                amount: orderSubtotal || orderTotal, // Subtotal (pre-tax) for reference
                 total_amount: orderTotal, // Total including tax (matches Stripe dashboard)
                 currency: session.currency?.toUpperCase() || 'USD',
                 buyer_email: session.metadata?.buyerEmail || session.customer_email || null,
