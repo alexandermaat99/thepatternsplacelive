@@ -128,6 +128,8 @@ export async function POST(request: NextRequest) {
                   const orderTotalAmount =
                     totalSubtotal > 0 ? orderAmount * (1 + taxRate) : orderAmount; // Fallback if no subtotal
                   const fees = calculateFees(orderAmount);
+                  // Net amount should be total_amount (with tax) minus fees
+                  const netAmount = orderTotalAmount - fees.platformFee - fees.stripeFee;
 
                   return {
                     product_id: item.productId,
@@ -141,7 +143,7 @@ export async function POST(request: NextRequest) {
                     buyer_email: session.metadata?.buyerEmail || session.customer_email || null,
                     platform_fee: fees.platformFee,
                     stripe_fee: fees.stripeFee,
-                    net_amount: fees.netAmount,
+                    net_amount: netAmount,
                   };
                 })
                 .filter(Boolean);
@@ -290,6 +292,8 @@ export async function POST(request: NextRequest) {
             // If subtotal is not available, use total as fallback (for backwards compatibility)
             const amountForFees = orderSubtotal > 0 ? orderSubtotal : orderTotal;
             const fees = calculateFees(amountForFees);
+            // Net amount should be total_amount (with tax) minus fees
+            const netAmount = orderTotal - fees.platformFee - fees.stripeFee;
 
             const { error: orderError, data: insertedOrders } = await supabase
               .from('orders')
@@ -305,7 +309,7 @@ export async function POST(request: NextRequest) {
                 buyer_email: session.metadata?.buyerEmail || session.customer_email || null,
                 platform_fee: fees.platformFee,
                 stripe_fee: fees.stripeFee,
-                net_amount: fees.netAmount,
+                net_amount: netAmount,
               })
               .select();
 
