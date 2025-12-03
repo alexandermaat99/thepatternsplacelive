@@ -75,6 +75,12 @@ export function AuthModal({
       // Session is created, close modal and refresh
       // We skip getUser() verification to avoid hanging
       // The router refresh will verify the session properly
+      
+      // Set a flag to indicate we just logged in (prevents auth modal from opening immediately)
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('just_logged_in', 'true');
+      }
+      
       onClose();
       
       // Refresh router to sync server-side state

@@ -18,13 +18,38 @@ export function RequireAuth({ children, fallback }: RequireAuthProps) {
   const router = useRouter();
   const { user, loading, openAuthModal, authModal } = useAuth();
   const modalWasOpen = useRef(false);
+  const justLoggedIn = useRef(false);
+
+  // Check if we just came from a login (check sessionStorage or URL params)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Check if there's a flag indicating we just logged in
+      const loginFlag = sessionStorage.getItem('just_logged_in');
+      if (loginFlag) {
+        justLoggedIn.current = true;
+        // Clear the flag after a short delay to allow auth to initialize
+        setTimeout(() => {
+          sessionStorage.removeItem('just_logged_in');
+          justLoggedIn.current = false;
+        }, 2000);
+      }
+    }
+  }, []);
 
   useEffect(() => {
-    // If not loading and no user, open the auth modal
-    if (!loading && !user) {
-      openAuthModal('login', {
-        redirectUrl: typeof window !== 'undefined' ? window.location.pathname : undefined,
-      });
+    // Don't open modal if we just logged in (give auth context time to initialize)
+    // Also add a small delay to prevent race conditions
+    if (!loading && !user && !justLoggedIn.current) {
+      // Small delay to ensure auth context has had time to initialize
+      const timeoutId = setTimeout(() => {
+        if (!justLoggedIn.current) {
+          openAuthModal('login', {
+            redirectUrl: typeof window !== 'undefined' ? window.location.pathname : undefined,
+          });
+        }
+      }, 500);
+
+      return () => clearTimeout(timeoutId);
     }
   }, [loading, user, openAuthModal]);
 

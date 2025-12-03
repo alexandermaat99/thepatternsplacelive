@@ -144,6 +144,11 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
 
       const destination = getRedirectUrl();
 
+      // Set a flag to indicate we just logged in (prevents auth modal from opening immediately)
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('just_logged_in', 'true');
+      }
+
       // Use window.location for a hard redirect to ensure cookies are sent
       // This is more reliable than router.push for authentication flows
       window.location.href = destination;
