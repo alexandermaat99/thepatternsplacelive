@@ -94,7 +94,6 @@ export async function deliverProductToCustomer(
 
         if (downloadError) {
           console.error(`❌ Error downloading file ${filePath}:`, downloadError);
-          console.error(`   Error code:`, downloadError.statusCode);
           console.error(`   Error message:`, downloadError.message);
           console.error(`   Error details:`, JSON.stringify(downloadError, null, 2));
           console.error('Troubleshooting:');
