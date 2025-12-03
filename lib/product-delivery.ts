@@ -28,6 +28,9 @@ export async function deliverProductToCustomer(
   product: DeliveryProduct,
   buyerEmail: string
 ): Promise<{ success: boolean; error?: string }> {
+  const deliveryStartTime = Date.now();
+  console.log(`⏱️ Starting product delivery for order ${order.id}...`);
+
   try {
     // Use regular client for database queries (needs user context for profiles)
     const supabase = await createClient();
@@ -42,7 +45,7 @@ export async function deliverProductToCustomer(
         .select('full_name')
         .eq('id', order.buyer_id)
         .single();
-      
+
       buyerName = buyerProfile?.full_name || undefined;
     }
 
@@ -53,21 +56,23 @@ export async function deliverProductToCustomer(
       .select('full_name, username')
       .eq('id', product.user_id)
       .single();
-    
+
     sellerName = sellerProfile?.full_name || sellerProfile?.username || undefined;
 
     // Check if product has files
     console.log(`📁 Checking files for product ${product.id} (${product.title})`);
     console.log(`Files array:`, product.files);
     console.log(`Files count:`, product.files?.length || 0);
-    
+
     if (!product.files || product.files.length === 0) {
       // No files to deliver, but we can still send a confirmation email
-      console.error(`❌ Product ${product.id} (${product.title}) has no files to deliver. Order ${order.id} will not receive an email.`);
+      console.error(
+        `❌ Product ${product.id} (${product.title}) has no files to deliver. Order ${order.id} will not receive an email.`
+      );
       console.error('To fix: Add files to the product using the product-files storage bucket.');
-      return { 
-        success: false, 
-        error: 'Product has no files attached. Please add files to the product.' 
+      return {
+        success: false,
+        error: 'Product has no files attached. Please add files to the product.',
       };
     }
 
@@ -79,47 +84,64 @@ export async function deliverProductToCustomer(
     }> = [];
 
     console.log(`📥 Attempting to download ${product.files.length} file(s) for delivery...`);
-    
-    for (let i = 0; i < product.files.length; i++) {
-      const filePath = product.files[i];
+    const downloadStartTime = Date.now();
+
+    // Download files in parallel for better performance
+    const fileDownloadPromises = product.files.map(async (filePath, index) => {
       try {
-        console.log(`[${i + 1}/${product.files.length}] Attempting to download file: ${filePath}`);
-        console.log(`   Full path: product-files/${filePath}`);
-        
+        console.log(`[${index + 1}/${product.files.length}] Starting download: ${filePath}`);
+        const fileStartTime = Date.now();
+
         // Download file from Supabase storage using service role client (bypasses RLS)
-        console.log('   Using service role client to bypass RLS policies...');
         const { data: fileData, error: downloadError } = await supabaseAdmin.storage
           .from('product-files')
           .download(filePath);
 
-        if (downloadError) {
-          console.error(`❌ Error downloading file ${filePath}:`, downloadError);
-          console.error(`   Error message:`, downloadError.message);
-          console.error(`   Error details:`, JSON.stringify(downloadError, null, 2));
-          console.error('Troubleshooting:');
-          console.error('1. Check if the product-files storage bucket exists');
-          console.error('2. Verify the file path is correct:', filePath);
-          console.error('3. Ensure the file exists at: product-files/' + filePath);
-          console.error('4. Check storage bucket permissions (should be private)');
-          console.error('5. Verify the server-side Supabase client has service role access');
-          continue; // Skip this file but continue with others
-        }
-        
-        if (!fileData) {
-          console.error(`❌ File download returned null/undefined for: ${filePath}`);
-          console.error('   The download succeeded but no file data was returned');
-          continue;
-        }
-        
-        console.log(`✅ Successfully downloaded file: ${filePath} (${fileData.size} bytes)`);
+        const downloadTime = Date.now() - fileStartTime;
 
+        if (downloadError) {
+          console.error(
+            `❌ Error downloading file ${filePath} (${downloadTime}ms):`,
+            downloadError.message
+          );
+          return null;
+        }
+
+        if (!fileData) {
+          console.error(`❌ File download returned null for: ${filePath}`);
+          return null;
+        }
+
+        console.log(
+          `✅ Downloaded ${filePath} (${(fileData.size / 1024).toFixed(1)}KB) in ${downloadTime}ms`
+        );
+        return { filePath, fileData, downloadTime };
+      } catch (fileError) {
+        console.error(`❌ Exception downloading file ${filePath}:`, fileError);
+        return null;
+      }
+    });
+
+    // Wait for all downloads to complete
+    const downloadResults = await Promise.all(fileDownloadPromises);
+    const totalDownloadTime = Date.now() - downloadStartTime;
+    console.log(`📥 All file downloads completed in ${totalDownloadTime}ms`);
+
+    // Process downloaded files
+    for (let i = 0; i < downloadResults.length; i++) {
+      const result = downloadResults[i];
+      if (!result) continue; // Skip failed downloads
+
+      const { filePath, fileData } = result;
+
+      try {
         // Convert blob to ArrayBuffer then to Buffer
         const arrayBuffer = await fileData.arrayBuffer();
         let fileBuffer = Buffer.from(arrayBuffer);
 
         // Get original filename
         const fileName = filePath.split('/').pop() || 'file';
-        
+
         // Determine content type based on file extension
         let contentType = 'application/octet-stream';
         const extension = fileName.split('.').pop()?.toLowerCase();
@@ -139,14 +161,18 @@ export async function deliverProductToCustomer(
         // Watermark PDFs
         if (isPDF(filePath, contentType)) {
           try {
-            const watermarkedPDF = await watermarkPDF(
-              new Uint8Array(fileBuffer),
-              buyerEmail
+            const watermarkStartTime = Date.now();
+            console.log(
+              `🎨 Watermarking PDF: ${fileName} (${(fileBuffer.length / 1024).toFixed(1)}KB)...`
             );
+            const watermarkedPDF = await watermarkPDF(new Uint8Array(fileBuffer), buyerEmail);
             fileBuffer = Buffer.from(watermarkedPDF);
-            console.log(`Successfully watermarked PDF: ${fileName}`);
+            const watermarkTime = Date.now() - watermarkStartTime;
+            console.log(
+              `✅ Watermarked PDF: ${fileName} in ${watermarkTime}ms (${(fileBuffer.length / 1024).toFixed(1)}KB)`
+            );
           } catch (watermarkError) {
-            console.error(`Error watermarking PDF ${fileName}:`, watermarkError);
+            console.error(`❌ Error watermarking PDF ${fileName}:`, watermarkError);
             // Continue with original file if watermarking fails
           }
         }
@@ -162,8 +188,10 @@ export async function deliverProductToCustomer(
       }
     }
 
-    console.log(`📊 File processing summary: ${attachments.length}/${product.files.length} files successfully processed`);
-    
+    console.log(
+      `📊 File processing summary: ${attachments.length}/${product.files.length} files successfully processed`
+    );
+
     if (attachments.length === 0) {
       console.error(`❌ CRITICAL: No files could be processed for delivery!`);
       console.error(`   Product ID: ${product.id}`);
@@ -174,10 +202,10 @@ export async function deliverProductToCustomer(
       console.error(`   File paths:`, product.files);
       console.error('');
       console.error('🔍 Possible causes:');
-      console.error('1. Files don\'t exist in the product-files storage bucket');
+      console.error("1. Files don't exist in the product-files storage bucket");
       console.error('2. File paths in the product.files array are incorrect');
       console.error('3. Storage bucket permissions block server-side access');
-      console.error('4. Server-side Supabase client doesn\'t have service role permissions');
+      console.error("4. Server-side Supabase client doesn't have service role permissions");
       console.error('5. Files were uploaded to a different bucket (e.g., product-images)');
       console.error('');
       console.error('💡 To fix:');
@@ -190,11 +218,17 @@ export async function deliverProductToCustomer(
         error: 'No files could be processed for delivery',
       };
     }
-    
-    console.log(`Successfully processed ${attachments.length} file(s) for delivery to ${buyerEmail}`);
+
+    const totalAttachmentSize = attachments.reduce((sum, att) => sum + att.content.length, 0);
+    console.log(
+      `✅ Processed ${attachments.length} file(s) (${(totalAttachmentSize / 1024 / 1024).toFixed(2)}MB total) for delivery to ${buyerEmail}`
+    );
 
     // Send email with attachments
-    console.log(`Sending email to ${buyerEmail} with ${attachments.length} attachment(s)...`);
+    const emailStartTime = Date.now();
+    console.log(
+      `📧 Sending email to ${buyerEmail} with ${attachments.length} attachment(s) (${(totalAttachmentSize / 1024 / 1024).toFixed(2)}MB)...`
+    );
     const emailResult = await sendProductDeliveryEmail({
       customerEmail: buyerEmail,
       customerName: buyerName,
@@ -204,6 +238,8 @@ export async function deliverProductToCustomer(
       orderId: order.id,
       attachments,
     });
+    const emailTime = Date.now() - emailStartTime;
+    console.log(`📧 Email send completed in ${emailTime}ms`);
 
     if (!emailResult.success) {
       console.error(`Failed to send email to ${buyerEmail}:`, emailResult.error);
@@ -217,7 +253,18 @@ export async function deliverProductToCustomer(
       };
     }
 
-    console.log(`✅ Successfully delivered product ${product.id} (${product.title}) to ${buyerEmail}. Email ID: ${emailResult.messageId || 'N/A'}`);
+    const totalDeliveryTime = Date.now() - deliveryStartTime;
+    console.log(
+      `✅ Successfully delivered product ${product.id} (${product.title}) to ${buyerEmail} in ${totalDeliveryTime}ms (${(totalDeliveryTime / 1000).toFixed(1)}s)`
+    );
+    console.log(`   Email ID: ${emailResult.messageId || 'N/A'}`);
+
+    if (totalDeliveryTime > 30000) {
+      console.warn(
+        `⚠️ Delivery took ${(totalDeliveryTime / 1000).toFixed(1)}s - consider optimizing file sizes or watermarking`
+      );
+    }
+
     return { success: true };
   } catch (error) {
     console.error('Error delivering product to customer:', error);
@@ -235,22 +282,23 @@ export async function deliverProductToCustomer(
 /**
  * Processes delivery for multiple orders (cart checkout)
  */
-export async function deliverProductsForOrders(
-  orders: DeliveryOrder[]
-): Promise<void> {
+export async function deliverProductsForOrders(orders: DeliveryOrder[]): Promise<void> {
   console.log('📦 deliverProductsForOrders called with', orders.length, 'order(s)');
-  console.log('Orders:', orders.map(o => ({
-    id: o.id,
-    product_id: o.product_id,
-    buyer_email: o.buyer_email || 'MISSING',
-    buyer_id: o.buyer_id || 'N/A'
-  })));
-  
+  console.log(
+    'Orders:',
+    orders.map(o => ({
+      id: o.id,
+      product_id: o.product_id,
+      buyer_email: o.buyer_email || 'MISSING',
+      buyer_id: o.buyer_id || 'N/A',
+    }))
+  );
+
   const supabase = await createClient();
 
   // Group orders by buyer email
   const ordersByEmail = new Map<string, DeliveryOrder[]>();
-  
+
   for (const order of orders) {
     const email = order.buyer_email;
     if (email) {
@@ -264,21 +312,21 @@ export async function deliverProductsForOrders(
       console.error('This order will NOT receive an email!');
     }
   }
-  
+
   if (ordersByEmail.size === 0) {
     console.error('❌ CRITICAL: No orders have buyer_email. Email delivery cannot proceed.');
     console.error('All orders:', JSON.stringify(orders, null, 2));
     return;
   }
-  
+
   console.log(`📧 Processing delivery for ${ordersByEmail.size} unique buyer email(s)`);
 
   // Process each buyer's orders
   for (const [buyerEmail, buyerOrders] of ordersByEmail.entries()) {
     console.log(`📬 Processing ${buyerOrders.length} order(s) for ${buyerEmail}`);
-    
+
     // Get all product IDs for this buyer
-    const productIds = buyerOrders.map((o) => o.product_id);
+    const productIds = buyerOrders.map(o => o.product_id);
 
     // Fetch all products
     const { data: products, error: productsError } = await supabase
@@ -295,7 +343,7 @@ export async function deliverProductsForOrders(
     console.log(`✅ Fetched ${products.length} product(s) for ${buyerEmail}`);
 
     // Create a map for quick product lookup
-    const productMap = new Map(products.map((p) => [p.id, p]));
+    const productMap = new Map(products.map(p => [p.id, p]));
 
     // Deliver each product
     for (const order of buyerOrders) {
@@ -312,11 +360,13 @@ export async function deliverProductsForOrders(
         continue;
       }
 
-      console.log(`🚀 Starting delivery for order ${order.id}, product: ${product.title}, email: ${email}`);
-      
+      console.log(
+        `🚀 Starting delivery for order ${order.id}, product: ${product.title}, email: ${email}`
+      );
+
       // Deliver product (errors are logged but don't stop other deliveries)
       const deliveryResult = await deliverProductToCustomer(order, product, email);
-      
+
       if (!deliveryResult.success) {
         console.error(`❌ Delivery failed for order ${order.id}:`, deliveryResult.error);
       } else {
@@ -324,8 +374,6 @@ export async function deliverProductsForOrders(
       }
     }
   }
-  
+
   console.log('📦 deliverProductsForOrders completed');
 }
-
-
