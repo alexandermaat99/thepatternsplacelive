@@ -133,15 +133,17 @@ export async function POST(request: NextRequest) {
     );
 
     // Calculate platform fee from centralized config (lib/company-info.ts)
+    // TAX WITHHOLDING: As the tax-collecting entity, we must withhold tax from seller payouts
+    // Seller receives: Sale Price - Platform Fee (tax is NOT included in seller payout)
+    // Platform keeps: Platform Fee + Tax (for remittance)
     const totalInCents = Math.round(totalAmount * 100);
 
-    // Platform transaction fee (e.g., 6%)
+    // Platform transaction fee (percentage of subtotal)
     const platformFee = Math.round(totalInCents * COMPANY_INFO.fees.platformFeePercent);
 
-    // Optionally pass Stripe's processing fees to the seller (like Etsy does)
+    // Optionally pass Stripe's processing fees to the seller
     let stripeFeePassthrough = 0;
     if (COMPANY_INFO.fees.passStripeFeesToSeller) {
-      // Estimate Stripe's fee: 2.9% + $0.30
       stripeFeePassthrough = Math.round(
         totalInCents * COMPANY_INFO.fees.stripePercentFee + COMPANY_INFO.fees.stripeFlatFeeCents
       );
@@ -150,6 +152,10 @@ export async function POST(request: NextRequest) {
     // Total application fee = platform fee + stripe passthrough (if enabled)
     const totalFee = platformFee + stripeFeePassthrough;
     const platformFeeAmount = Math.max(totalFee, COMPANY_INFO.fees.minimumFeeCents);
+    
+    // Calculate seller payout: Total Sale Price - Platform Fee (tax excluded)
+    // This ensures seller only gets their net from the sale, not the tax portion
+    const sellerPayoutCents = totalInCents - platformFeeAmount;
 
     // Create Stripe checkout session with Connect transfer
     // Note: For multi-seller carts, consider splitting into separate sessions
@@ -168,12 +174,20 @@ export async function POST(request: NextRequest) {
       },
       payment_intent_data: {
         // Transfer payment to primary seller's Stripe Connect account
+        // IMPORTANT: We set the transfer amount explicitly to exclude tax
+        // Seller receives: Sale Price - Platform Fee (tax is withheld by platform)
         // For multi-seller carts, you may want to handle transfers in webhook
         transfer_data: {
           destination: primarySellerAccountId,
+          // Set explicit amount to seller: Sale Price - Platform Fee
+          // This ensures tax is NOT included in seller payout
+          amount: sellerPayoutCents,
         },
-        // Platform fee - goes to The Pattern's Place
-        ...(platformFeeAmount > 0 && { application_fee_amount: platformFeeAmount }),
+        // Platform fee - this will be calculated as: Total - Transfer Amount
+        // So if total is $0.81 and transfer is $0.25, fee = $0.56
+        // This includes both platform fee ($0.50) and tax ($0.06) for remittance
+        // Note: We don't set application_fee_amount when using transfer_data.amount
+        // Stripe automatically calculates: application_fee = total - transfer_amount
         // Store metadata on PaymentIntent for webhook processing
         metadata: {
           ...(user?.id && { buyerId: user.id }),
