@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { createServiceRoleClient } from '@/lib/supabase/service-role';
 import { watermarkPDF, isPDF } from '@/lib/watermark';
 import { sendProductDeliveryEmail } from '@/lib/email';
 
@@ -28,7 +29,10 @@ export async function deliverProductToCustomer(
   buyerEmail: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    // Use regular client for database queries (needs user context for profiles)
     const supabase = await createClient();
+    // Use service role client for storage downloads (bypasses RLS)
+    const supabaseAdmin = createServiceRoleClient();
 
     // Get buyer profile for name
     let buyerName: string | undefined;
@@ -53,10 +57,14 @@ export async function deliverProductToCustomer(
     sellerName = sellerProfile?.full_name || sellerProfile?.username || undefined;
 
     // Check if product has files
+    console.log(`📁 Checking files for product ${product.id} (${product.title})`);
+    console.log(`Files array:`, product.files);
+    console.log(`Files count:`, product.files?.length || 0);
+    
     if (!product.files || product.files.length === 0) {
       // No files to deliver, but we can still send a confirmation email
-      console.warn(`Product ${product.id} (${product.title}) has no files to deliver. Order ${order.id} will not receive an email.`);
-      console.warn('To fix: Add files to the product using the product-files storage bucket.');
+      console.error(`❌ Product ${product.id} (${product.title}) has no files to deliver. Order ${order.id} will not receive an email.`);
+      console.error('To fix: Add files to the product using the product-files storage bucket.');
       return { 
         success: false, 
         error: 'Product has no files attached. Please add files to the product.' 
@@ -70,25 +78,41 @@ export async function deliverProductToCustomer(
       contentType: string;
     }> = [];
 
-    for (const filePath of product.files) {
+    console.log(`📥 Attempting to download ${product.files.length} file(s) for delivery...`);
+    
+    for (let i = 0; i < product.files.length; i++) {
+      const filePath = product.files[i];
       try {
-        console.log(`Attempting to download file: ${filePath} from product-files bucket`);
+        console.log(`[${i + 1}/${product.files.length}] Attempting to download file: ${filePath}`);
+        console.log(`   Full path: product-files/${filePath}`);
         
-        // Download file from Supabase storage
-        const { data: fileData, error: downloadError } = await supabase.storage
+        // Download file from Supabase storage using service role client (bypasses RLS)
+        console.log('   Using service role client to bypass RLS policies...');
+        const { data: fileData, error: downloadError } = await supabaseAdmin.storage
           .from('product-files')
           .download(filePath);
 
-        if (downloadError || !fileData) {
-          console.error(`Error downloading file ${filePath} from product-files bucket:`, downloadError);
-          console.error('Make sure:');
-          console.error('1. The product-files storage bucket exists');
-          console.error('2. The file path is correct');
-          console.error('3. The file was uploaded to the product-files bucket (not product-images)');
+        if (downloadError) {
+          console.error(`❌ Error downloading file ${filePath}:`, downloadError);
+          console.error(`   Error code:`, downloadError.statusCode);
+          console.error(`   Error message:`, downloadError.message);
+          console.error(`   Error details:`, JSON.stringify(downloadError, null, 2));
+          console.error('Troubleshooting:');
+          console.error('1. Check if the product-files storage bucket exists');
+          console.error('2. Verify the file path is correct:', filePath);
+          console.error('3. Ensure the file exists at: product-files/' + filePath);
+          console.error('4. Check storage bucket permissions (should be private)');
+          console.error('5. Verify the server-side Supabase client has service role access');
           continue; // Skip this file but continue with others
         }
         
-        console.log(`Successfully downloaded file: ${filePath}`);
+        if (!fileData) {
+          console.error(`❌ File download returned null/undefined for: ${filePath}`);
+          console.error('   The download succeeded but no file data was returned');
+          continue;
+        }
+        
+        console.log(`✅ Successfully downloaded file: ${filePath} (${fileData.size} bytes)`);
 
         // Convert blob to ArrayBuffer then to Buffer
         const arrayBuffer = await fileData.arrayBuffer();
@@ -139,12 +163,29 @@ export async function deliverProductToCustomer(
       }
     }
 
+    console.log(`📊 File processing summary: ${attachments.length}/${product.files.length} files successfully processed`);
+    
     if (attachments.length === 0) {
-      console.error(`No files could be processed for delivery. Product ${product.id} has ${product.files?.length || 0} files listed, but none could be downloaded.`);
-      console.error('Check:');
-      console.error('1. Files exist in the product-files storage bucket');
-      console.error('2. File paths in the product.files array are correct');
-      console.error('3. Storage bucket permissions allow access');
+      console.error(`❌ CRITICAL: No files could be processed for delivery!`);
+      console.error(`   Product ID: ${product.id}`);
+      console.error(`   Product Title: ${product.title}`);
+      console.error(`   Order ID: ${order.id}`);
+      console.error(`   Files listed in product: ${product.files?.length || 0}`);
+      console.error(`   Files that failed: ${product.files?.length || 0}`);
+      console.error(`   File paths:`, product.files);
+      console.error('');
+      console.error('🔍 Possible causes:');
+      console.error('1. Files don\'t exist in the product-files storage bucket');
+      console.error('2. File paths in the product.files array are incorrect');
+      console.error('3. Storage bucket permissions block server-side access');
+      console.error('4. Server-side Supabase client doesn\'t have service role permissions');
+      console.error('5. Files were uploaded to a different bucket (e.g., product-images)');
+      console.error('');
+      console.error('💡 To fix:');
+      console.error('1. Check the Supabase Storage dashboard for the product-files bucket');
+      console.error('2. Verify files exist at the paths listed in product.files');
+      console.error('3. Check that the server-side Supabase client uses the service role key');
+      console.error('4. Re-upload files to the product if paths are incorrect');
       return {
         success: false,
         error: 'No files could be processed for delivery',
