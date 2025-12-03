@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { BackButton } from '@/components/back-button';
+import { DateDisplay } from '@/components/date-display';
 import Link from 'next/link';
 import {
   DollarSign,
@@ -20,17 +21,6 @@ function formatCurrency(amount: number, currency: string = 'USD') {
     style: 'currency',
     currency: currency,
   }).format(amount);
-}
-
-// Format date
-function formatDate(date: string) {
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(new Date(date));
 }
 
 // Get percentage change
@@ -63,6 +53,7 @@ export default async function EarningsPage() {
       `
       id,
       amount,
+      total_amount,
       currency,
       platform_fee,
       stripe_fee,
@@ -425,10 +416,13 @@ export default async function EarningsPage() {
                         </div>
                       </td>
                       <td className="py-3 text-sm text-muted-foreground">
-                        {formatDate(order.created_at)}
+                        <DateDisplay date={order.created_at} />
                       </td>
                       <td className="py-3 text-right">
-                        {formatCurrency(order.amount, order.currency)}
+                        {formatCurrency(
+                          order.total_amount || order.amount,
+                          order.currency
+                        )}
                       </td>
                       <td className="py-3 text-right text-orange-600">
                         -

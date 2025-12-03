@@ -101,6 +101,22 @@ export async function POST(request: NextRequest) {
               .in('id', productIds);
 
             if (products) {
+              // Calculate tax allocation for cart checkout
+              // session.amount_total includes tax, session.amount_subtotal is pre-tax
+              const sessionSubtotal = session.amount_subtotal ? session.amount_subtotal / 100 : 0;
+              const sessionTotal = session.amount_total ? session.amount_total / 100 : 0;
+              const taxRate =
+                sessionSubtotal > 0 ? (sessionTotal - sessionSubtotal) / sessionSubtotal : 0;
+
+              // Calculate total subtotal for all items
+              const totalSubtotal = items.reduce(
+                (sum: number, item: { productId: string; quantity: number }) => {
+                  const product = products.find(p => p.id === item.productId);
+                  return sum + (product?.price || 0) * item.quantity;
+                },
+                0
+              );
+
               // Create an order for each product in the cart
               const orders = items
                 .map((item: { productId: string; quantity: number }) => {
@@ -108,6 +124,9 @@ export async function POST(request: NextRequest) {
                   if (!product) return null;
 
                   const orderAmount = product.price * item.quantity;
+                  // Allocate tax proportionally based on item's share of subtotal
+                  const orderTotalAmount =
+                    totalSubtotal > 0 ? orderAmount * (1 + taxRate) : orderAmount; // Fallback if no subtotal
                   const fees = calculateFees(orderAmount);
 
                   return {
@@ -117,6 +136,7 @@ export async function POST(request: NextRequest) {
                     stripe_session_id: session.id,
                     status: 'completed',
                     amount: orderAmount,
+                    total_amount: orderTotalAmount,
                     currency: product.currency || 'USD',
                     buyer_email: session.metadata?.buyerEmail || session.customer_email || null,
                     platform_fee: fees.platformFee,
@@ -151,21 +171,28 @@ export async function POST(request: NextRequest) {
                   // Verify buyer_email is set, and update if missing
                   const ordersWithoutEmail = insertedOrders.filter(o => !o.buyer_email);
                   if (ordersWithoutEmail.length > 0) {
-                    console.error('❌ WARNING: Some orders have no buyer_email! Attempting to fix...');
+                    console.error(
+                      '❌ WARNING: Some orders have no buyer_email! Attempting to fix...'
+                    );
                     console.error('Session customer_email:', session.customer_email);
                     console.error('Session metadata:', session.metadata);
-                    
+
                     // Try to update orders with customer_email from session if available
                     if (session.customer_email) {
-                      console.log(`🔧 Updating ${ordersWithoutEmail.length} order(s) with customer_email from session...`);
+                      console.log(
+                        `🔧 Updating ${ordersWithoutEmail.length} order(s) with customer_email from session...`
+                      );
                       const orderIdsToUpdate = ordersWithoutEmail.map(o => o.id);
                       const { error: updateError } = await supabase
                         .from('orders')
                         .update({ buyer_email: session.customer_email })
                         .in('id', orderIdsToUpdate);
-                      
+
                       if (updateError) {
-                        console.error('❌ Failed to update orders with customer_email:', updateError);
+                        console.error(
+                          '❌ Failed to update orders with customer_email:',
+                          updateError
+                        );
                       } else {
                         console.log('✅ Successfully updated orders with customer_email');
                         // Update the local array so delivery can proceed
@@ -176,13 +203,15 @@ export async function POST(request: NextRequest) {
                         });
                       }
                     } else {
-                      console.error('❌ Session has no customer_email either! Email delivery will fail.');
+                      console.error(
+                        '❌ Session has no customer_email either! Email delivery will fail.'
+                      );
                     }
                   }
 
                   // Send purchase emails synchronously (industry standard - same as test-email pattern)
                   console.log('📧 Sending purchase emails...');
-                  
+
                   // Products already fetched above with files included
                   for (const order of insertedOrders) {
                     const product = products.find(p => p.id === order.product_id);
@@ -232,7 +261,10 @@ export async function POST(request: NextRequest) {
                     if (emailResult.success) {
                       console.log(`✅ Email sent for order ${order.id} to ${order.buyer_email}`);
                     } else {
-                      console.error(`❌ Failed to send email for order ${order.id}:`, emailResult.error);
+                      console.error(
+                        `❌ Failed to send email for order ${order.id}:`,
+                        emailResult.error
+                      );
                     }
                   }
                 }
@@ -250,8 +282,14 @@ export async function POST(request: NextRequest) {
             .single();
 
           if (product) {
-            const orderAmount = session.amount_total ? session.amount_total / 100 : 0;
-            const fees = calculateFees(orderAmount);
+            // For single product checkout, use amount_subtotal for fee calculations (pre-tax)
+            // and amount_total for total_amount (includes tax, matches Stripe dashboard)
+            const orderSubtotal = session.amount_subtotal ? session.amount_subtotal / 100 : 0;
+            const orderTotal = session.amount_total ? session.amount_total / 100 : 0;
+            // Use subtotal for fee calculations (fees calculated on pre-tax amount)
+            // If subtotal is not available, use total as fallback (for backwards compatibility)
+            const amountForFees = orderSubtotal > 0 ? orderSubtotal : orderTotal;
+            const fees = calculateFees(amountForFees);
 
             const { error: orderError, data: insertedOrders } = await supabase
               .from('orders')
@@ -261,7 +299,8 @@ export async function POST(request: NextRequest) {
                 seller_id: product.user_id,
                 stripe_session_id: session.id,
                 status: 'completed',
-                amount: orderAmount,
+                amount: amountForFees, // Subtotal for fee calculations (pre-tax)
+                total_amount: orderTotal, // Total including tax (matches Stripe dashboard)
                 currency: session.currency?.toUpperCase() || 'USD',
                 buyer_email: session.metadata?.buyerEmail || session.customer_email || null,
                 platform_fee: fees.platformFee,
@@ -286,7 +325,7 @@ export async function POST(request: NextRequest) {
                 console.error('❌ WARNING: Order has no buyer_email! Attempting to fix...');
                 console.error('Session customer_email:', session.customer_email);
                 console.error('Session metadata:', session.metadata);
-                
+
                 // Try to update order with customer_email from session if available
                 if (session.customer_email) {
                   console.log('🔧 Updating order with customer_email from session...');
@@ -294,7 +333,7 @@ export async function POST(request: NextRequest) {
                     .from('orders')
                     .update({ buyer_email: session.customer_email })
                     .eq('id', insertedOrders[0].id);
-                  
+
                   if (updateError) {
                     console.error('❌ Failed to update order with customer_email:', updateError);
                   } else {
@@ -302,14 +341,21 @@ export async function POST(request: NextRequest) {
                     insertedOrders[0].buyer_email = session.customer_email;
                   }
                 } else {
-                  console.error('❌ Session has no customer_email either! Email delivery will fail.');
+                  console.error(
+                    '❌ Session has no customer_email either! Email delivery will fail.'
+                  );
                 }
               }
 
               // Send purchase email synchronously (same pattern as test-email)
-              if (product && product.files && product.files.length > 0 && insertedOrders[0].buyer_email) {
+              if (
+                product &&
+                product.files &&
+                product.files.length > 0 &&
+                insertedOrders[0].buyer_email
+              ) {
                 console.log('📧 Sending purchase email...');
-                
+
                 // Get seller name
                 let sellerName: string | undefined;
                 const { data: sellerProfile } = await supabase
