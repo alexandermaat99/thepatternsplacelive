@@ -97,6 +97,7 @@ export async function POST(request: NextRequest) {
               name: product.title,
               description: product.description,
               images: product.image_url ? [product.image_url] : [],
+              tax_code: 'txcd_10301000', // Digital products tax code (eBooks, digital files, etc.)
             },
             unit_amount: formatAmountForStripe(product.price, product.currency),
           },
