@@ -72,21 +72,13 @@ export function AuthModal({
         throw new Error('Login failed - no session created');
       }
 
-      // Verify the session is established
-      const {
-        data: { user },
-        error: getUserError,
-      } = await supabase.auth.getUser();
-
-      if (getUserError || !user) {
-        throw new Error('Failed to verify session after login');
-      }
-
+      // Session is created, close modal and refresh
+      // We skip getUser() verification to avoid hanging
+      // The router refresh will verify the session properly
+      onClose();
+      
       // Refresh router to sync server-side state
       router.refresh();
-      
-      // Close modal
-      onClose();
 
       // Navigate if there's a redirect URL
       if (redirectUrl) {

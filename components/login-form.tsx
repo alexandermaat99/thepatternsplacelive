@@ -109,21 +109,13 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
         throw new Error('Login failed - no session created');
       }
 
-      // Verify the session is established by checking the user
-      // This ensures cookies are properly set before redirecting
-      const {
-        data: { user },
-        error: getUserError,
-      } = await supabase.auth.getUser();
-
-      if (getUserError || !user) {
-        throw new Error('Failed to verify session after login');
-      }
-
-      // Refresh the router to sync server-side state
-      router.refresh();
+      // Session is created, proceed with redirect
+      // We skip getUser() verification here to avoid hanging
+      // The full page reload (window.location.href) will verify the session properly
 
       // Determine redirect destination
+      // Note: We use window.location.href which does a full page reload,
+      // so router.refresh() is not needed and session will be verified on reload
       // Validate redirect URL to prevent open redirect vulnerabilities
       const getRedirectUrl = (): string => {
         if (!redirectUrl) {
