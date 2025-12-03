@@ -328,22 +328,34 @@ export async function deliverProductsForOrders(orders: DeliveryOrder[]): Promise
   for (const [buyerEmail, buyerOrders] of ordersByEmail.entries()) {
     console.log(`📬 Processing ${buyerOrders.length} order(s) for ${buyerEmail}`);
 
-    // Get all product IDs for this buyer
-    const productIds = buyerOrders.map(o => o.product_id);
+    try {
+      // Get all product IDs for this buyer
+      const productIds = buyerOrders.map(o => o.product_id);
+      console.log(`🔍 Fetching products with IDs:`, productIds);
 
-    // Fetch all products
-    const { data: products, error: productsError } = await supabase
-      .from('products')
-      .select('id, title, description, files, user_id')
-      .in('id', productIds);
+      // Fetch all products
+      const fetchStartTime = Date.now();
+      const { data: products, error: productsError } = await supabase
+        .from('products')
+        .select('id, title, description, files, user_id')
+        .in('id', productIds);
+      const fetchTime = Date.now() - fetchStartTime;
 
-    if (productsError || !products) {
-      console.error(`❌ Error fetching products for delivery to ${buyerEmail}:`, productsError);
-      console.error('Product IDs requested:', productIds);
-      continue;
-    }
+      if (productsError) {
+        console.error(`❌ Error fetching products for delivery to ${buyerEmail} (${fetchTime}ms):`, productsError);
+        console.error('Error details:', JSON.stringify(productsError, null, 2));
+        console.error('Product IDs requested:', productIds);
+        continue;
+      }
 
-    console.log(`✅ Fetched ${products.length} product(s) for ${buyerEmail}`);
+      if (!products) {
+        console.error(`❌ Products query returned null for ${buyerEmail} (${fetchTime}ms)`);
+        console.error('Product IDs requested:', productIds);
+        continue;
+      }
+
+      console.log(`✅ Fetched ${products.length} product(s) for ${buyerEmail} in ${fetchTime}ms`);
+      console.log('Products:', products.map(p => ({ id: p.id, title: p.title, files_count: p.files?.length || 0 })));
 
     // Create a map for quick product lookup
     const productMap = new Map(products.map(p => [p.id, p]));
@@ -375,6 +387,11 @@ export async function deliverProductsForOrders(orders: DeliveryOrder[]): Promise
       } else {
         console.log(`✅ Delivery completed successfully for order ${order.id}`);
       }
+    }
+    } catch (buyerError) {
+      console.error(`❌ Exception processing buyer ${buyerEmail}:`, buyerError);
+      console.error('Error stack:', buyerError instanceof Error ? buyerError.stack : 'No stack trace');
+      // Continue with next buyer
     }
   }
 
