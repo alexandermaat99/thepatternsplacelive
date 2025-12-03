@@ -288,7 +288,61 @@ export async function deliverProductToCustomer(
 }
 
 /**
- * Processes delivery for multiple orders (cart checkout)
+ * Processes delivery for multiple orders with pre-fetched products (avoids async query issues)
+ */
+export async function deliverProductsForOrdersWithProducts(
+  orders: DeliveryOrder[],
+  productsMap: Map<string, DeliveryProduct>
+): Promise<void> {
+  console.log('📦 deliverProductsForOrdersWithProducts called with', orders.length, 'order(s)');
+  
+  const supabase = createServiceRoleClient();
+
+  // Group orders by buyer email
+  const ordersByEmail = new Map<string, DeliveryOrder[]>();
+  
+  for (const order of orders) {
+    const email = order.buyer_email;
+    if (email) {
+      if (!ordersByEmail.has(email)) {
+        ordersByEmail.set(email, []);
+      }
+      ordersByEmail.get(email)!.push(order);
+    }
+  }
+
+  if (ordersByEmail.size === 0) {
+    console.error('❌ CRITICAL: No orders have buyer_email');
+    return;
+  }
+
+  // Process each buyer's orders
+  for (const [buyerEmail, buyerOrders] of ordersByEmail.entries()) {
+    for (const order of buyerOrders) {
+      const product = productsMap.get(order.product_id);
+      if (!product) {
+        console.error(`❌ Product ${order.product_id} not found in products map`);
+        continue;
+      }
+
+      const email = order.buyer_email;
+      if (!email) {
+        console.error(`❌ No email for order ${order.id}`);
+        continue;
+      }
+
+      console.log(`🚀 Starting delivery for order ${order.id}, product: ${product.title}`);
+      const deliveryResult = await deliverProductToCustomer(order, product, email);
+      
+      if (!deliveryResult.success) {
+        console.error(`❌ Delivery failed for order ${order.id}:`, deliveryResult.error);
+      }
+    }
+  }
+}
+
+/**
+ * Processes delivery for multiple orders (cart checkout) - fetches products
  */
 export async function deliverProductsForOrders(orders: DeliveryOrder[]): Promise<void> {
   console.log('📦 deliverProductsForOrders called with', orders.length, 'order(s)');
@@ -341,13 +395,24 @@ export async function deliverProductsForOrders(orders: DeliveryOrder[]): Promise
       const productIds = buyerOrders.map(o => o.product_id);
       console.log(`🔍 Fetching products with IDs:`, productIds);
 
-      // Fetch all products
+      // Fetch all products with timeout protection
       const fetchStartTime = Date.now();
-      const { data: products, error: productsError } = await supabase
+      console.log(`   Executing product query for ${productIds.length} product(s)...`);
+      
+      // Add timeout to prevent hanging
+      const queryPromise = supabase
         .from('products')
         .select('id, title, description, files, user_id')
         .in('id', productIds);
+      
+      const timeoutPromise = new Promise<{ data: null; error: { message: string } }>((resolve) =>
+        setTimeout(() => resolve({ data: null, error: { message: 'Query timeout after 10s' } }), 10000)
+      );
+      
+      const result = await Promise.race([queryPromise, timeoutPromise]) as { data: any[] | null; error: any };
+      const { data: products, error: productsError } = result;
       const fetchTime = Date.now() - fetchStartTime;
+      console.log(`   Query finished in ${fetchTime}ms`);
 
       if (productsError) {
         console.error(`❌ Error fetching products for delivery to ${buyerEmail} (${fetchTime}ms):`, productsError);

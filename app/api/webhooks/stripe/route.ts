@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getStripe } from '@/lib/stripe';
 import { createClient } from '@/lib/supabase/server';
 import { headers } from 'next/headers';
-import { deliverProductsForOrders } from '@/lib/product-delivery';
+import { sendPurchaseEmail } from '@/lib/send-purchase-email';
 import { COMPANY_INFO } from '@/lib/company-info';
 
 // Calculate fees for an order (matches checkout calculation)
@@ -93,11 +93,11 @@ export async function POST(request: NextRequest) {
           try {
             const items = JSON.parse(cartItems);
 
-            // Get product details to get seller_id for each product
+            // Get product details to get seller_id for each product (include files for email delivery)
             const productIds = items.map((item: { productId: string }) => item.productId);
             const { data: products } = await supabase
               .from('products')
-              .select('id, user_id, price, currency')
+              .select('id, user_id, price, currency, title, description, files')
               .in('id', productIds);
 
             if (products) {
@@ -180,13 +180,61 @@ export async function POST(request: NextRequest) {
                     }
                   }
 
-                  // Deliver products via email (non-blocking)
-                  console.log('📧 Triggering email delivery for orders...');
-                  deliverProductsForOrders(insertedOrders).catch(error => {
-                    console.error('❌ FATAL ERROR in email delivery:', error);
-                    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-                    // Don't throw - email delivery failures shouldn't fail the webhook
-                  });
+                  // Send purchase emails synchronously (industry standard - same as test-email pattern)
+                  console.log('📧 Sending purchase emails...');
+                  
+                  // Products already fetched above with files included
+                  for (const order of insertedOrders) {
+                    const product = products.find(p => p.id === order.product_id);
+                    if (!product || !product.files || product.files.length === 0) {
+                      console.log(`⏭️ Skipping email for order ${order.id} - no files`);
+                      continue;
+                    }
+
+                    if (!order.buyer_email) {
+                      console.error(`❌ Skipping email for order ${order.id} - no buyer email`);
+                      continue;
+                    }
+
+                    // Get seller name
+                    let sellerName: string | undefined;
+                    const { data: sellerProfile } = await supabase
+                      .from('profiles')
+                      .select('full_name, username')
+                      .eq('id', product.user_id)
+                      .single();
+                    sellerName = sellerProfile?.full_name || sellerProfile?.username;
+
+                    // Get buyer name
+                    let buyerName: string | undefined;
+                    if (order.buyer_id) {
+                      const { data: buyerProfile } = await supabase
+                        .from('profiles')
+                        .select('full_name')
+                        .eq('id', order.buyer_id)
+                        .single();
+                      buyerName = buyerProfile?.full_name;
+                    }
+
+                    // Send email synchronously
+                    const emailResult = await sendPurchaseEmail({
+                      orderId: order.id,
+                      buyerEmail: order.buyer_email,
+                      buyerName,
+                      productId: product.id,
+                      productTitle: product.title || 'Product',
+                      productDescription: product.description || undefined,
+                      sellerId: product.user_id,
+                      sellerName,
+                      filePaths: product.files,
+                    });
+
+                    if (emailResult.success) {
+                      console.log(`✅ Email sent for order ${order.id} to ${order.buyer_email}`);
+                    } else {
+                      console.error(`❌ Failed to send email for order ${order.id}:`, emailResult.error);
+                    }
+                  }
                 }
               }
             }
@@ -194,10 +242,10 @@ export async function POST(request: NextRequest) {
             console.error('Error parsing cart items:', parseError);
           }
         } else {
-          // Single product checkout (legacy)
+          // Single product checkout
           const { data: product } = await supabase
             .from('products')
-            .select('user_id')
+            .select('id, user_id, title, description, files')
             .eq('id', session.metadata?.productId)
             .single();
 
@@ -258,13 +306,50 @@ export async function POST(request: NextRequest) {
                 }
               }
 
-              // Deliver product via email (non-blocking)
-              console.log('📧 Triggering email delivery for order...');
-              deliverProductsForOrders(insertedOrders).catch(error => {
-                console.error('❌ FATAL ERROR in email delivery:', error);
-                console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-                // Don't throw - email delivery failures shouldn't fail the webhook
-              });
+              // Send purchase email synchronously (same pattern as test-email)
+              if (product && product.files && product.files.length > 0 && insertedOrders[0].buyer_email) {
+                console.log('📧 Sending purchase email...');
+                
+                // Get seller name
+                let sellerName: string | undefined;
+                const { data: sellerProfile } = await supabase
+                  .from('profiles')
+                  .select('full_name, username')
+                  .eq('id', product.user_id)
+                  .single();
+                sellerName = sellerProfile?.full_name || sellerProfile?.username;
+
+                // Get buyer name
+                let buyerName: string | undefined;
+                if (insertedOrders[0].buyer_id) {
+                  const { data: buyerProfile } = await supabase
+                    .from('profiles')
+                    .select('full_name')
+                    .eq('id', insertedOrders[0].buyer_id)
+                    .single();
+                  buyerName = buyerProfile?.full_name;
+                }
+
+                const emailResult = await sendPurchaseEmail({
+                  orderId: insertedOrders[0].id,
+                  buyerEmail: insertedOrders[0].buyer_email,
+                  buyerName,
+                  productId: product.id,
+                  productTitle: product.title || 'Product',
+                  productDescription: product.description || undefined,
+                  sellerId: product.user_id,
+                  sellerName,
+                  filePaths: product.files,
+                });
+
+                if (emailResult.success) {
+                  console.log(`✅ Email sent to ${insertedOrders[0].buyer_email}`);
+                } else {
+                  console.error(`❌ Failed to send email:`, emailResult.error);
+                }
+              } else {
+                console.log('⏭️ Skipping email - no files or no buyer email');
+              }
             }
           }
         }
