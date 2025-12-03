@@ -152,10 +152,19 @@ export async function POST(request: NextRequest) {
 
     // Create Stripe checkout session with Connect transfer
     // Note: For multi-seller carts, consider splitting into separate sessions
+    // 
+    // Tax handling (industry standard for marketplaces):
+    // - Platform-level tax: Tax is calculated and collected by Stripe on the platform account
+    // - Tax amount stays with platform for remittance to tax authorities
+    // - Transfer to seller = product amount - platform fees (tax is separate)
+    // - This is the standard model used by Etsy, Amazon, etc.
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: lineItems,
       mode: 'payment',
+      automatic_tax: {
+        enabled: true, // Platform-level tax calculation (industry standard)
+      },
       payment_intent_data: {
         // Transfer payment to primary seller's Stripe Connect account
         // For multi-seller carts, you may want to handle transfers in webhook

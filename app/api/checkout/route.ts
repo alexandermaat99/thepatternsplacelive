@@ -81,6 +81,12 @@ export async function POST(request: NextRequest) {
     const platformFeeAmount = Math.max(totalFee, COMPANY_INFO.fees.minimumFeeCents);
 
     // Create Stripe checkout session with Connect transfer
+    //
+    // Tax handling (industry standard for marketplaces):
+    // - Platform-level tax: Tax is calculated and collected by Stripe on the platform account
+    // - Tax amount stays with platform for remittance to tax authorities
+    // - Transfer to seller = product amount - platform fees (tax is separate)
+    // - This is the standard model used by Etsy, Amazon, etc.
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
@@ -98,6 +104,9 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: 'payment',
+      automatic_tax: {
+        enabled: true, // Platform-level tax calculation (industry standard)
+      },
       payment_intent_data: {
         // Transfer payment to seller's Stripe Connect account
         transfer_data: {
