@@ -76,6 +76,9 @@ export async function deliverProductToCustomer(
       };
     }
 
+    // Store files array after null check to satisfy TypeScript
+    const files = product.files;
+
     // Download and process files
     const attachments: Array<{
       filename: string;
@@ -83,13 +86,13 @@ export async function deliverProductToCustomer(
       contentType: string;
     }> = [];
 
-    console.log(`📥 Attempting to download ${product.files.length} file(s) for delivery...`);
+    console.log(`📥 Attempting to download ${files.length} file(s) for delivery...`);
     const downloadStartTime = Date.now();
 
     // Download files in parallel for better performance
-    const fileDownloadPromises = product.files.map(async (filePath, index) => {
+    const fileDownloadPromises = files.map(async (filePath, index) => {
       try {
-        console.log(`[${index + 1}/${product.files.length}] Starting download: ${filePath}`);
+        console.log(`[${index + 1}/${files.length}] Starting download: ${filePath}`);
         const fileStartTime = Date.now();
 
         // Download file from Supabase storage using service role client (bypasses RLS)
@@ -189,7 +192,7 @@ export async function deliverProductToCustomer(
     }
 
     console.log(
-      `📊 File processing summary: ${attachments.length}/${product.files.length} files successfully processed`
+      `📊 File processing summary: ${attachments.length}/${files.length} files successfully processed`
     );
 
     if (attachments.length === 0) {
@@ -197,9 +200,9 @@ export async function deliverProductToCustomer(
       console.error(`   Product ID: ${product.id}`);
       console.error(`   Product Title: ${product.title}`);
       console.error(`   Order ID: ${order.id}`);
-      console.error(`   Files listed in product: ${product.files?.length || 0}`);
-      console.error(`   Files that failed: ${product.files?.length || 0}`);
-      console.error(`   File paths:`, product.files);
+      console.error(`   Files listed in product: ${files.length}`);
+      console.error(`   Files that failed: ${files.length}`);
+      console.error(`   File paths:`, files);
       console.error('');
       console.error('🔍 Possible causes:');
       console.error("1. Files don't exist in the product-files storage bucket");
