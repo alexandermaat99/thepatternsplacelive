@@ -143,11 +143,16 @@ export async function POST(request: NextRequest) {
 
     // Optionally pass Stripe's processing fees to the seller
     let stripeFeePassthrough = 0;
-    if (COMPANY_INFO.fees.passStripeFeesToSeller) {
+    if (COMPANY_INFO.fees.passStripeFeesToSeller === true) {
+      // Pass both percentage and flat fee
       stripeFeePassthrough = Math.round(
         totalInCents * COMPANY_INFO.fees.stripePercentFee + COMPANY_INFO.fees.stripeFlatFeeCents
       );
+    } else if (COMPANY_INFO.fees.passStripeFeesToSeller === 'flat-only') {
+      // Only pass the flat fee, platform absorbs the percentage
+      stripeFeePassthrough = COMPANY_INFO.fees.stripeFlatFeeCents;
     }
+    // If false, stripeFeePassthrough remains 0 (platform absorbs all)
 
     // Total application fee = platform fee + stripe passthrough (if enabled)
     const totalFee = platformFee + stripeFeePassthrough;

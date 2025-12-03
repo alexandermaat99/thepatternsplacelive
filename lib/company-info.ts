@@ -65,14 +65,15 @@ export const COMPANY_INFO = {
     platformFeePercent: 0.056, // 5.5% transaction fee
 
     // Whether to pass Stripe's processing fees to the seller
-    // true = Seller pays Stripe fees (like Etsy) - you keep more
-    // false = Platform absorbs Stripe fees - seller-friendly
-    passStripeFeesToSeller: false, // Platform absorbs Stripe fees
+    // true = Seller pays all Stripe fees (like Etsy) - you keep more
+    // false = Platform absorbs all Stripe fees - seller-friendly
+    // 'flat-only' = Only pass the flat fee ($0.30), platform absorbs percentage (2.9%)
+    passStripeFeesToSeller: 'flat-only' as true | false | 'flat-only', // Only pass $0.30 flat fee, platform absorbs 2.9%
 
     // Stripe's approximate fees (used for calculation when passing to seller)
     // These are estimates - actual Stripe fees may vary slightly
-    stripePercentFee: 0.029, // 2.9%
-    stripeFlatFeeCents: 30, // $0.30
+    stripePercentFee: 0.029, // 2.9% (platform absorbs this)
+    stripeFlatFeeCents: 30, // $0.30 (passed to seller)
 
     // Minimum platform fee in cents (optional floor)
     // e.g., 50 = $0.50 minimum fee per transaction
@@ -82,7 +83,7 @@ export const COMPANY_INFO = {
     // Products must be priced at least this amount
     minimumProductPrice: 1.0,
   },
-} as const;
+};
 
 // Helper function to get full copyright text
 export function getCopyrightText() {
