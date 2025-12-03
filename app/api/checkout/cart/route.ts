@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getStripe } from '@/lib/stripe';
 import { createClient } from '@/lib/supabase/server';
 import { formatAmountForStripe } from '@/lib/stripe';
-import { COMPANY_INFO } from '@/lib/company-info';
+import { COMPANY_INFO, calculateEtsyFees } from '@/lib/company-info';
 
 export async function POST(request: NextRequest) {
   try {
@@ -132,31 +132,21 @@ export async function POST(request: NextRequest) {
       0
     );
 
-    // Calculate platform fee from centralized config (lib/company-info.ts)
+    // Calculate Etsy-style platform fees from centralized config (lib/company-info.ts)
     // TAX WITHHOLDING: As the tax-collecting entity, we must withhold tax from seller payouts
     // Seller receives: Sale Price - Platform Fee (tax is NOT included in seller payout)
     // Platform keeps: Platform Fee + Tax (for remittance)
+    //
+    // Etsy fee structure:
+    // - Listing Fee: $0.20 per sale
+    // - Transaction Fee: 6.5% of sale price
+    // - Payment Processing: 3% + $0.25
+    // Total: $0.20 + (sale_price * 0.065) + (sale_price * 0.03) + $0.25
     const totalInCents = Math.round(totalAmount * 100);
 
-    // Platform transaction fee (percentage of subtotal)
-    const platformFee = Math.round(totalInCents * COMPANY_INFO.fees.platformFeePercent);
-
-    // Optionally pass Stripe's processing fees to the seller
-    let stripeFeePassthrough = 0;
-    if (COMPANY_INFO.fees.passStripeFeesToSeller === true) {
-      // Pass both percentage and flat fee
-      stripeFeePassthrough = Math.round(
-        totalInCents * COMPANY_INFO.fees.stripePercentFee + COMPANY_INFO.fees.stripeFlatFeeCents
-      );
-    } else if (COMPANY_INFO.fees.passStripeFeesToSeller === 'flat-only') {
-      // Only pass the flat fee, platform absorbs the percentage
-      stripeFeePassthrough = COMPANY_INFO.fees.stripeFlatFeeCents;
-    }
-    // If false, stripeFeePassthrough remains 0 (platform absorbs all)
-
-    // Total application fee = platform fee + stripe passthrough (if enabled)
-    const totalFee = platformFee + stripeFeePassthrough;
-    const platformFeeAmount = Math.max(totalFee, COMPANY_INFO.fees.minimumFeeCents);
+    // Calculate Etsy-style fees
+    const fees = calculateEtsyFees(totalInCents);
+    const platformFeeAmount = fees.totalFee;
     
     // Calculate seller payout: Total Sale Price - Platform Fee (tax excluded)
     // This ensures seller only gets their net from the sale, not the tax portion

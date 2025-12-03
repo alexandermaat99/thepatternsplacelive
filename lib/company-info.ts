@@ -58,22 +58,24 @@ export const COMPANY_INFO = {
   },
 
   // Platform Fees & Revenue
-  // This is how The Pattern's Place makes money - a percentage of each sale
+  // Etsy-style fee structure
   fees: {
-    // Platform transaction fee percentage (like Etsy's 6.5%, we charge 6%)
-    // This is taken from the seller's payout
-    platformFeePercent: 0.056, // 5.5% transaction fee
+    // Listing Fee: $0.20 per sale (charged each time item sells)
+    listingFeeCents: 20, // $0.20
 
-    // Whether to pass Stripe's processing fees to the seller
-    // true = Seller pays all Stripe fees (like Etsy) - you keep more
-    // false = Platform absorbs all Stripe fees - seller-friendly
-    // 'flat-only' = Only pass the flat fee ($0.30), platform absorbs percentage (2.9%)
-    passStripeFeesToSeller: 'flat-only' as true | false | 'flat-only', // Only pass $0.30 flat fee, platform absorbs 2.9%
+    // Transaction Fee: 6.5% of sale price (like Etsy)
+    transactionFeePercent: 0.065, // 6.5%
 
-    // Stripe's approximate fees (used for calculation when passing to seller)
-    // These are estimates - actual Stripe fees may vary slightly
-    stripePercentFee: 0.029, // 2.9% (platform absorbs this)
-    stripeFlatFeeCents: 30, // $0.30 (passed to seller)
+    // Payment Processing: 3% + $0.25 (like Etsy)
+    paymentProcessingPercent: 0.03, // 3%
+    paymentProcessingFlatCents: 25, // $0.25
+
+    // Legacy fields (kept for backward compatibility, but not used)
+    // These are replaced by the Etsy-style structure above
+    platformFeePercent: 0.056, // Deprecated - use transactionFeePercent instead
+    passStripeFeesToSeller: true as true | false | 'flat-only', // Always true with Etsy structure
+    stripePercentFee: 0.03, // 3% (payment processing percentage)
+    stripeFlatFeeCents: 25, // $0.25 (payment processing flat fee)
 
     // Minimum platform fee in cents (optional floor)
     // e.g., 50 = $0.50 minimum fee per transaction
@@ -88,6 +90,33 @@ export const COMPANY_INFO = {
 // Helper function to get full copyright text
 export function getCopyrightText() {
   return `© ${COMPANY_INFO.legal.copyrightYear} ${COMPANY_INFO.name}. All rights reserved.`;
+}
+
+/**
+ * Calculate Etsy-style platform fees for a sale
+ * @param salePriceInCents - The sale price in cents
+ * @returns Object with fee breakdown in cents
+ */
+export function calculateEtsyFees(salePriceInCents: number) {
+  const listingFee = COMPANY_INFO.fees.listingFeeCents; // $0.20
+  const transactionFee = Math.round(salePriceInCents * COMPANY_INFO.fees.transactionFeePercent); // 6.5%
+  const paymentProcessingPercent = Math.round(
+    salePriceInCents * COMPANY_INFO.fees.paymentProcessingPercent
+  ); // 3%
+  const paymentProcessingFlat = COMPANY_INFO.fees.paymentProcessingFlatCents; // $0.25
+
+  const totalFee = listingFee + transactionFee + paymentProcessingPercent + paymentProcessingFlat;
+  const finalFee = Math.max(totalFee, COMPANY_INFO.fees.minimumFeeCents);
+
+  return {
+    listingFee,
+    transactionFee,
+    paymentProcessing: paymentProcessingPercent + paymentProcessingFlat,
+    totalFee: finalFee,
+    // For backward compatibility
+    platformFee: finalFee,
+    stripeFee: 0, // Payment processing is included in total fee
+  };
 }
 
 // Type for easy access

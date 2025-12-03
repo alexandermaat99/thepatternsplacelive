@@ -156,10 +156,11 @@ export default async function EarningsPage() {
   // Recent orders (last 10)
   const recentOrders = completedOrders.slice(0, 10);
 
-  // Fee info - use toFixed to avoid floating point precision issues
-  const feePercent = Number((COMPANY_INFO.fees.platformFeePercent * 100).toFixed(2));
-  const stripePercent = Number((COMPANY_INFO.fees.stripePercentFee * 100).toFixed(2));
-  const stripeFlatFee = Number((COMPANY_INFO.fees.stripeFlatFeeCents / 100).toFixed(2));
+  // Fee info - Etsy-style structure
+  const listingFee = COMPANY_INFO.fees.listingFeeCents / 100;
+  const transactionFeePercent = Number((COMPANY_INFO.fees.transactionFeePercent * 100).toFixed(2));
+  const paymentProcessingPercent = Number((COMPANY_INFO.fees.paymentProcessingPercent * 100).toFixed(2));
+  const paymentProcessingFlat = COMPANY_INFO.fees.paymentProcessingFlatCents / 100;
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
@@ -340,20 +341,29 @@ export default async function EarningsPage() {
             <div className="space-y-4">
               <div className="flex justify-between items-center py-2 border-b">
                 <div>
-                  <p className="font-medium">Platform Fee</p>
+                  <p className="font-medium">Listing Fee</p>
+                  <p className="text-sm text-muted-foreground">
+                    Per sale
+                  </p>
+                </div>
+                <Badge variant="secondary">${listingFee.toFixed(2)}</Badge>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b">
+                <div>
+                  <p className="font-medium">Transaction Fee</p>
                   <p className="text-sm text-muted-foreground">
                     {COMPANY_INFO.name} transaction fee
                   </p>
                 </div>
-                <Badge variant="secondary">{feePercent}%</Badge>
+                <Badge variant="secondary">{transactionFeePercent}%</Badge>
               </div>
               <div className="flex justify-between items-center py-2 border-b">
                 <div>
                   <p className="font-medium">Payment Processing</p>
-                  <p className="text-sm text-muted-foreground">Stripe processing fee</p>
+                  <p className="text-sm text-muted-foreground">Payment processing fee</p>
                 </div>
                 <Badge variant="secondary">
-                  {stripePercent}% + ${stripeFlatFee.toFixed(2)}
+                  {paymentProcessingPercent}% + ${paymentProcessingFlat.toFixed(2)}
                 </Badge>
               </div>
               <div className="flex justify-between items-center py-2">

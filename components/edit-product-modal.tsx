@@ -19,7 +19,7 @@ import { CategoryInput, linkCategoriesToProduct } from '@/components/marketplace
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import { DIFFICULTY_LEVELS } from '@/lib/constants';
-import { COMPANY_INFO } from '@/lib/company-info';
+import { COMPANY_INFO, calculateEtsyFees } from '@/lib/company-info';
 import { Info } from 'lucide-react';
 import Link from 'next/link';
 import { FeesInfoModal } from '@/components/marketplace/fees-info-modal';
@@ -530,8 +530,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="flex items-center gap-1">
-                          Platform fee ({(COMPANY_INFO.fees.platformFeePercent * 100).toFixed(1)}%,
-                          min ${(COMPANY_INFO.fees.minimumFeeCents / 100).toFixed(2)}):
+                          Platform fees (Etsy-style):
                           <button
                             type="button"
                             onClick={() => setShowFeesModal(true)}
@@ -542,23 +541,18 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
                         </span>
                         <span className="font-medium text-orange-600">
                           -$
-                          {Math.max(
-                            parseFloat(formData.price) * COMPANY_INFO.fees.platformFeePercent,
-                            COMPANY_INFO.fees.minimumFeeCents / 100
-                          ).toFixed(2)}
+                          {(formData.price && !isNaN(parseFloat(formData.price)))
+                            ? (calculateEtsyFees(Math.round(parseFloat(formData.price) * 100)).totalFee / 100).toFixed(2)
+                            : '0.00'}
                         </span>
                       </div>
                       <div className="flex justify-between pt-1 border-t">
                         <span className="font-medium">You receive:</span>
                         <span className="font-bold text-green-600">
                           $
-                          {(
-                            parseFloat(formData.price) -
-                            Math.max(
-                              parseFloat(formData.price) * COMPANY_INFO.fees.platformFeePercent,
-                              COMPANY_INFO.fees.minimumFeeCents / 100
-                            )
-                          ).toFixed(2)}
+                          {(formData.price && !isNaN(parseFloat(formData.price)))
+                            ? (parseFloat(formData.price) - calculateEtsyFees(Math.round(parseFloat(formData.price) * 100)).totalFee / 100).toFixed(2)
+                            : '0.00'}
                         </span>
                       </div>
                     </div>

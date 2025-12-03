@@ -3,9 +3,9 @@ import { getStripe } from '@/lib/stripe';
 import { createClient } from '@/lib/supabase/server';
 import { headers } from 'next/headers';
 import { sendPurchaseEmail } from '@/lib/send-purchase-email';
-import { COMPANY_INFO } from '@/lib/company-info';
+import { COMPANY_INFO, calculateEtsyFees } from '@/lib/company-info';
 
-// Calculate fees for an order
+// Calculate fees for an order using Etsy-style structure
 // When tax is included, we maintain the seller's net amount by scaling the fee proportionally
 function calculateFees(amount: number, originalSubtotal?: number) {
   // Convert to cents for calculation
@@ -14,29 +14,20 @@ function calculateFees(amount: number, originalSubtotal?: number) {
   // If we have the original subtotal, maintain seller's net amount
   // This ensures that when tax is added, the seller gets the same net as before
   if (originalSubtotal && originalSubtotal !== amount) {
-    // Calculate what the fee was on the original subtotal
+    // Calculate what the fee was on the original subtotal using Etsy structure
     const originalSubtotalCents = Math.round(originalSubtotal * 100);
-    const originalFeeCents = Math.round(
-      originalSubtotalCents * COMPANY_INFO.fees.platformFeePercent
-    );
-    const originalStripeFeeCents = COMPANY_INFO.fees.passStripeFeesToSeller
-      ? Math.round(
-          originalSubtotalCents * COMPANY_INFO.fees.stripePercentFee +
-            COMPANY_INFO.fees.stripeFlatFeeCents
-        )
-      : 0;
-    const originalTotalFeeCents = originalFeeCents + originalStripeFeeCents;
-    const originalFeeWithMin = Math.max(originalTotalFeeCents, COMPANY_INFO.fees.minimumFeeCents);
+    const originalFees = calculateEtsyFees(originalSubtotalCents);
+    const originalFeeCents = originalFees.totalFee;
 
     // Calculate original seller net
-    const originalSellerNetCents = originalSubtotalCents - originalFeeWithMin;
+    const originalSellerNetCents = originalSubtotalCents - originalFeeCents;
 
     // Maintain the same seller net, so new fee = new total - original seller net
     const applicationFeeCents = amountInCents - originalSellerNetCents;
 
     // Convert back to dollars
     const platformFee = applicationFeeCents / 100; // Platform fee (scaled to maintain seller net)
-    const stripeFee = 0; // Platform absorbs Stripe fees
+    const stripeFee = 0; // Payment processing is included in total fee
     const netAmount = originalSellerNetCents / 100; // Seller's net (same as before tax)
 
     return {
@@ -47,21 +38,11 @@ function calculateFees(amount: number, originalSubtotal?: number) {
     };
   }
 
-  // No original subtotal or amounts are the same - calculate normally
-  const platformFeeCents = Math.round(amountInCents * COMPANY_INFO.fees.platformFeePercent);
-  let stripeFeePassthroughCents = 0;
-  if (COMPANY_INFO.fees.passStripeFeesToSeller) {
-    stripeFeePassthroughCents = Math.round(
-      amountInCents * COMPANY_INFO.fees.stripePercentFee + COMPANY_INFO.fees.stripeFlatFeeCents
-    );
-  }
-
-  const totalFeeCents = platformFeeCents + stripeFeePassthroughCents;
-  const applicationFeeCents = Math.max(totalFeeCents, COMPANY_INFO.fees.minimumFeeCents);
-
-  const platformFee = applicationFeeCents / 100;
-  const stripeFee = 0;
-  const netAmount = (amountInCents - applicationFeeCents) / 100;
+  // No original subtotal or amounts are the same - calculate normally using Etsy structure
+  const fees = calculateEtsyFees(amountInCents);
+  const platformFee = fees.totalFee / 100;
+  const stripeFee = 0; // Payment processing is included in total fee
+  const netAmount = (amountInCents - fees.totalFee) / 100;
 
   return {
     platformFee,

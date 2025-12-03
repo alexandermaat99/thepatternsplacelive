@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStripe } from '@/lib/stripe';
 import { createClient } from '@/lib/supabase/server';
-import { COMPANY_INFO } from '@/lib/company-info';
+import { calculateEtsyFees } from '@/lib/company-info';
 import { deliverProductsForOrders } from '@/lib/product-delivery';
 
-// Calculate fees for an order
+// Calculate fees for an order using Etsy-style structure
 function calculateFees(amount: number) {
-  const platformFeePercent = COMPANY_INFO.fees.platformFeePercent;
-  const stripePercent = COMPANY_INFO.fees.stripePercentFee;
-  const stripeFlatFee = COMPANY_INFO.fees.stripeFlatFeeCents / 100;
-
-  const platformFee = Math.round(amount * platformFeePercent * 100) / 100;
-  const stripeFee = Math.round((amount * stripePercent + stripeFlatFee) * 100) / 100;
-  const netAmount = Math.round((amount - platformFee - stripeFee) * 100) / 100;
+  const amountInCents = Math.round(amount * 100);
+  const fees = calculateEtsyFees(amountInCents);
+  
+  // Convert back to dollars for return value
+  const platformFee = fees.totalFee / 100;
+  const stripeFee = 0; // Payment processing is included in total fee
+  const netAmount = Math.round((amount - platformFee) * 100) / 100;
 
   return { platformFee, stripeFee, netAmount };
 }
