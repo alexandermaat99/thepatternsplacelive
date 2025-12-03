@@ -95,30 +95,28 @@ export async function deliverProductToCustomer(
         console.log(`   Full storage path: product-files/${filePath}`);
         const fileStartTime = Date.now();
 
-        // Download file from Supabase storage using service role client (bypasses RLS)
-        console.log(`   Calling supabaseAdmin.storage.from('product-files').download()...`);
-        const downloadResult = await supabaseAdmin.storage
+        // Create signed URL and download via HTTP (same approach as test-email page)
+        const { data: signedUrlData, error: urlError } = await supabaseAdmin.storage
           .from('product-files')
-          .download(filePath);
-        
-        const downloadTime = Date.now() - fileStartTime;
-        console.log(`   Download call completed in ${downloadTime}ms`);
-        
-        const { data: fileData, error: downloadError } = downloadResult;
+          .createSignedUrl(filePath, 3600);
 
-        if (downloadError) {
-          console.error(
-            `❌ Error downloading file ${filePath} (${downloadTime}ms):`,
-            downloadError.message || downloadError
-          );
-          console.error(`   Error details:`, JSON.stringify(downloadError, null, 2));
-          console.error(`   Check if file exists at path: product-files/${filePath}`);
+        if (urlError || !signedUrlData?.signedUrl) {
+          console.error(`❌ Error creating signed URL for ${filePath}:`, urlError);
           return null;
         }
 
-        if (!fileData) {
-          console.error(`❌ File download returned null/undefined for: ${filePath} (${downloadTime}ms)`);
-          console.error(`   No error was returned, but fileData is null`);
+        // Download file via HTTP fetch (reliable for server-side)
+        const response = await fetch(signedUrlData.signedUrl);
+        if (!response.ok) {
+          console.error(`❌ HTTP error downloading file ${filePath}: ${response.status} ${response.statusText}`);
+          return null;
+        }
+
+        const fileData = await response.blob();
+        const downloadTime = Date.now() - fileStartTime;
+
+        if (!fileData || fileData.size === 0) {
+          console.error(`❌ Downloaded file is empty: ${filePath}`);
           return null;
         }
 
