@@ -92,25 +92,33 @@ export async function deliverProductToCustomer(
     const fileDownloadPromises = files.map(async (filePath, index) => {
       try {
         console.log(`[${index + 1}/${files.length}] Starting download: ${filePath}`);
+        console.log(`   Full storage path: product-files/${filePath}`);
         const fileStartTime = Date.now();
 
         // Download file from Supabase storage using service role client (bypasses RLS)
-        const { data: fileData, error: downloadError } = await supabaseAdmin.storage
+        console.log(`   Calling supabaseAdmin.storage.from('product-files').download()...`);
+        const downloadResult = await supabaseAdmin.storage
           .from('product-files')
           .download(filePath);
-
+        
         const downloadTime = Date.now() - fileStartTime;
+        console.log(`   Download call completed in ${downloadTime}ms`);
+        
+        const { data: fileData, error: downloadError } = downloadResult;
 
         if (downloadError) {
           console.error(
             `❌ Error downloading file ${filePath} (${downloadTime}ms):`,
-            downloadError.message
+            downloadError.message || downloadError
           );
+          console.error(`   Error details:`, JSON.stringify(downloadError, null, 2));
+          console.error(`   Check if file exists at path: product-files/${filePath}`);
           return null;
         }
 
         if (!fileData) {
-          console.error(`❌ File download returned null for: ${filePath}`);
+          console.error(`❌ File download returned null/undefined for: ${filePath} (${downloadTime}ms)`);
+          console.error(`   No error was returned, but fileData is null`);
           return null;
         }
 
