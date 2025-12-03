@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/supabase/server';
 import { createServiceRoleClient } from '@/lib/supabase/service-role';
 import { watermarkPDF, isPDF } from '@/lib/watermark';
 import { sendProductDeliveryEmail } from '@/lib/email';
@@ -32,9 +31,9 @@ export async function deliverProductToCustomer(
   console.log(`⏱️ Starting product delivery for order ${order.id}...`);
 
   try {
-    // Use regular client for database queries (needs user context for profiles)
-    const supabase = await createClient();
-    // Use service role client for storage downloads (bypasses RLS)
+    // Use service role client for all operations since this runs async without request context
+    // Service role bypasses RLS and works in async contexts
+    const supabase = createServiceRoleClient();
     const supabaseAdmin = createServiceRoleClient();
 
     // Get buyer profile for name
@@ -297,7 +296,10 @@ export async function deliverProductsForOrders(orders: DeliveryOrder[]): Promise
     }))
   );
 
-  const supabase = await createClient();
+  // Use service role client since this runs async after request context is gone
+  // This prevents the query from hanging when cookies/request context is unavailable
+  console.log('🔧 Creating Supabase client for async operation...');
+  const supabase = createServiceRoleClient();
 
   // Group orders by buyer email
   const ordersByEmail = new Map<string, DeliveryOrder[]>();
