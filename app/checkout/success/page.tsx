@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +8,7 @@ import { CheckCircle, ShoppingBag, Home, Loader2 } from 'lucide-react';
 import { useCart } from '@/contexts/cart-context';
 import Link from 'next/link';
 
-export default function CheckoutSuccessPage() {
+function CheckoutSuccessContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get('session_id');
   const { clearCart } = useCart();
@@ -110,5 +110,26 @@ export default function CheckoutSuccessPage() {
           </CardContent>
         </Card>
     </div>
+  );
+}
+
+export default function CheckoutSuccessPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="container mx-auto px-4 py-8 max-w-2xl">
+          <Card>
+            <CardContent className="text-center py-12">
+              <Loader2 className="h-16 w-16 text-primary mx-auto mb-6 animate-spin" />
+              <CardHeader>
+                <CardTitle className="text-2xl">Loading...</CardTitle>
+              </CardHeader>
+            </CardContent>
+          </Card>
+        </div>
+      }
+    >
+      <CheckoutSuccessContent />
+    </Suspense>
   );
 }
