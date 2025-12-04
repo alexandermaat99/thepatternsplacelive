@@ -65,7 +65,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
     openGraph: {
       title: `${product.title} | ${COMPANY_INFO.name}`,
       description,
-      type: 'product',
+      type: 'website',
       url: `${COMPANY_INFO.urls.website}/marketplace/product/${id}`,
       images: [
         {
