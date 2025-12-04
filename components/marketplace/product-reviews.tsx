@@ -92,42 +92,42 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
   // Fetch reviews and check if user has purchased
   useEffect(() => {
     const fetchData = async () => {
-      if (!user) {
-        setHasPurchased(false);
-        setLoading(false);
-        return;
-      }
-
       try {
-        const supabase = createClient();
-
-        // Check if user has purchased
-        const { data: order } = await supabase
-          .from('orders')
-          .select('id')
-          .eq('product_id', productId)
-          .eq('buyer_id', user.id)
-          .eq('status', 'completed')
-          .limit(1)
-          .single();
-
-        setHasPurchased(!!order);
-
-        // Fetch reviews
+        // Always fetch reviews (even for non-logged-in users)
         const response = await fetch(`/api/reviews?productId=${productId}`);
         const data = await response.json();
 
         if (data.reviews) {
           setReviews(data.reviews);
-          // Check if user has already reviewed
-          const existingReview = data.reviews.find((r: Review) => r.buyer_id === user.id);
-          if (existingReview) {
-            setUserReview(existingReview);
-            setRating(existingReview.rating);
-            setDifficultyRating(existingReview.difficulty_rating || '');
-            setTitle(existingReview.title || '');
-            setComment(existingReview.comment || '');
+
+          // Only check for user's review if user is logged in
+          if (user) {
+            const existingReview = data.reviews.find((r: Review) => r.buyer_id === user.id);
+            if (existingReview) {
+              setUserReview(existingReview);
+              setRating(existingReview.rating);
+              setDifficultyRating(existingReview.difficulty_rating || '');
+              setTitle(existingReview.title || '');
+              setComment(existingReview.comment || '');
+            }
           }
+        }
+
+        // Check if user has purchased (only if logged in)
+        if (user) {
+          const supabase = createClient();
+          const { data: order } = await supabase
+            .from('orders')
+            .select('id')
+            .eq('product_id', productId)
+            .eq('buyer_id', user.id)
+            .eq('status', 'completed')
+            .limit(1)
+            .single();
+
+          setHasPurchased(!!order);
+        } else {
+          setHasPurchased(false);
         }
       } catch (error) {
         console.error('Error fetching reviews:', error);
