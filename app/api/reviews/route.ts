@@ -92,6 +92,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate character limits
+    const MAX_TITLE_LENGTH = 100;
+    const MAX_COMMENT_LENGTH = 2000;
+    if (title && title.length > MAX_TITLE_LENGTH) {
+      return NextResponse.json(
+        { error: `Review title must be ${MAX_TITLE_LENGTH} characters or less` },
+        { status: 400 }
+      );
+    }
+    if (comment && comment.length > MAX_COMMENT_LENGTH) {
+      return NextResponse.json(
+        { error: `Review comment must be ${MAX_COMMENT_LENGTH} characters or less` },
+        { status: 400 }
+      );
+    }
+
     // Verify user has purchased this product
     const { data: order, error: orderError } = await supabase
       .from('orders')

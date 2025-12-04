@@ -51,6 +51,10 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
   const [title, setTitle] = useState('');
   const [comment, setComment] = useState('');
 
+  // Character limits
+  const MAX_TITLE_LENGTH = 100;
+  const MAX_COMMENT_LENGTH = 2000;
+
   // Scroll to reviews section if hash is present (industry standard approach)
   useEffect(() => {
     // Only attempt scroll after component has finished loading
@@ -142,6 +146,16 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !hasPurchased) return;
+
+    // Validate character limits
+    if (title.trim().length > MAX_TITLE_LENGTH) {
+      showToast(`Review title must be ${MAX_TITLE_LENGTH} characters or less`, 'error');
+      return;
+    }
+    if (comment.trim().length > MAX_COMMENT_LENGTH) {
+      showToast(`Review comment must be ${MAX_COMMENT_LENGTH} characters or less`, 'error');
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -402,9 +416,19 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
                     value={title}
                     onChange={e => setTitle(e.target.value)}
                     placeholder="Brief summary of your experience"
-                    maxLength={100}
+                    maxLength={MAX_TITLE_LENGTH}
                     className="mt-1"
                   />
+                  <div className="flex justify-between items-center mt-1">
+                    <p className="text-xs text-muted-foreground">
+                      {title.length} / {MAX_TITLE_LENGTH} characters
+                    </p>
+                    {title.length > MAX_TITLE_LENGTH * 0.9 && (
+                      <p className="text-xs text-amber-600">
+                        {MAX_TITLE_LENGTH - title.length} characters remaining
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 <div>
@@ -416,8 +440,19 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
                     placeholder="Share your thoughts about this pattern..."
                     rows={4}
                     className="mt-1"
+                    maxLength={MAX_COMMENT_LENGTH}
                     required
                   />
+                  <div className="flex justify-between items-center mt-1">
+                    <p className="text-xs text-muted-foreground">
+                      {comment.length} / {MAX_COMMENT_LENGTH} characters
+                    </p>
+                    {comment.length > MAX_COMMENT_LENGTH * 0.9 && (
+                      <p className="text-xs text-amber-600">
+                        {MAX_COMMENT_LENGTH - comment.length} characters remaining
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex gap-2">

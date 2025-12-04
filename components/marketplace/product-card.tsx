@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatAmountForDisplay } from '@/lib/utils-client';
 import Link from 'next/link';
 import Image from 'next/image';
 import { getDifficultyLabel, getDifficultyColor } from '@/lib/constants';
-import { Heart } from 'lucide-react';
+import { Heart, Star } from 'lucide-react';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useToast } from '@/contexts/toast-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -52,6 +52,8 @@ export function ProductCard({ product, hideFavorite = false }: ProductCardProps)
   const [isHovered, setIsHovered] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
+  const [averageRating, setAverageRating] = useState<number | null>(null);
+  const [reviewCount, setReviewCount] = useState(0);
 
   // Get the first image from images array or fallback to image_url
   const getImageUrl = () => {
@@ -63,6 +65,29 @@ export function ProductCard({ product, hideFavorite = false }: ProductCardProps)
 
   const imageUrl = getImageUrl();
   const favorited = isFavorite(product.id);
+
+  // Fetch reviews to calculate average rating
+  useEffect(() => {
+    const fetchReviews = async () => {
+      try {
+        const response = await fetch(`/api/reviews?productId=${product.id}`);
+        const data = await response.json();
+
+        if (data.reviews && data.reviews.length > 0) {
+          const ratings = data.reviews.map((r: { rating: number }) => r.rating);
+          const avg =
+            ratings.reduce((sum: number, rating: number) => sum + rating, 0) / ratings.length;
+          setAverageRating(avg);
+          setReviewCount(data.reviews.length);
+        }
+      } catch (error) {
+        // Silently fail - reviews are optional
+        console.error('Error fetching reviews:', error);
+      }
+    };
+
+    fetchReviews();
+  }, [product.id]);
 
   const handleFavoriteClick = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -124,7 +149,7 @@ export function ProductCard({ product, hideFavorite = false }: ProductCardProps)
           )}
 
           {/* Price overlay bubble */}
-          <div className="absolute bottom-2 right-2 bg-background/20 backdrop-blur-sm rounded-full px-3 py-1 shadow-md border border-border/50">
+          <div className="absolute bottom-2 right-2 bg-background/40 backdrop-blur-sm rounded-full px-3 py-1 shadow-md border border-border/50">
             <span className="text-xs font-bold text-foreground">
               {formatAmountForDisplay(product.price, product.currency)}
             </span>
@@ -148,7 +173,17 @@ export function ProductCard({ product, hideFavorite = false }: ProductCardProps)
         </div>
 
         <CardHeader className="p-4">
-          <CardTitle className="text-sm font-semibold line-clamp-2">{product.title}</CardTitle>
+          <div className="flex items-start gap-2">
+            <CardTitle className="text-sm font-semibold line-clamp-2 flex-1">
+              {product.title}
+            </CardTitle>
+            {averageRating !== null && reviewCount > 0 && (
+              <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
+                <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+                <span className="text-xs font-medium">{averageRating.toFixed(1)}</span>
+              </div>
+            )}
+          </div>
           {product.profiles && (
             <p className="text-sm text-muted-foreground mt-1">
               {product.profiles.username ? (
