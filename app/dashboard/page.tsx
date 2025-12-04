@@ -67,6 +67,7 @@ export default async function DashboardPage() {
   const stripeStatus = (await Promise.race([stripeStatusPromise, stripeStatusTimeout])) as any;
 
   const canSell = stripeStatus.isOnboarded;
+  const hasSellerIntent = !!profile?.stripe_account_id; // User has started seller onboarding
 
   // Fetch earnings data if user can sell
   let earningsData = {
@@ -121,14 +122,17 @@ export default async function DashboardPage() {
         <div>
           <h1 className="text-3xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground">
-            Manage your marketplace account and Stripe integration
+            {hasSellerIntent
+              ? 'Manage your marketplace account and Stripe integration'
+              : 'Manage your account, purchases, and favorites'}
           </p>
         </div>
         <SignOutButton />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Stripe Connect Status */}
+      <div className={`grid grid-cols-1 ${hasSellerIntent ? 'md:grid-cols-2' : ''} gap-6`}>
+        {/* Stripe Connect Status - Only show if user has started seller onboarding */}
+        {hasSellerIntent && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -272,6 +276,7 @@ export default async function DashboardPage() {
             )}
           </CardContent>
         </Card>
+        )}
 
         {/* Quick Actions */}
         <Card>
@@ -292,6 +297,16 @@ export default async function DashboardPage() {
                 View My Favorites
               </Button>
             </Link>
+
+            {/* Show "Start Selling" option for buyers who haven't started onboarding */}
+            {!hasSellerIntent && (
+              <div className="pt-3 border-t">
+                <p className="text-sm text-muted-foreground mb-3">
+                  Interested in selling? Connect your Stripe account to start listing products.
+                </p>
+                <StripeConnectButton userId={user.id} />
+              </div>
+            )}
 
             {canSell && (
               <>

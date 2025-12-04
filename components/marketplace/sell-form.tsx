@@ -158,17 +158,32 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                 </div>
 
                 <div>
-                  <Label htmlFor="description">Description</Label>
+                  <Label htmlFor="description">
+                    Description
+                    <span className="text-muted-foreground text-sm font-normal ml-2">
+                      ({formData.description.length}/500 characters)
+                    </span>
+                  </Label>
                   <Textarea
                     id="description"
                     value={formData.description}
-                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                      setFormData({ ...formData, description: e.target.value })
-                    }
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                      const value = e.target.value;
+                      if (value.length <= 500) {
+                        setFormData({ ...formData, description: value });
+                      }
+                    }}
                     required
                     placeholder="Describe your product"
                     rows={4}
+                    maxLength={500}
                   />
+                  {formData.description.length > 450 && (
+                    <p className="text-sm text-orange-600 mt-1">
+                      Warning: Description is getting long ({formData.description.length}{' '}
+                      characters).
+                    </p>
+                  )}
                 </div>
 
                 <div>

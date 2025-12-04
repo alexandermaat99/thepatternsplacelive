@@ -11,11 +11,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/auth-context';
-import { User, Settings, LogOut, ShoppingBag, Package, Plus } from 'lucide-react';
+import { User, LogOut, ShoppingBag, Package, Plus } from 'lucide-react';
 import Link from 'next/link';
 
 export function ProfileDropdown() {
-  const { user, profile, signOut, loading, openAuthModal } = useAuth();
+  const { user, profile, signOut, loading, openAuthModal, canSell } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
   // Debug logging
@@ -133,16 +133,18 @@ export function ProfileDropdown() {
               <span>Marketplace</span>
             </Link>
           </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link
-              href="/dashboard/my-products"
-              className="flex items-center w-full"
-              onClick={() => setIsOpen(false)}
-            >
-              <Package className="mr-2 h-4 w-4" />
-              <span>My Products</span>
-            </Link>
-          </DropdownMenuItem>
+          {canSell && (
+            <DropdownMenuItem asChild>
+              <Link
+                href="/dashboard/my-products"
+                className="flex items-center w-full"
+                onClick={() => setIsOpen(false)}
+              >
+                <Package className="mr-2 h-4 w-4" />
+                <span>My Products</span>
+              </Link>
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem asChild>
             <Link
               href="/marketplace/sell"
@@ -150,18 +152,7 @@ export function ProfileDropdown() {
               onClick={() => setIsOpen(false)}
             >
               <Plus className="mr-2 h-4 w-4" />
-              <span>Sell Products</span>
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem asChild>
-            <Link
-              href="/dashboard"
-              className="flex items-center w-full"
-              onClick={() => setIsOpen(false)}
-            >
-              <Settings className="mr-2 h-4 w-4" />
-              <span>Settings</span>
+              <span>Sell Patterns</span>
             </Link>
           </DropdownMenuItem>
           <DropdownMenuSeparator />

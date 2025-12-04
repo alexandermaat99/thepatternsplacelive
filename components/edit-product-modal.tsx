@@ -201,7 +201,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
       }
 
       // Check if description is too long (practical limit)
-      const MAX_DESCRIPTION_LENGTH = 10000;
+      const MAX_DESCRIPTION_LENGTH = 500;
       if (sanitizedDescription.length > MAX_DESCRIPTION_LENGTH) {
         console.warn(
           `Description is ${sanitizedDescription.length} characters, truncating to ${MAX_DESCRIPTION_LENGTH}`
@@ -409,7 +409,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
               <Label htmlFor="description">
                 Description
                 <span className="text-muted-foreground text-sm font-normal ml-2">
-                  ({formData.description.length}/10000 characters)
+                  ({formData.description.length}/500 characters)
                 </span>
               </Label>
               <Textarea
@@ -420,6 +420,10 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
                   let cleaned = e.target.value;
                   // Remove any non-printable characters except newlines and tabs
                   cleaned = cleaned.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
+                  // Limit to 500 characters
+                  if (cleaned.length > 500) {
+                    cleaned = cleaned.substring(0, 500);
+                  }
                   setFormData({ ...formData, description: cleaned });
                 }}
                 onPaste={e => {
@@ -428,26 +432,29 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
                   const pastedText = e.clipboardData.getData('text/plain');
                   // Remove non-printable characters but preserve URLs and links
                   // URLs contain :, /, ?, &, =, etc. which are all printable ASCII
-                  const cleaned = pastedText.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
+                  let cleaned = pastedText.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
                   // Get current cursor position or append to end
                   const textarea = e.currentTarget;
                   const start = textarea.selectionStart;
                   const end = textarea.selectionEnd;
                   const currentText = formData.description;
-                  const newText =
+                  let newText =
                     currentText.substring(0, start) + cleaned + currentText.substring(end);
+                  // Limit to 500 characters
+                  if (newText.length > 500) {
+                    newText = newText.substring(0, 500);
+                  }
                   setFormData({ ...formData, description: newText });
                 }}
                 required
                 placeholder="Describe your product"
                 rows={6}
-                maxLength={10000}
+                maxLength={500}
                 className="resize-y min-h-[120px] max-h-[300px] overflow-y-auto"
               />
-              {formData.description.length > 9000 && (
+              {formData.description.length > 450 && (
                 <p className="text-sm text-orange-600 mt-1">
                   Warning: Description is getting long ({formData.description.length} characters).
-                  Very long descriptions may cause slow updates.
                 </p>
               )}
             </div>
