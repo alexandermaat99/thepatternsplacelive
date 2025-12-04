@@ -17,6 +17,7 @@ import {
   RefreshCw,
   ArrowUpCircle,
   TrendingUp,
+  ShoppingBag,
 } from 'lucide-react';
 import { StripeDashboardButton } from '@/components/stripe-dashboard-button';
 import {
@@ -278,6 +279,13 @@ export default async function DashboardPage() {
             <CardTitle>Quick Actions</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            <Link href="/dashboard/purchases" className="block">
+              <Button variant="outline" className="w-full justify-start">
+                <ShoppingBag className="h-4 w-4 mr-2" />
+                My Purchases
+              </Button>
+            </Link>
+
             <Link href="/dashboard/favorites" className="block">
               <Button variant="outline" className="w-full justify-start">
                 <Heart className="h-4 w-4 mr-2" />

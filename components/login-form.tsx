@@ -163,7 +163,7 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
 
   // Check if a path requires authentication
   const isProtectedRoute = (path: string): boolean => {
-    const protectedPaths = ['/dashboard', '/marketplace/sell', '/protected', '/checkout'];
+    const protectedPaths = ['/dashboard', '/marketplace/sell', '/protected'];
     return protectedPaths.some(p => path.startsWith(p));
   };
 

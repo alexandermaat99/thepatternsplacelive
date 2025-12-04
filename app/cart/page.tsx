@@ -1,25 +1,95 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useCart } from '@/contexts/cart-context';
+import { useAuth } from '@/contexts/auth-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatAmountForDisplay } from '@/lib/utils-client';
-import { ShoppingCart, Trash2, ArrowLeft } from 'lucide-react';
+import { ShoppingCart, Trash2, ArrowLeft, Lock } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { RemoveCartItemDialog } from '@/components/remove-cart-item-dialog';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { CheckoutAuthModal } from '@/components/checkout-auth-modal';
 
 export default function CartPage() {
   const { state, removeItem, clearCart } = useCart();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [itemToRemove, setItemToRemove] = useState<{ id: string; title: string } | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [showCheckoutAuthModal, setShowCheckoutAuthModal] = useState(false);
+
+  const proceedToStripeCheckout = async () => {
+    if (state.items.length === 0) return;
+
+    setIsProcessing(true);
+
+    try {
+      // Prepare cart items for checkout (digital products, quantity always 1)
+      const cartItems = state.items.map(item => ({
+        productId: item.id,
+        quantity: 1,
+      }));
+
+      // Create Stripe checkout session
+      const response = await fetch('/api/checkout/cart', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ items: cartItems }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create checkout session');
+      }
+
+      const { url } = await response.json();
+
+      if (url) {
+        // Redirect to Stripe Checkout
+        window.location.href = url;
+      } else {
+        throw new Error('No checkout URL received');
+      }
+    } catch (error) {
+      console.error('Checkout error:', error);
+      alert(error instanceof Error ? error.message : 'Checkout failed. Please try again.');
+      setIsProcessing(false);
+    }
+  };
 
   const handleCheckout = () => {
-    router.push('/checkout');
+    if (state.items.length === 0) return;
+
+    // Wait for auth to finish loading
+    if (authLoading) return;
+
+    // If user is not authenticated, show auth modal
+    if (!user) {
+      setShowCheckoutAuthModal(true);
+      return;
+    }
+
+    // User is authenticated, proceed directly to Stripe
+    proceedToStripeCheckout();
+  };
+
+  const handleGuestCheckout = () => {
+    setShowCheckoutAuthModal(false);
+    proceedToStripeCheckout();
+  };
+
+  const handleLoginSuccess = () => {
+    setShowCheckoutAuthModal(false);
+    // After login, proceed to checkout
+    proceedToStripeCheckout();
   };
 
   const handleRemoveClick = (item: { id: string; title: string }) => {
@@ -159,8 +229,23 @@ export default function CartPage() {
                 </div>
               </div>
 
-              <Button onClick={handleCheckout} className="w-full" size="lg">
+              <Button 
+                onClick={handleCheckout} 
+                className="w-full" 
+                size="lg"
+                disabled={isProcessing}
+              >
+                {isProcessing ? (
+                  <>
+                    <LoadingSpinner size="sm" text="" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <Lock className="h-4 w-4 mr-2" />
                 Proceed to Checkout
+                  </>
+                )}
               </Button>
 
               <Link href="/marketplace" className="block">
@@ -181,6 +266,13 @@ export default function CartPage() {
           setItemToRemove(null);
         }}
         onConfirm={handleConfirmRemove}
+      />
+
+      <CheckoutAuthModal
+        isOpen={showCheckoutAuthModal}
+        onClose={() => setShowCheckoutAuthModal(false)}
+        onGuestCheckout={handleGuestCheckout}
+        onLoginSuccess={handleLoginSuccess}
       />
     </div>
   );

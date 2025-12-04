@@ -17,6 +17,7 @@ import { linkifyText } from '@/lib/text-utils';
 import { getDifficultyLabel, getDifficultyColor } from '@/lib/constants';
 import { ProductFilesDownload } from '@/components/marketplace/product-files-download';
 import { EditProductModal } from '@/components/edit-product-modal';
+import { ProductReviews } from '@/components/marketplace/product-reviews';
 
 interface Category {
   id: string;
@@ -73,6 +74,38 @@ export function ProductDetail({ product }: ProductDetailProps) {
       const params = new URLSearchParams(window.location.search);
       setFromCart(params.get('from') === 'cart');
     }
+  }, []);
+
+  // Handle hash navigation (e.g., #reviews) - industry standard approach
+  useEffect(() => {
+    const handleHashNavigation = () => {
+      const hash = window.location.hash;
+      if (hash === '#reviews') {
+        // Wait for reviews component to render
+        setTimeout(() => {
+          const element = document.getElementById('reviews');
+          if (element) {
+            const offset = 100;
+            const elementTop = element.getBoundingClientRect().top + window.pageYOffset;
+            const offsetPosition = elementTop - offset;
+            window.scrollTo({
+              top: Math.max(0, offsetPosition),
+              behavior: 'smooth',
+            });
+          }
+        }, 300);
+      }
+    };
+
+    // Check on mount
+    handleHashNavigation();
+
+    // Listen for hash changes
+    window.addEventListener('hashchange', handleHashNavigation);
+
+    return () => {
+      window.removeEventListener('hashchange', handleHashNavigation);
+    };
   }, []);
 
   const handleAddToCart = () => {
@@ -332,6 +365,9 @@ export function ProductDetail({ product }: ProductDetailProps) {
           )}
         </div>
       </div>
+
+      {/* Reviews Section */}
+      <ProductReviews productId={product.id} />
 
       <AuthPromptDialog isOpen={showAuthDialog} onClose={() => setShowAuthDialog(false)} />
 
