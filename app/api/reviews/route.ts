@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
     // Check if review already exists
     const { data: existingReview } = await supabase
       .from('reviews')
-      .select('id')
+      .select('id, order_id')
       .eq('product_id', productId)
       .eq('buyer_id', user.id)
       .single();
