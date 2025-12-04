@@ -21,43 +21,39 @@ export default function FeesPage() {
         <CardContent className="space-y-6">
           {/* Fee Breakdown */}
           <div className="bg-muted p-4 rounded-lg">
-            <h2 className="text-lg font-semibold mb-3">Platform Fee Breakdown (Etsy-style)</h2>
+            <h2 className="text-lg font-semibold mb-3">Fee Breakdown</h2>
             <p className="text-sm text-muted-foreground mb-4">
-              Our fee structure matches Etsy's model. Here's how fees are calculated per sale:
+              Our fee structure is the same as most popular platforms.
             </p>
-            
+            <p className="text-sm mb-4">Here's how fees are calculated per sale:</p>
             <div className="p-4 bg-white dark:bg-gray-900 rounded border-2 border-rose-200 dark:border-rose-800">
               <div className="space-y-3">
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1">Listing Fee</p>
-                  <p className="text-sm font-medium">
-                    ${(COMPANY_INFO.fees.listingFeeCents / 100).toFixed(2)} per sale
+                  <p className="text-xs text-muted-foreground mb-2">{COMPANY_INFO.name} Fees</p>
+                  <p className="text-sm font-medium mb-1">
+                    Listing Fee: ${(COMPANY_INFO.fees.listingFeeCents / 100).toFixed(2)} per sale
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Charged each time an item sells
+                  <p className="text-sm font-medium mb-2">
+                    Transaction Fee: {(COMPANY_INFO.fees.transactionFeePercent * 100).toFixed(1)}%
+                    of sale price
                   </p>
-                </div>
-                
-                <div className="pt-2 border-t border-muted">
-                  <p className="text-xs text-muted-foreground mb-1">Transaction Fee</p>
-                  <p className="text-sm font-medium">
-                    {(COMPANY_INFO.fees.transactionFeePercent * 100).toFixed(1)}% of sale price
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Applied to the sale price
+                  <p className="text-xs text-muted-foreground">
+                    Charged each time an item sells. Applied to the sale price. Goes to{' '}
+                    {COMPANY_INFO.name} to help keep things running.
                   </p>
                 </div>
-                
+
                 <div className="pt-2 border-t border-muted">
                   <p className="text-xs text-muted-foreground mb-1">Payment Processing Fee</p>
                   <p className="text-sm font-medium">
-                    {(COMPANY_INFO.fees.paymentProcessingPercent * 100).toFixed(1)}% + ${(COMPANY_INFO.fees.paymentProcessingFlatCents / 100).toFixed(2)}
+                    {(COMPANY_INFO.fees.paymentProcessingPercent * 100).toFixed(1)}% + $
+                    {(COMPANY_INFO.fees.paymentProcessingFlatCents / 100).toFixed(2)}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Payment processing charges
+                    Goes to Stripe for payment processing.
                   </p>
                 </div>
-                
+
                 <div className="pt-3 border-t-2 border-muted mt-3">
                   <p className="text-xs text-muted-foreground mb-1">Example: $10.00 sale</p>
                   <div className="text-sm space-y-1">
@@ -71,7 +67,13 @@ export default function FeesPage() {
                     </div>
                     <div className="flex justify-between">
                       <span>Payment Processing (3% + $0.25):</span>
-                      <span>${(10 * COMPANY_INFO.fees.paymentProcessingPercent + COMPANY_INFO.fees.paymentProcessingFlatCents / 100).toFixed(2)}</span>
+                      <span>
+                        $
+                        {(
+                          10 * COMPANY_INFO.fees.paymentProcessingPercent +
+                          COMPANY_INFO.fees.paymentProcessingFlatCents / 100
+                        ).toFixed(2)}
+                      </span>
                     </div>
                     <div className="flex justify-between font-semibold pt-1 border-t">
                       <span>Total Fees:</span>
@@ -91,9 +93,9 @@ export default function FeesPage() {
             <h2 className="text-lg font-semibold mb-2">Questions?</h2>
             <p className="text-sm text-muted-foreground mb-2">
               For more information about Stripe's processing fees, visit{' '}
-              <a 
-                href="https://stripe.com/pricing" 
-                target="_blank" 
+              <a
+                href="https://stripe.com/pricing"
+                target="_blank"
                 rel="noopener noreferrer"
                 className="text-primary hover:underline"
               >
@@ -103,7 +105,10 @@ export default function FeesPage() {
             </p>
             <p className="text-sm text-muted-foreground">
               If you have questions about fees or pricing, please contact{' '}
-              <a href={`mailto:${COMPANY_INFO.email.support}`} className="text-primary hover:underline">
+              <a
+                href={`mailto:${COMPANY_INFO.email.support}`}
+                className="text-primary hover:underline"
+              >
                 {COMPANY_INFO.email.support}
               </a>
               .
@@ -114,4 +119,3 @@ export default function FeesPage() {
     </div>
   );
 }
-

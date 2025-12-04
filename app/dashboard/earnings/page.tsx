@@ -14,6 +14,8 @@ import {
   Calendar,
 } from 'lucide-react';
 import { COMPANY_INFO } from '@/lib/company-info';
+import { StripeDashboardLink } from '@/components/stripe-dashboard-link';
+import { RecentSalesTable } from '@/components/marketplace/recent-sales-table';
 
 // Format currency
 function formatCurrency(amount: number, currency: string = 'USD') {
@@ -61,6 +63,9 @@ export default async function EarningsPage() {
       status,
       created_at,
       product_id,
+      buyer_id,
+      buyer_email,
+      stripe_session_id,
       products (
         id,
         title,
@@ -77,9 +82,37 @@ export default async function EarningsPage() {
   }
 
   // Normalize orders - Supabase returns products as object but TS sees array
-  const completedOrders = (orders || []).map(order => ({
+  const normalizedOrders = (orders || []).map(order => ({
     ...order,
     products: Array.isArray(order.products) ? order.products[0] : order.products,
+  }));
+
+  // Fetch buyer profiles for orders that have buyer_id
+  const buyerIds = normalizedOrders
+    .map(order => order.buyer_id)
+    .filter((id): id is string => id !== null && id !== undefined);
+
+  let buyerProfilesMap: Record<string, any> = {};
+  if (buyerIds.length > 0) {
+    const { data: buyers, error: buyersError } = await supabase
+      .from('profiles')
+      .select('id, full_name, username, avatar_url')
+      .in('id', buyerIds);
+
+    if (buyersError) {
+      console.error('Error fetching buyer profiles:', buyersError);
+    } else if (buyers) {
+      buyerProfilesMap = buyers.reduce((acc, buyer) => {
+        acc[buyer.id] = buyer;
+        return acc;
+      }, {} as Record<string, any>);
+    }
+  }
+
+  // Combine orders with buyer information
+  const completedOrders = normalizedOrders.map(order => ({
+    ...order,
+    buyer: order.buyer_id ? buyerProfilesMap[order.buyer_id] || null : null,
   }));
 
   // Calculate stats
@@ -159,7 +192,9 @@ export default async function EarningsPage() {
   // Fee info - Etsy-style structure
   const listingFee = COMPANY_INFO.fees.listingFeeCents / 100;
   const transactionFeePercent = Number((COMPANY_INFO.fees.transactionFeePercent * 100).toFixed(2));
-  const paymentProcessingPercent = Number((COMPANY_INFO.fees.paymentProcessingPercent * 100).toFixed(2));
+  const paymentProcessingPercent = Number(
+    (COMPANY_INFO.fees.paymentProcessingPercent * 100).toFixed(2)
+  );
   const paymentProcessingFlat = COMPANY_INFO.fees.paymentProcessingFlatCents / 100;
 
   return (
@@ -177,7 +212,7 @@ export default async function EarningsPage() {
       </div>
 
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         {/* Total Net Earnings */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -188,7 +223,7 @@ export default async function EarningsPage() {
             <div className="text-2xl font-bold text-green-600">
               {formatCurrency(totalNetEarnings)}
             </div>
-            <p className="text-xs text-muted-foreground">After all fees</p>
+            <p className="text-xs text-muted-foreground">Your earnings</p>
           </CardContent>
         </Card>
 
@@ -213,20 +248,6 @@ export default async function EarningsPage() {
           <CardContent>
             <div className="text-2xl font-bold">{completedOrders.length}</div>
             <p className="text-xs text-muted-foreground">Completed orders</p>
-          </CardContent>
-        </Card>
-
-        {/* Total Fees */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Fees</CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
-              {formatCurrency(totalPlatformFees + totalStripeFees)}
-            </div>
-            <p className="text-xs text-muted-foreground">Platform + payment processing</p>
           </CardContent>
         </Card>
       </div>
@@ -282,7 +303,7 @@ export default async function EarningsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{formatCurrency(thisMonthNet)}</div>
-            <p className="text-xs text-muted-foreground">Your earnings after fees</p>
+            <p className="text-xs text-muted-foreground">Your earnings</p>
           </CardContent>
         </Card>
       </div>
@@ -332,59 +353,34 @@ export default async function EarningsPage() {
           </CardContent>
         </Card>
 
-        {/* Fee Breakdown */}
+        {/* Quick Actions */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Fee Structure</CardTitle>
+            <CardTitle className="text-lg">Quick Actions</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center py-2 border-b">
-                <div>
-                  <p className="font-medium">Listing Fee</p>
-                  <p className="text-sm text-muted-foreground">
-                    Per sale
-                  </p>
+            <div className="space-y-3">
+              <Link
+                href="/dashboard/my-products"
+                className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <Package className="h-5 w-5 text-muted-foreground" />
+                  <span className="font-medium">Manage Products</span>
                 </div>
-                <Badge variant="secondary">${listingFee.toFixed(2)}</Badge>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b">
-                <div>
-                  <p className="font-medium">Transaction Fee</p>
-                  <p className="text-sm text-muted-foreground">
-                    {COMPANY_INFO.name} transaction fee
-                  </p>
+                <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
+              </Link>
+              <Link
+                href="/marketplace/sell"
+                className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <TrendingUp className="h-5 w-5 text-muted-foreground" />
+                  <span className="font-medium">List New Product</span>
                 </div>
-                <Badge variant="secondary">{transactionFeePercent}%</Badge>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b">
-                <div>
-                  <p className="font-medium">Payment Processing</p>
-                  <p className="text-sm text-muted-foreground">Payment processing fee</p>
-                </div>
-                <Badge variant="secondary">
-                  {paymentProcessingPercent}% + ${paymentProcessingFlat.toFixed(2)}
-                </Badge>
-              </div>
-              <div className="flex justify-between items-center py-2">
-                <div>
-                  <p className="font-medium">Your Fees Paid</p>
-                  <p className="text-sm text-muted-foreground">Total deducted from sales</p>
-                </div>
-                <span className="text-lg font-bold text-orange-600">
-                  {formatCurrency(totalPlatformFees + totalStripeFees)}
-                </span>
-              </div>
-              <div className="bg-green-50 dark:bg-green-950 rounded-lg p-4 mt-4">
-                <div className="flex justify-between items-center">
-                  <p className="font-medium text-green-800 dark:text-green-200">
-                    Your Net Earnings
-                  </p>
-                  <span className="text-xl font-bold text-green-600">
-                    {formatCurrency(totalNetEarnings)}
-                  </span>
-                </div>
-              </div>
+                <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
+              </Link>
+              <StripeDashboardLink />
             </div>
           </CardContent>
         </Card>
@@ -397,58 +393,7 @@ export default async function EarningsPage() {
         </CardHeader>
         <CardContent>
           {recentOrders.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="text-left border-b">
-                    <th className="pb-3 font-medium">Product</th>
-                    <th className="pb-3 font-medium">Date</th>
-                    <th className="pb-3 font-medium text-right">Amount</th>
-                    <th className="pb-3 font-medium text-right">Fees</th>
-                    <th className="pb-3 font-medium text-right">Net</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentOrders.map(order => (
-                    <tr key={order.id} className="border-b last:border-0">
-                      <td className="py-3">
-                        <div className="flex items-center gap-3">
-                          {order.products?.image_url && (
-                            <img
-                              src={order.products.image_url}
-                              alt={order.products?.title || 'Product'}
-                              className="w-10 h-10 rounded object-cover"
-                            />
-                          )}
-                          <span className="font-medium truncate max-w-[200px]">
-                            {order.products?.title || 'Unknown Product'}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-3 text-sm text-muted-foreground">
-                        <DateDisplay date={order.created_at} />
-                      </td>
-                      <td className="py-3 text-right">
-                        {formatCurrency(
-                          order.total_amount || order.amount,
-                          order.currency
-                        )}
-                      </td>
-                      <td className="py-3 text-right text-orange-600">
-                        -
-                        {formatCurrency(
-                          (order.platform_fee || 0) + (order.stripe_fee || 0),
-                          order.currency
-                        )}
-                      </td>
-                      <td className="py-3 text-right font-medium text-green-600">
-                        {formatCurrency(order.net_amount || order.amount, order.currency)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <RecentSalesTable orders={recentOrders} />
           ) : (
             <div className="text-center py-12">
               <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />

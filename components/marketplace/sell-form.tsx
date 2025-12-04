@@ -51,7 +51,7 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
       }
 
       const price = parseFloat(formData.price);
-      if (isNaN(price) || price < 1.00) {
+      if (isNaN(price) || price < 1.0) {
         throw new Error('Price must be at least $1.00');
       }
 
@@ -106,205 +106,221 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
     <>
       <FeesInfoModal isOpen={showFeesModal} onClose={() => setShowFeesModal(false)} />
       <div className="container mx-auto px-4 py-8 max-w-2xl">
-      <div className="mb-6">
-        <Button variant="ghost" onClick={() => router.back()} className="flex items-center gap-2">
-          <ArrowLeft className="h-4 w-4" />
-          Back
-        </Button>
-      </div>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl">List Your Product</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!canSell ? (
-            <div className="space-y-4">
-              {!stripeStatus.isConnected ? (
-                <p className="text-red-500 font-medium">
-                  You must connect your Stripe account before listing a product.
-                </p>
-              ) : (
-                <p className="text-orange-500 font-medium">
-                  Your Stripe account is not fully set up yet. Please complete the onboarding
-                  process.
-                </p>
-              )}
-              <StripeConnectButton userId={user.id} />
-              {profile?.stripe_account_id && (
-                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
-                  <p className="text-sm text-blue-800">
-                    <strong>Debug Info:</strong>
-                    <br />
-                    Account ID: {profile.stripe_account_id}
-                    <br />
-                    Status: {stripeStatus.status}
-                    <br />
-                    Fully Onboarded: {stripeStatus.isOnboarded ? 'Yes' : 'No'}
+        <div className="mb-6">
+          <Button variant="ghost" onClick={() => router.back()} className="flex items-center gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </Button>
+        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl">List Your Product</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {!canSell ? (
+              <div className="space-y-4">
+                {!stripeStatus.isConnected ? (
+                  <p className="text-red-500 font-medium">
+                    You must connect your Stripe account before listing a product.
                   </p>
-                </div>
-              )}
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <Label htmlFor="title">Product Title</Label>
-                <Input
-                  id="title"
-                  value={formData.title}
-                  onChange={e => setFormData({ ...formData, title: e.target.value })}
-                  required
-                  placeholder="Enter product title"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                    setFormData({ ...formData, description: e.target.value })
-                  }
-                  required
-                  placeholder="Describe your product"
-                  rows={4}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="details">
-                  Details (Optional)
-                  <span className="text-muted-foreground text-sm font-normal ml-2">
-                    ({formData.details.length}/10000 characters)
-                  </span>
-                </Label>
-                <Textarea
-                  id="details"
-                  value={formData.details}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
-                    const value = e.target.value;
-                    if (value.length <= 10000) {
-                      setFormData({ ...formData, details: value });
-                    }
-                  }}
-                  placeholder="Additional product details, specifications, or information"
-                  rows={4}
-                  maxLength={10000}
-                />
-                {formData.details.length > 9000 && (
-                  <p className="text-sm text-orange-600 mt-1">
-                    Warning: Details is getting long ({formData.details.length} characters).
+                ) : (
+                  <p className="text-orange-500 font-medium">
+                    Your Stripe account is not fully set up yet. Please complete the onboarding
+                    process.
                   </p>
                 )}
-              </div>
-
-              <div>
-                <Label htmlFor="price">Price (USD) - Minimum $1.00</Label>
-                <Input
-                  id="price"
-                  type="number"
-                  step="0.01"
-                  min="1.00"
-                  value={formData.price}
-                  onChange={e => setFormData({ ...formData, price: e.target.value })}
-                  required
-                  placeholder="1.00"
-                />
-                {formData.price && !isNaN(parseFloat(formData.price)) && parseFloat(formData.price) >= 1.0 && (
-                  <div className="mt-2 text-xs text-muted-foreground space-y-1">
-                    <div className="flex justify-between">
-                      <span>Customer pays:</span>
-                      <span className="font-medium">${parseFloat(formData.price).toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="flex items-center gap-1">
-                        Platform fees (Etsy-style):
-                        <button
-                          type="button"
-                          onClick={() => setShowFeesModal(true)}
-                          className="text-muted-foreground hover:text-primary"
-                        >
-                          <Info className="h-3 w-3" />
-                        </button>
-                      </span>
-                      <span className="font-medium text-orange-600">
-                        -${(formData.price && !isNaN(parseFloat(formData.price)))
-                          ? (calculateEtsyFees(Math.round(parseFloat(formData.price) * 100)).totalFee / 100).toFixed(2)
-                          : '0.00'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between pt-1 border-t">
-                      <span className="font-medium">You receive:</span>
-                      <span className="font-bold text-green-600">
-                        ${(formData.price && !isNaN(parseFloat(formData.price)))
-                          ? (parseFloat(formData.price) - calculateEtsyFees(Math.round(parseFloat(formData.price) * 100)).totalFee / 100).toFixed(2)
-                          : '0.00'}
-                      </span>
-                    </div>
+                <StripeConnectButton userId={user.id} />
+                {profile?.stripe_account_id && (
+                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                    <p className="text-sm text-blue-800">
+                      <strong>Debug Info:</strong>
+                      <br />
+                      Account ID: {profile.stripe_account_id}
+                      <br />
+                      Status: {stripeStatus.status}
+                      <br />
+                      Fully Onboarded: {stripeStatus.isOnboarded ? 'Yes' : 'No'}
+                    </p>
                   </div>
                 )}
               </div>
-
-              <CategoryInput
-                value={formData.category}
-                onChange={value => setFormData({ ...formData, category: value })}
-              />
-
-              <div>
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="difficulty">Difficulty Level</Label>
-                  <Link
-                    href="/marketplace/difficulty-levels"
-                    target="_blank"
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                    title="Learn about difficulty levels"
-                  >
-                    <Info className="h-4 w-4" />
-                  </Link>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div>
+                  <Label htmlFor="title">Product Title</Label>
+                  <Input
+                    id="title"
+                    value={formData.title}
+                    onChange={e => setFormData({ ...formData, title: e.target.value })}
+                    required
+                    placeholder="Enter product title"
+                  />
                 </div>
-                <select
-                  id="difficulty"
-                  value={formData.difficulty}
-                  onChange={e => setFormData({ ...formData, difficulty: e.target.value })}
-                  required
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
-                >
-                  <option value="" disabled>Select difficulty level</option>
-                  {DIFFICULTY_LEVELS.map(level => (
-                    <option key={level.value} value={level.value}>
-                      {level.label}
+
+                <div>
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    value={formData.description}
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                      setFormData({ ...formData, description: e.target.value })
+                    }
+                    required
+                    placeholder="Describe your product"
+                    rows={4}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="details">
+                    Details (Optional)
+                    <span className="text-muted-foreground text-sm font-normal ml-2">
+                      ({formData.details.length}/10000 characters)
+                    </span>
+                  </Label>
+                  <Textarea
+                    id="details"
+                    value={formData.details}
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                      const value = e.target.value;
+                      if (value.length <= 10000) {
+                        setFormData({ ...formData, details: value });
+                      }
+                    }}
+                    placeholder="Additional product details, specifications, or information"
+                    rows={4}
+                    maxLength={10000}
+                  />
+                  {formData.details.length > 9000 && (
+                    <p className="text-sm text-orange-600 mt-1">
+                      Warning: Details is getting long ({formData.details.length} characters).
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <Label htmlFor="price">Price (USD) - Minimum $1.00</Label>
+                  <Input
+                    id="price"
+                    type="number"
+                    step="0.01"
+                    min="1.00"
+                    value={formData.price}
+                    onChange={e => setFormData({ ...formData, price: e.target.value })}
+                    required
+                    placeholder="1.00"
+                  />
+                  {formData.price &&
+                    !isNaN(parseFloat(formData.price)) &&
+                    parseFloat(formData.price) >= 1.0 && (
+                      <div className="mt-2 text-xs text-muted-foreground space-y-1">
+                        <div className="flex justify-between">
+                          <span>Customer pays:</span>
+                          <span className="font-medium">
+                            ${parseFloat(formData.price).toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="flex items-center gap-1">
+                            Fees (processing + platform fees):
+                            <button
+                              type="button"
+                              onClick={() => setShowFeesModal(true)}
+                              className="text-muted-foreground hover:text-primary"
+                            >
+                              <Info className="h-3 w-3" />
+                            </button>
+                          </span>
+                          <span className="font-medium text-orange-600">
+                            -$
+                            {formData.price && !isNaN(parseFloat(formData.price))
+                              ? (
+                                  calculateEtsyFees(Math.round(parseFloat(formData.price) * 100))
+                                    .totalFee / 100
+                                ).toFixed(2)
+                              : '0.00'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between pt-1 border-t">
+                          <span className="font-medium">You receive:</span>
+                          <span className="font-bold text-green-600">
+                            $
+                            {formData.price && !isNaN(parseFloat(formData.price))
+                              ? (
+                                  parseFloat(formData.price) -
+                                  calculateEtsyFees(Math.round(parseFloat(formData.price) * 100))
+                                    .totalFee /
+                                    100
+                                ).toFixed(2)
+                              : '0.00'}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                </div>
+
+                <CategoryInput
+                  value={formData.category}
+                  onChange={value => setFormData({ ...formData, category: value })}
+                />
+
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="difficulty">Difficulty Level</Label>
+                    <Link
+                      href="/marketplace/difficulty-levels"
+                      target="_blank"
+                      className="text-muted-foreground hover:text-foreground transition-colors"
+                      title="Learn about difficulty levels"
+                    >
+                      <Info className="h-4 w-4" />
+                    </Link>
+                  </div>
+                  <select
+                    id="difficulty"
+                    value={formData.difficulty}
+                    onChange={e => setFormData({ ...formData, difficulty: e.target.value })}
+                    required
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+                  >
+                    <option value="" disabled>
+                      Select difficulty level
                     </option>
-                  ))}
-                </select>
-              </div>
+                    {DIFFICULTY_LEVELS.map(level => (
+                      <option key={level.value} value={level.value}>
+                        {level.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-              {user && (
-                <>
-                  <MultiImageUpload
-                    value={formData.images}
-                    onChange={urls => setFormData({ ...formData, images: urls })}
-                    userId={user.id}
-                    maxImages={10}
-                  />
+                {user && (
+                  <>
+                    <MultiImageUpload
+                      value={formData.images}
+                      onChange={urls => setFormData({ ...formData, images: urls })}
+                      userId={user.id}
+                      maxImages={10}
+                    />
 
-                  <DigitalFileUpload
-                    value={formData.files}
-                    onChange={paths => setFormData({ ...formData, files: paths })}
-                    userId={user.id}
-                    maxFiles={10}
-                    maxFileSizeMB={100}
-                  />
-                </>
-              )}
+                    <DigitalFileUpload
+                      value={formData.files}
+                      onChange={paths => setFormData({ ...formData, files: paths })}
+                      userId={user.id}
+                      maxFiles={10}
+                      maxFileSizeMB={100}
+                    />
+                  </>
+                )}
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? 'Creating...' : 'List Product'}
-              </Button>
-            </form>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading ? 'Creating...' : 'List Product'}
+                </Button>
+              </form>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </>
   );
 }

@@ -530,7 +530,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="flex items-center gap-1">
-                          Platform fees (Etsy-style):
+                          Fees (processing + platform fees):
                           <button
                             type="button"
                             onClick={() => setShowFeesModal(true)}
@@ -541,8 +541,11 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
                         </span>
                         <span className="font-medium text-orange-600">
                           -$
-                          {(formData.price && !isNaN(parseFloat(formData.price)))
-                            ? (calculateEtsyFees(Math.round(parseFloat(formData.price) * 100)).totalFee / 100).toFixed(2)
+                          {formData.price && !isNaN(parseFloat(formData.price))
+                            ? (
+                                calculateEtsyFees(Math.round(parseFloat(formData.price) * 100))
+                                  .totalFee / 100
+                              ).toFixed(2)
                             : '0.00'}
                         </span>
                       </div>
@@ -550,8 +553,13 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
                         <span className="font-medium">You receive:</span>
                         <span className="font-bold text-green-600">
                           $
-                          {(formData.price && !isNaN(parseFloat(formData.price)))
-                            ? (parseFloat(formData.price) - calculateEtsyFees(Math.round(parseFloat(formData.price) * 100)).totalFee / 100).toFixed(2)
+                          {formData.price && !isNaN(parseFloat(formData.price))
+                            ? (
+                                parseFloat(formData.price) -
+                                calculateEtsyFees(Math.round(parseFloat(formData.price) * 100))
+                                  .totalFee /
+                                  100
+                              ).toFixed(2)
                             : '0.00'}
                         </span>
                       </div>
