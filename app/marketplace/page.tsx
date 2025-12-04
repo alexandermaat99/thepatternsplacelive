@@ -7,6 +7,22 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Suspense } from 'react';
 import type { Category } from '@/lib/types/categories';
+import { Metadata } from 'next';
+import { COMPANY_INFO } from '@/lib/company-info';
+
+export const metadata: Metadata = {
+  title: 'Marketplace',
+  description: 'Browse and discover unique sewing and crafting patterns from independent creators. Find digital patterns for your next project.',
+  openGraph: {
+    title: `Marketplace | ${COMPANY_INFO.name}`,
+    description: 'Browse and discover unique sewing and crafting patterns from independent creators.',
+    url: `${COMPANY_INFO.urls.website}${COMPANY_INFO.urls.marketplace}`,
+    type: 'website',
+  },
+  alternates: {
+    canonical: `${COMPANY_INFO.urls.website}${COMPANY_INFO.urls.marketplace}`,
+  },
+};
 
 interface MarketplacePageProps {
   searchParams: Promise<{
