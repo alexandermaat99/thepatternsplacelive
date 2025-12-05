@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStripe } from '@/lib/stripe';
-import { createClient } from '@/lib/supabase/server';
 import { createServiceRoleClient } from '@/lib/supabase/service-role';
 import { headers } from 'next/headers';
 import { sendPurchaseEmail } from '@/lib/send-purchase-email';
@@ -73,7 +72,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
-  const supabase = await createClient();
+  // Use service role client to bypass RLS for webhook operations
+  // Webhooks run without user context, so RLS would block all operations
+  const supabase = createServiceRoleClient();
 
   console.log('🔔 Webhook received:', event.type);
 

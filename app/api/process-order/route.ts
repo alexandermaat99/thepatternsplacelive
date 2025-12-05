@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStripe } from '@/lib/stripe';
-import { createClient } from '@/lib/supabase/server';
 import { createServiceRoleClient } from '@/lib/supabase/service-role';
 import { calculateEtsyFees } from '@/lib/company-info';
 import { deliverProductsForOrders } from '@/lib/product-delivery';
@@ -28,7 +27,9 @@ export async function POST(request: NextRequest) {
     }
 
     const stripe = getStripe();
-    const supabase = await createClient();
+    // Use service role client to bypass RLS for order processing
+    // This route processes orders from Stripe webhooks without user context
+    const supabase = createServiceRoleClient();
 
     // Retrieve the checkout session from Stripe
     const session = await stripe.checkout.sessions.retrieve(sessionId);
