@@ -1,4 +1,7 @@
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import sharp from 'sharp';
+import { readFile } from 'fs/promises';
+import { join } from 'path';
 
 /**
  * Watermarks a PDF file with the customer's email address, flattens it, and locks it
@@ -16,6 +19,35 @@ export async function watermarkPDF(
 
     // Get the Helvetica font for the watermark text
     const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+    // Load and convert SVG logo to PNG for embedding
+    let logoImage: Uint8Array | null = null;
+    try {
+      const logoPath = join(process.cwd(), 'public', 'logos', 'back_logo.svg');
+      const svgBuffer = await readFile(logoPath);
+      // Convert SVG to PNG using sharp
+      const pngBuffer = await sharp(svgBuffer)
+        .resize(150, null, {
+          // Resize to 150px width, maintain aspect ratio
+          withoutEnlargement: true,
+        })
+        .png()
+        .toBuffer();
+      logoImage = new Uint8Array(pngBuffer);
+    } catch (logoError) {
+      console.warn('⚠️ Could not load logo for watermark:', logoError);
+      // Continue without logo if it fails
+    }
+
+    // Embed logo image if available
+    let embeddedLogo: any = null;
+    if (logoImage) {
+      try {
+        embeddedLogo = await pdfDoc.embedPng(logoImage);
+      } catch (embedError) {
+        console.warn('⚠️ Could not embed logo in PDF:', embedError);
+      }
+    }
 
     const pages = pdfDoc.getPages();
     const fontSize = 24; // Larger base font size for better visibility
@@ -37,23 +69,55 @@ export async function watermarkPDF(
 
       // Add visible watermark in top-left corner
       const topText = `Licensed for personal use only: ${customerEmail}`;
-      const topTextWidth = helveticaFont.widthOfTextAtSize(topText, 14);
+      const topTextWidth = helveticaFont.widthOfTextAtSize(topText, 4);
+      const topTextY = height - 18;
       page.drawText(topText, {
         x: 10,
-        y: height - 25, // Top-left (y is from bottom in PDF)
-        size: 50,
+        y: topTextY, // Top-left (y is from bottom in PDF)
+        size: 15,
         font: helveticaFont,
         color: rgb(0.3, 0.3, 0.3), // Darker
         opacity: 0.2, // Very visible
       });
 
-      // Add watermark at bottom center
+      // Add watermark at bottom with logo and text on same line (bottom left)
       const bottomText = `Licensed for personal use only: ${customerEmail}`;
-      const bottomTextWidth = helveticaFont.widthOfTextAtSize(bottomText, 16);
+      const textSize = 15;
+      const bottomY = 20; // Distance from bottom of page
+
+      // Calculate positions for logo and text on same line
+      let logoX = 10;
+      let textX = 10;
+      let logoHeight = 0;
+      let logoWidth = 0;
+
+      if (embeddedLogo) {
+        const logoScale = 0.12; // Scale logo to fit with text
+        logoWidth = embeddedLogo.width * logoScale;
+        logoHeight = embeddedLogo.height * logoScale;
+
+        // Position logo on the left
+        logoX = 10;
+        // Position text next to logo with some spacing
+        textX = logoX + logoWidth + 8;
+      }
+
+      // Draw logo first (if available)
+      if (embeddedLogo) {
+        page.drawImage(embeddedLogo, {
+          x: logoX,
+          y: bottomY,
+          width: logoWidth,
+          height: logoHeight,
+          opacity: 0.2,
+        });
+      }
+
+      // Draw text on same line as logo
       page.drawText(bottomText, {
-        x: width / 2 - bottomTextWidth / 2,
-        y: 40, // Bottom of page
-        size: 50,
+        x: textX,
+        y: bottomY + logoHeight / 2 - textSize / 3, // Vertically center with logo
+        size: textSize,
         font: helveticaFont,
         color: rgb(0.3, 0.3, 0.3),
         opacity: 0.3,
