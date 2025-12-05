@@ -20,6 +20,7 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  Award,
 } from 'lucide-react';
 import { useToast } from '@/contexts/toast-context';
 import { DateDisplay } from '@/components/date-display';
@@ -28,6 +29,7 @@ import { DIFFICULTY_LEVELS, getDifficultyLabel, getDifficultyColor } from '@/lib
 import Image from 'next/image';
 import { compressImage, validateImageFile } from '@/lib/image-compression';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { PATTERN_POINTS } from '@/lib/pattern-points';
 
 interface Review {
   id: string;
@@ -442,6 +444,17 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
       {user && hasPurchased && (
         <Card className="mb-6">
           <CardContent className="p-6">
+            {!userReview && !isEditing && (
+              <div className="mb-4 p-3 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Award className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                  <p className="text-sm text-rose-800 dark:text-rose-200">
+                    <strong>Earn {PATTERN_POINTS.LEAVE_REVIEW} Pattern Points</strong> for leaving a
+                    review!
+                  </p>
+                </div>
+              </div>
+            )}
             {userReview && !isEditing ? (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">

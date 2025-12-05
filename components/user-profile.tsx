@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
 import { AvatarUpload } from '@/components/avatar-upload';
-import { ExternalLink, User } from 'lucide-react';
+import { ExternalLink, User, Award } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { UserProfile as UserProfileType, StripeAccountStatus } from '@/lib/auth-helpers';
@@ -211,8 +212,13 @@ export function UserProfile({
                 <p className="text-sm text-muted-foreground">{user?.email}</p>
               </div>
               <div>
-                <span className="text-sm font-medium">User ID:</span>
-                <p className="text-sm text-muted-foreground font-mono">{user?.id}</p>
+                <span className="text-sm font-medium">Pattern Points:</span>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge className="text-sm font-semibold bg-rose-300 text-white">
+                    <Award className="h-3 w-3 mr-1" />
+                    {currentProfile?.pattern_points ?? profile?.pattern_points ?? 0} pts
+                  </Badge>
+                </div>
               </div>
               <div>
                 <span className="text-sm font-medium">Member Since:</span>

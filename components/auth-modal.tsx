@@ -12,8 +12,9 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Sparkles } from 'lucide-react';
+import { ArrowLeft, Sparkles, Award } from 'lucide-react';
 
 type AuthView = 'login' | 'signup' | 'forgot-password' | 'check-email' | 'signup-success';
 
@@ -25,12 +26,12 @@ interface AuthModalProps {
   redirectUrl?: string | null;
 }
 
-export function AuthModal({ 
-  isOpen, 
-  onClose, 
+export function AuthModal({
+  isOpen,
+  onClose,
   defaultView = 'login',
   action,
-  redirectUrl 
+  redirectUrl,
 }: AuthModalProps) {
   const [view, setView] = useState<AuthView>(defaultView);
   const [email, setEmail] = useState('');
@@ -75,14 +76,14 @@ export function AuthModal({
       // Session is created, close modal and refresh
       // We skip getUser() verification to avoid hanging
       // The router refresh will verify the session properly
-      
+
       // Set a flag to indicate we just logged in (prevents auth modal from opening immediately)
       if (typeof window !== 'undefined') {
         sessionStorage.setItem('just_logged_in', 'true');
       }
-      
+
       onClose();
-      
+
       // Refresh router to sync server-side state
       router.refresh();
 
@@ -127,7 +128,7 @@ export function AuthModal({
         },
       });
       if (error) throw error;
-      
+
       // Show success view
       setView('signup-success');
     } catch (error: unknown) {
@@ -158,18 +159,18 @@ export function AuthModal({
 
   const getDescription = () => {
     if (action === 'heart') {
-      return "Yay! You found something you like. Sign in so you can keep track of your favorite patterns!";
+      return 'Yay! You found something you like. Sign in so you can keep track of your favorite patterns!';
     }
     if (view === 'login') {
-      return "Enter your email below to sign in to your account";
+      return 'Enter your email below to sign in to your account';
     }
     if (view === 'signup') {
-      return "Create a new account to start exploring patterns";
+      return 'Create a new account to start exploring patterns';
     }
     if (view === 'forgot-password') {
       return "Type in your email and we'll send you a link to reset your password";
     }
-    return "";
+    return '';
   };
 
   const renderLoginForm = () => (
@@ -207,7 +208,9 @@ export function AuthModal({
           className="h-11"
         />
       </div>
-      {error && <p className="text-sm text-red-500 bg-red-50 dark:bg-red-950/30 p-3 rounded-md">{error}</p>}
+      {error && (
+        <p className="text-sm text-red-500 bg-red-50 dark:bg-red-950/30 p-3 rounded-md">{error}</p>
+      )}
       <Button type="submit" className="w-full h-11 font-medium" disabled={isLoading}>
         {isLoading ? 'Signing in...' : 'Sign In'}
       </Button>
@@ -265,10 +268,18 @@ export function AuthModal({
           className="h-11"
         />
       </div>
-      {error && <p className="text-sm text-red-500 bg-red-50 dark:bg-red-950/30 p-3 rounded-md">{error}</p>}
+      {error && (
+        <p className="text-sm text-red-500 bg-red-50 dark:bg-red-950/30 p-3 rounded-md">{error}</p>
+      )}
       <Button type="submit" className="w-full h-11 font-medium" disabled={isLoading}>
         {isLoading ? 'Creating account...' : 'Create Account'}
       </Button>
+      <div className="flex justify-center pt-1">
+        <Badge className="bg-rose-300 hover:bg-rose-300 text-white border-0">
+          <Award className="h-3 w-3 mr-1" />
+          Get 20 Pattern Points when you sign up!
+        </Badge>
+      </div>
       <p className="text-center text-sm text-muted-foreground">
         Already have an account?{' '}
         <button
@@ -299,7 +310,9 @@ export function AuthModal({
           className="h-11"
         />
       </div>
-      {error && <p className="text-sm text-red-500 bg-red-50 dark:bg-red-950/30 p-3 rounded-md">{error}</p>}
+      {error && (
+        <p className="text-sm text-red-500 bg-red-50 dark:bg-red-950/30 p-3 rounded-md">{error}</p>
+      )}
       <Button type="submit" className="w-full h-11 font-medium" disabled={isLoading}>
         {isLoading ? 'Sending...' : 'Send Reset Link'}
       </Button>
@@ -330,8 +343,8 @@ export function AuthModal({
           If you registered using your email and password, you will receive a password reset email.
         </p>
       </div>
-      <Button 
-        variant="outline" 
+      <Button
+        variant="outline"
         onClick={() => {
           setEmail('');
           setView('login');
@@ -351,11 +364,12 @@ export function AuthModal({
       <div className="space-y-2">
         <h3 className="text-lg font-semibold">Check Your Email</h3>
         <p className="text-sm text-muted-foreground">
-          We&apos;ve sent you a confirmation email. Please check your inbox and click the link to verify your account.
+          We&apos;ve sent you a confirmation email. Please check your inbox and click the link to
+          verify your account.
         </p>
       </div>
-      <Button 
-        variant="outline" 
+      <Button
+        variant="outline"
         onClick={() => {
           setEmail('');
           setPassword('');
@@ -403,25 +417,23 @@ export function AuthModal({
             </button>
           )}
           <div className="flex justify-center">
-            <img 
-              src="/logos/back_logo.svg" 
-              alt="The Patterns Place" 
+            <img
+              src="/logos/back_logo.svg"
+              alt="The Patterns Place"
               className="h-8 w-auto dark:hidden"
             />
-            <img 
-              src="/logos/back_logo_light.svg" 
-              alt="The Patterns Place" 
+            <img
+              src="/logos/back_logo_light.svg"
+              alt="The Patterns Place"
               className="h-8 w-auto hidden dark:block"
             />
           </div>
         </div>
-        
+
         {/* Content */}
         <div className="p-6">
           <DialogHeader className="text-center mb-6">
-            <DialogTitle className="text-xl font-semibold">
-              {getTitle()}
-            </DialogTitle>
+            <DialogTitle className="text-xl font-semibold">{getTitle()}</DialogTitle>
             {(view === 'login' || view === 'signup' || view === 'forgot-password') && (
               <DialogDescription className="text-muted-foreground mt-2">
                 {getDescription()}
@@ -439,4 +451,3 @@ export function AuthModal({
     </Dialog>
   );
 }
-

@@ -6,6 +6,7 @@ export interface UserProfile {
   avatar_url: string | null;
   stripe_account_id: string | null;
   username: string | null;
+  pattern_points: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -32,48 +33,44 @@ export async function getCurrentUserWithProfile(): Promise<{
   try {
     console.log('getCurrentUserWithProfile: Starting...');
     const supabase = createClient();
-    
+
     console.log('getCurrentUserWithProfile: Getting user...');
-    
+
     // Add timeout to auth.getUser() call
     const authPromise = supabase.auth.getUser();
-    const authTimeoutPromise = new Promise((_, reject) => 
+    const authTimeoutPromise = new Promise((_, reject) =>
       setTimeout(() => reject(new Error('Auth getUser timeout')), 3000)
     );
-    
-    const { data: { user }, error: authError } = await Promise.race([
-      authPromise,
-      authTimeoutPromise
-    ]) as any;
-    
+
+    const {
+      data: { user },
+      error: authError,
+    } = (await Promise.race([authPromise, authTimeoutPromise])) as any;
+
     if (authError) {
       console.error('getCurrentUserWithProfile: Auth error:', authError);
       return null;
     }
-    
+
     if (!user) {
       console.log('getCurrentUserWithProfile: No user found');
       return null;
     }
 
     console.log('getCurrentUserWithProfile: User found, fetching profile...');
-    
+
     try {
       // Add timeout to prevent hanging
-      const profilePromise = supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-      
-      const timeoutPromise = new Promise((_, reject) => 
+      const profilePromise = supabase.from('profiles').select('*').eq('id', user.id).single();
+
+      const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Profile query timeout')), 5000)
       );
-      
-      const { data: profile, error: profileError } = await Promise.race([
+
+      const { data: profile, error: profileError } = (await Promise.race([
         profilePromise,
-        timeoutPromise
-      ]) as any;
+        timeoutPromise,
+      ])) as any;
 
       if (profileError) {
         console.error('getCurrentUserWithProfile: Profile error:', profileError);
@@ -93,7 +90,6 @@ export async function getCurrentUserWithProfile(): Promise<{
   }
 }
 
-
 // Check Stripe account status
 export async function getStripeAccountStatus(accountId: string): Promise<StripeAccountStatus> {
   if (!accountId) {
@@ -101,7 +97,7 @@ export async function getStripeAccountStatus(accountId: string): Promise<StripeA
       isConnected: false,
       isOnboarded: false,
       accountId: null,
-      status: 'unknown'
+      status: 'unknown',
     };
   }
 
@@ -109,17 +105,17 @@ export async function getStripeAccountStatus(accountId: string): Promise<StripeA
     const response = await fetch('/api/check-stripe-account', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ accountId })
+      body: JSON.stringify({ accountId }),
     });
 
     const data = await response.json();
-    
+
     if (!response.ok) {
       return {
         isConnected: true,
         isOnboarded: false,
         accountId,
-        status: 'error'
+        status: 'error',
       };
     }
 
@@ -127,7 +123,7 @@ export async function getStripeAccountStatus(accountId: string): Promise<StripeA
       isConnected: true,
       isOnboarded: data.status === 'onboarded',
       accountId,
-      status: data.status
+      status: data.status,
     };
   } catch (error) {
     console.error('Error checking Stripe account status:', error);
@@ -135,7 +131,7 @@ export async function getStripeAccountStatus(accountId: string): Promise<StripeA
       isConnected: true,
       isOnboarded: false,
       accountId,
-      status: 'error'
+      status: 'error',
     };
   }
 }
@@ -143,17 +139,16 @@ export async function getStripeAccountStatus(accountId: string): Promise<StripeA
 // Update user profile
 export async function updateUserProfile(updates: Partial<UserProfile>): Promise<boolean> {
   const supabase = createClient();
-  
-  const { data: { user } } = await supabase.auth.getUser();
-  
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) {
     return false;
   }
 
-  const { error } = await supabase
-    .from('profiles')
-    .update(updates)
-    .eq('id', user.id);
+  const { error } = await supabase.from('profiles').update(updates).eq('id', user.id);
 
   if (error) {
     console.error('Error updating profile:', error);
@@ -171,20 +166,20 @@ export async function createOrUpdateProfile(profileData: {
   username?: string;
 }): Promise<boolean> {
   const supabase = createClient();
-  
-  const { data: { user } } = await supabase.auth.getUser();
-  
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) {
     return false;
   }
 
-  const { error } = await supabase
-    .from('profiles')
-    .upsert({
-      id: user.id,
-      ...profileData,
-      updated_at: new Date().toISOString()
-    });
+  const { error } = await supabase.from('profiles').upsert({
+    id: user.id,
+    ...profileData,
+    updated_at: new Date().toISOString(),
+  });
 
   if (error) {
     console.error('Error creating/updating profile:', error);
@@ -226,7 +221,9 @@ export async function checkUsernameAvailability(
   username: string
 ): Promise<{ available: boolean; error?: string }> {
   const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
     return { available: false, error: 'Not authenticated' };

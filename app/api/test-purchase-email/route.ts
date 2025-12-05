@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendProductDeliveryEmail } from '@/lib/email';
 import { watermarkPDF, isPDF } from '@/lib/watermark';
+import { validateSafeUrl, safeFetch } from '@/lib/url-validation';
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,8 +40,19 @@ export async function POST(request: NextRequest) {
       try {
         console.log('📥 Downloading PDF from:', pdfUrl);
 
-        // Download PDF
-        const response = await fetch(pdfUrl);
+        // Validate URL to prevent SSRF attacks
+        // Allow Supabase storage URLs and other public HTTPS URLs
+        const validation = validateSafeUrl(pdfUrl, [
+          '*.supabase.co',
+          '*.supabase.in', // Supabase India region
+        ]);
+
+        if (!validation.isValid) {
+          throw new Error(`Invalid PDF URL: ${validation.error}`);
+        }
+
+        // Download PDF using safe fetch
+        const response = await safeFetch(pdfUrl, ['*.supabase.co', '*.supabase.in']);
         if (!response.ok) {
           throw new Error(`Failed to download PDF: ${response.statusText}`);
         }

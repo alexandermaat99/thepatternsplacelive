@@ -4,6 +4,7 @@ import { createServiceRoleClient } from '@/lib/supabase/service-role';
 import { calculateEtsyFees } from '@/lib/company-info';
 import { deliverProductsForOrders } from '@/lib/product-delivery';
 import { sendSellerSaleNotificationEmail } from '@/lib/email';
+import { awardPointsForPurchase, awardPointsForSale } from '@/lib/pattern-points';
 
 // Calculate fees for an order using Etsy-style structure
 function calculateFees(amount: number) {
@@ -166,6 +167,30 @@ export async function POST(request: NextRequest) {
                   error instanceof Error ? error.stack : 'No stack trace'
                 );
               });
+
+              // Award pattern points (non-blocking)
+              // Award points per item: 10 points per product purchased
+              (async () => {
+                try {
+                  const uniqueSellers = new Set<string>();
+
+                  for (const order of insertedOrders) {
+                    // Award points to buyer for each item purchased (if authenticated)
+                    if (order.buyer_id) {
+                      await awardPointsForPurchase(order.buyer_id);
+                    }
+
+                    // Award points to seller (once per seller, not per item)
+                    if (order.seller_id && !uniqueSellers.has(order.seller_id)) {
+                      uniqueSellers.add(order.seller_id);
+                      await awardPointsForSale(order.seller_id);
+                    }
+                  }
+                } catch (error) {
+                  console.error('Error awarding pattern points:', error);
+                  // Don't throw - points are non-critical
+                }
+              })();
 
               // Send seller notification emails (non-blocking)
               (async () => {

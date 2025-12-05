@@ -12,12 +12,14 @@ import { StripeConnectButton } from '@/components/marketplace/stripe-connect-but
 import { MultiImageUpload } from '@/components/marketplace/multi-image-upload';
 import { DigitalFileUpload } from '@/components/marketplace/digital-file-upload';
 import { CategoryInput, linkCategoriesToProduct } from '@/components/marketplace/category-input';
-import { ArrowLeft, Info } from 'lucide-react';
+import { ArrowLeft, Info, Award } from 'lucide-react';
 import Link from 'next/link';
 import type { UserProfile, StripeAccountStatus } from '@/lib/auth-helpers';
 import { DIFFICULTY_LEVELS } from '@/lib/constants';
 import { COMPANY_INFO, calculateEtsyFees } from '@/lib/company-info';
 import { FeesInfoModal } from '@/components/marketplace/fees-info-modal';
+import { PATTERN_POINTS } from '@/lib/pattern-points';
+import { Badge } from '@/components/ui/badge';
 
 interface SellFormProps {
   user: any;
@@ -98,6 +100,17 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
         }
       }
 
+      // Award pattern points for listing (non-blocking)
+      if (product && user) {
+        try {
+          const { awardPointsForListing } = await import('@/lib/pattern-points');
+          await awardPointsForListing(user.id);
+        } catch (error) {
+          console.error('Error awarding pattern points for listing:', error);
+          // Don't fail the operation if points fail
+        }
+      }
+
       router.push('/marketplace');
     } catch (error) {
       console.error('Error creating product:', error);
@@ -119,7 +132,17 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
         </div>
         <Card>
           <CardHeader>
-            <CardTitle className="text-2xl">List Your Product</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-2xl">List Your Product</CardTitle>
+              <Badge className="bg-rose-300 text-white border-0">
+                <Award className="h-3 w-3 mr-1" />
+                Earn {PATTERN_POINTS.LIST_PRODUCT} Pattern Points
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground mt-2">
+              List your product to earn {PATTERN_POINTS.LIST_PRODUCT} pattern points! You'll also
+              earn {PATTERN_POINTS.SELL_PRODUCT} points each time someone purchases your product.
+            </p>
           </CardHeader>
           <CardContent>
             {!canSell ? (

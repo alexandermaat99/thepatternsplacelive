@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { awardPointsForReview } from '@/lib/pattern-points';
 
 // GET - Fetch reviews for a product
 export async function GET(request: NextRequest) {
@@ -200,6 +201,12 @@ export async function POST(request: NextRequest) {
         console.error('Error creating review:', insertError);
         return NextResponse.json({ error: 'Failed to create review' }, { status: 500 });
       }
+
+      // Award pattern points for creating a review (non-blocking)
+      awardPointsForReview(user.id).catch(error => {
+        console.error('Error awarding pattern points for review:', error);
+        // Don't fail the operation if points fail
+      });
 
       return NextResponse.json({ review: newReview, message: 'Review created successfully' });
     }

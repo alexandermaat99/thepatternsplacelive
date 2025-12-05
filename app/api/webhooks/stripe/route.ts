@@ -5,6 +5,7 @@ import { headers } from 'next/headers';
 import { sendPurchaseEmail } from '@/lib/send-purchase-email';
 import { sendSellerSaleNotificationEmail } from '@/lib/email';
 import { COMPANY_INFO, calculateEtsyFees } from '@/lib/company-info';
+import { awardPointsForPurchase, awardPointsForSale } from '@/lib/pattern-points';
 
 // Calculate fees for an order using Etsy-style structure
 // When tax is included, we maintain the seller's net amount by scaling the fee proportionally
@@ -281,6 +282,30 @@ export async function POST(request: NextRequest) {
                       );
                     }
                   }
+
+                  // Award pattern points (non-blocking)
+                  // Award points per item: 10 points per product purchased
+                  (async () => {
+                    try {
+                      const uniqueSellers = new Set<string>();
+
+                      for (const order of insertedOrders) {
+                        // Award points to buyer for each item purchased (if authenticated)
+                        if (order.buyer_id) {
+                          await awardPointsForPurchase(order.buyer_id);
+                        }
+
+                        // Award points to seller (once per seller, not per item)
+                        if (order.seller_id && !uniqueSellers.has(order.seller_id)) {
+                          uniqueSellers.add(order.seller_id);
+                          await awardPointsForSale(order.seller_id);
+                        }
+                      }
+                    } catch (error) {
+                      console.error('Error awarding pattern points:', error);
+                      // Don't throw - points are non-critical
+                    }
+                  })();
 
                   // Send seller notification emails
                   console.log('📧 Sending seller notification emails...');

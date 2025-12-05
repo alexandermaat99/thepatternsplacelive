@@ -4,12 +4,13 @@ import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, Award } from 'lucide-react';
 
 export function SignUpForm({ className, ...props }: React.ComponentPropsWithoutRef<'div'>) {
   const [email, setEmail] = useState('');
@@ -276,6 +277,12 @@ export function SignUpForm({ className, ...props }: React.ComponentPropsWithoutR
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? 'Creating an account...' : 'Sign up'}
               </Button>
+              <div className="flex justify-center pt-2">
+                <Badge className="bg-rose-300 text-white border-0">
+                  <Award className="h-3 w-3 mr-1" />
+                  Get 20 Pattern Points when you sign up!
+                </Badge>
+              </div>
             </div>
             <div className="mt-4 text-center text-sm">
               Already have an account?{' '}

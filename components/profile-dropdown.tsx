@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
 import { User, LogOut, ShoppingBag, Package, Plus } from 'lucide-react';
 import Link from 'next/link';
@@ -83,7 +84,7 @@ export function ProfileDropdown() {
     return (
       <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
         <DropdownMenuTrigger
-          className="h-8 w-8 rounded-full p-0 hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer"
+          className="flex items-center gap-2 h-8 px-1 rounded-full hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer"
           onClick={e => {
             console.log('[ProfileDropdown] Trigger clicked!', e);
             e.stopPropagation();
@@ -104,6 +105,11 @@ export function ProfileDropdown() {
               {initials}
             </AvatarFallback>
           </Avatar>
+          {profile?.pattern_points !== null && profile?.pattern_points !== undefined && (
+            <Badge className="text-xs font-semibold shrink-0 bg-rose-300 text-white border-0">
+              {profile.pattern_points} pts
+            </Badge>
+          )}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuLabel>

@@ -7,13 +7,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatAmountForDisplay } from '@/lib/utils-client';
-import { ShoppingCart, Trash2, ArrowLeft, Lock } from 'lucide-react';
+import { ShoppingCart, Trash2, ArrowLeft, Lock, Award } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { RemoveCartItemDialog } from '@/components/remove-cart-item-dialog';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { CheckoutAuthModal } from '@/components/checkout-auth-modal';
+import { PATTERN_POINTS } from '@/lib/pattern-points';
 
 export default function CartPage() {
   const { state, removeItem, clearCart } = useCart();
@@ -229,12 +230,21 @@ export default function CartPage() {
                 </div>
               </div>
 
-              <Button 
-                onClick={handleCheckout} 
-                className="w-full" 
-                size="lg"
-                disabled={isProcessing}
-              >
+              {user && (
+                <div className="p-3 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Award className="h-4 w-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                    <p className="text-sm text-rose-800 dark:text-rose-200">
+                      <strong>
+                        Earn {PATTERN_POINTS.BUY_PRODUCT * state.items.length} Pattern Points
+                      </strong>{' '}
+                      ({PATTERN_POINTS.BUY_PRODUCT} per item) when you complete this purchase!
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <Button onClick={handleCheckout} className="w-full" size="lg" disabled={isProcessing}>
                 {isProcessing ? (
                   <>
                     <LoadingSpinner size="sm" text="" />
@@ -243,7 +253,7 @@ export default function CartPage() {
                 ) : (
                   <>
                     <Lock className="h-4 w-4 mr-2" />
-                Proceed to Checkout
+                    Proceed to Checkout
                   </>
                 )}
               </Button>

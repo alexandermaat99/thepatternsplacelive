@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { X, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { COMPANY_INFO } from '@/lib/company-info';
@@ -9,10 +10,16 @@ import Link from 'next/link';
 const BANNER_DISMISSED_KEY = 'platform-banner-dismissed';
 
 export function PlatformBanner() {
+  const pathname = usePathname();
   const [isVisible, setIsVisible] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
 
   useEffect(() => {
+    // Only show banner on marketplace routes
+    if (!pathname?.startsWith('/marketplace')) {
+      return;
+    }
+
     // Check if banner should be shown
     if (!COMPANY_INFO.banner.showNewPlatformBanner) {
       return;
@@ -31,7 +38,7 @@ export function PlatformBanner() {
     }, 100);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [pathname]);
 
   const handleDismiss = () => {
     setIsVisible(false);
@@ -39,8 +46,12 @@ export function PlatformBanner() {
     setIsDismissed(true);
   };
 
-  // Don't render if banner is disabled or dismissed
-  if (!COMPANY_INFO.banner.showNewPlatformBanner || isDismissed) {
+  // Don't render if not on marketplace route, banner is disabled, or dismissed
+  if (
+    !pathname?.startsWith('/marketplace') ||
+    !COMPANY_INFO.banner.showNewPlatformBanner ||
+    isDismissed
+  ) {
     return null;
   }
 
