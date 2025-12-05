@@ -1,13 +1,20 @@
-'use client';
-
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { notFound } from 'next/navigation';
 
 export default function TestEmailPage() {
+  // Test page disabled - return 404
+  notFound();
+
+  /* DISABLED - Test email page
+  'use client';
+
+  import { useState } from 'react';
+  import { Button } from '@/components/ui/button';
+  import { Input } from '@/components/ui/input';
+  import { Textarea } from '@/components/ui/textarea';
+  import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+  import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+  export default function TestEmailPage() {
   const [email, setEmail] = useState('');
   const [pdfUrl, setPdfUrl] = useState(
     'https://gwvoordtliaptzoffgew.supabase.co/storage/v1/object/sign/product-files/c8815245-5ae9-4f50-80a4-4428c5e08c73/1764136118964-34qel-GMK67_AL65__User_Manual.pdf?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9hN2I1ZTJhZS00NThlLTRlMWUtOGY5Yi1lMTk3MzUxMWMwNTAiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJwcm9kdWN0LWZpbGVzL2M4ODE1MjQ1LTVhZTktNGY1MC04MGE0LTQ0MjhjNWUwOGM3My8xNzY0MTM2MTE4OTY0LTM0cWVsLUdNSzY3X0FMNjVfX1VzZXJfTWFudWFsLnBkZiIsImlhdCI6MTc2NDMwNTM5MywiZXhwIjoxNzk1ODQxMzkzfQ.2Pdw2bVDfb50kBdkU2Tc3M3VPBWXz7wqLJmRK6adHqE'
@@ -346,4 +353,5 @@ export default function TestEmailPage() {
       </Card>
     </div>
   );
+  */
 }

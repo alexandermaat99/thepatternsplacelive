@@ -2,9 +2,32 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { watermarkPDF, isPDF } from '@/lib/watermark';
 import { validateSafeUrl, safeFetch } from '@/lib/url-validation';
+import { rateLimit, getClientIdentifier, RATE_LIMITS } from '@/lib/security/rate-limit';
+import { validateEmail, sanitizeString } from '@/lib/security/input-validation';
 
 export async function GET(request: NextRequest) {
+  // Test endpoint disabled
+  return NextResponse.json({ success: false, error: 'Not Found' }, { status: 404 });
+
+  /* DISABLED - Test endpoint
   try {
+    // Rate limiting - stricter for test endpoints
+    const identifier = getClientIdentifier(request);
+    const rateLimitResult = rateLimit(identifier, RATE_LIMITS.STRICT);
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { success: false, error: 'Too many requests. Please try again later.' },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': rateLimitResult.limit.toString(),
+            'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+            'X-RateLimit-Reset': new Date(rateLimitResult.reset).toISOString(),
+          },
+        }
+      );
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const testEmail = searchParams.get('email');
     const pdfUrl = searchParams.get('pdfUrl');
@@ -14,6 +37,12 @@ export async function GET(request: NextRequest) {
         { success: false, error: 'Email parameter is required' },
         { status: 400 }
       );
+    }
+
+    // Validate and sanitize email
+    const sanitizedEmail = sanitizeString(testEmail, 254);
+    if (!validateEmail(sanitizedEmail)) {
+      return NextResponse.json({ success: false, error: 'Invalid email format' }, { status: 400 });
     }
 
     if (!process.env.RESEND_API_KEY) {
@@ -94,7 +123,7 @@ export async function GET(request: NextRequest) {
 
     const result = await resend.emails.send({
       from: `${fromName} <${fromEmail}>`,
-      to: testEmail,
+      to: sanitizedEmail, // Use sanitized email
       subject: pdfUrl
         ? 'Test Email with Watermarked PDF - The Patterns Place'
         : 'Test Email from The Patterns Place',
@@ -105,7 +134,7 @@ export async function GET(request: NextRequest) {
           ${pdfUrl ? '<p><strong>📎 A watermarked PDF is attached to this email.</strong></p>' : ''}
           <p>If you received this, Resend is configured properly!</p>
           <p><strong>Timestamp:</strong> ${new Date().toISOString()}</p>
-          ${pdfUrl ? '<p><strong>Watermark:</strong> Your email address (' + testEmail + ') has been embedded in the PDF.</p>' : ''}
+          ${pdfUrl ? '<p><strong>Watermark:</strong> Your email address (' + sanitizedEmail + ') has been embedded in the PDF.</p>' : ''}
           <hr style="margin: 20px 0; border: none; border-top: 1px solid #e0e0e0;">
           <p style="color: #666; font-size: 12px;">This is an automated test message.</p>
         </div>
@@ -131,17 +160,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       messageId: result.data?.id,
-      sentTo: testEmail,
+      sentTo: sanitizedEmail,
     });
   } catch (error) {
+    // Log full error server-side but don't expose details to client
     console.error('❌ Error sending test email:', error);
     return NextResponse.json(
       {
         success: false,
-        error: 'Unexpected error',
-        details: error instanceof Error ? error.message : String(error),
+        error: 'An error occurred while sending the email. Please try again later.',
       },
       { status: 500 }
     );
   }
+  */
 }

@@ -1,15 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { awardPointsForReview } from '@/lib/pattern-points';
+import { rateLimit, getClientIdentifier, RATE_LIMITS } from '@/lib/security/rate-limit';
+import { sanitizeString, validateUUID } from '@/lib/security/input-validation';
 
 // GET - Fetch reviews for a product
 export async function GET(request: NextRequest) {
   try {
+    // Rate limiting
+    const identifier = getClientIdentifier(request);
+    const rateLimitResult = rateLimit(identifier, RATE_LIMITS.STANDARD);
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': rateLimitResult.limit.toString(),
+            'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+            'X-RateLimit-Reset': new Date(rateLimitResult.reset).toISOString(),
+          },
+        }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const productId = searchParams.get('productId');
 
     if (!productId) {
       return NextResponse.json({ error: 'Product ID is required' }, { status: 400 });
+    }
+
+    // Validate UUID format
+    if (!validateUUID(productId)) {
+      return NextResponse.json({ error: 'Invalid product ID format' }, { status: 400 });
     }
 
     const supabase = await createClient();
@@ -59,6 +83,23 @@ export async function GET(request: NextRequest) {
 // POST - Create or update a review
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting
+    const identifier = getClientIdentifier(request);
+    const rateLimitResult = rateLimit(identifier, RATE_LIMITS.STANDARD);
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': rateLimitResult.limit.toString(),
+            'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+            'X-RateLimit-Reset': new Date(rateLimitResult.reset).toISOString(),
+          },
+        }
+      );
+    }
+
     const supabase = await createClient();
 
     // Get the current user
@@ -71,12 +112,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Parse and validate request body size (max 1MB)
+    const contentType = request.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      return NextResponse.json({ error: 'Content-Type must be application/json' }, { status: 400 });
+    }
+
     const body = await request.json();
     const { productId, rating, difficultyRating, title, comment, orderId, images } = body;
 
     // Validate input
     if (!productId || !rating) {
       return NextResponse.json({ error: 'Product ID and rating are required' }, { status: 400 });
+    }
+
+    // Validate UUID format
+    if (!validateUUID(productId)) {
+      return NextResponse.json({ error: 'Invalid product ID format' }, { status: 400 });
     }
 
     if (rating < 1 || rating > 5) {
@@ -94,20 +146,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate character limits
+    // Validate and sanitize character limits
     const MAX_TITLE_LENGTH = 100;
     const MAX_COMMENT_LENGTH = 2000;
     const MAX_IMAGES = 5; // Limit to 5 images per review
 
-    if (title && title.length > MAX_TITLE_LENGTH) {
+    // Sanitize title and comment
+    const sanitizedTitle = title ? sanitizeString(title, MAX_TITLE_LENGTH) : null;
+    const sanitizedComment = comment ? sanitizeString(comment, MAX_COMMENT_LENGTH) : null;
+
+    if (title && sanitizedTitle.length < title.length) {
       return NextResponse.json(
-        { error: `Review title must be ${MAX_TITLE_LENGTH} characters or less` },
+        {
+          error: `Review title contains invalid characters or exceeds ${MAX_TITLE_LENGTH} characters`,
+        },
         { status: 400 }
       );
     }
-    if (comment && comment.length > MAX_COMMENT_LENGTH) {
+    if (comment && sanitizedComment.length < comment.length) {
       return NextResponse.json(
-        { error: `Review comment must be ${MAX_COMMENT_LENGTH} characters or less` },
+        {
+          error: `Review comment contains invalid characters or exceeds ${MAX_COMMENT_LENGTH} characters`,
+        },
         { status: 400 }
       );
     }
@@ -158,14 +218,14 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (existingReview) {
-      // Update existing review
+      // Update existing review (use sanitized values)
       const { data: updatedReview, error: updateError } = await supabase
         .from('reviews')
         .update({
           rating,
           difficulty_rating: difficultyRating || null,
-          title: title || null,
-          comment: comment || null,
+          title: sanitizedTitle || null,
+          comment: sanitizedComment || null,
           images: images && images.length > 0 ? images : null,
           order_id: orderId || existingReview.order_id || null,
           updated_at: new Date().toISOString(),
@@ -181,7 +241,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({ review: updatedReview, message: 'Review updated successfully' });
     } else {
-      // Create new review
+      // Create new review (use sanitized values)
       const { data: newReview, error: insertError } = await supabase
         .from('reviews')
         .insert({
@@ -190,8 +250,8 @@ export async function POST(request: NextRequest) {
           order_id: orderId || order.id || null,
           rating,
           difficulty_rating: difficultyRating || null,
-          title: title || null,
-          comment: comment || null,
+          title: sanitizedTitle || null,
+          comment: sanitizedComment || null,
           images: images && images.length > 0 ? images : null,
         })
         .select()
@@ -219,6 +279,23 @@ export async function POST(request: NextRequest) {
 // DELETE - Delete a review
 export async function DELETE(request: NextRequest) {
   try {
+    // Rate limiting
+    const identifier = getClientIdentifier(request);
+    const rateLimitResult = rateLimit(identifier, RATE_LIMITS.STANDARD);
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': rateLimitResult.limit.toString(),
+            'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+            'X-RateLimit-Reset': new Date(rateLimitResult.reset).toISOString(),
+          },
+        }
+      );
+    }
+
     const supabase = await createClient();
 
     // Get the current user
@@ -236,6 +313,11 @@ export async function DELETE(request: NextRequest) {
 
     if (!reviewId) {
       return NextResponse.json({ error: 'Review ID is required' }, { status: 400 });
+    }
+
+    // Validate UUID format
+    if (!validateUUID(reviewId)) {
+      return NextResponse.json({ error: 'Invalid review ID format' }, { status: 400 });
     }
 
     // Verify user owns this review

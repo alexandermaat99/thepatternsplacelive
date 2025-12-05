@@ -25,14 +25,17 @@ interface ProductStructuredDataProps {
 export function ProductStructuredData({ product }: ProductStructuredDataProps) {
   const baseUrl = COMPANY_INFO.urls.website;
   const imageUrl = product.image_url
-    ? (product.image_url.startsWith('http') ? product.image_url : `${baseUrl}${product.image_url}`)
+    ? product.image_url.startsWith('http')
+      ? product.image_url
+      : `${baseUrl}${product.image_url}`
     : `${baseUrl}/opengraph-image.png`;
-  
+
   const sellerName = product.profiles?.full_name || product.profiles?.username || 'Creator';
-  const categories = product.product_categories
-    ?.map(pc => pc?.category?.name)
-    .filter(Boolean)
-    .join(', ') || 'Pattern';
+  const categories =
+    product.product_categories
+      ?.map(pc => pc?.category?.name)
+      .filter(Boolean)
+      .join(', ') || 'Pattern';
 
   const structuredData = {
     '@context': 'https://schema.org',
@@ -64,12 +67,13 @@ export function ProductStructuredData({ product }: ProductStructuredDataProps) {
     },
   };
 
-  return (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
-    />
-  );
+  // Sanitize JSON to prevent XSS - escape any HTML entities
+  const jsonString = JSON.stringify(structuredData)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026');
+
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonString }} />;
 }
 
 export function OrganizationStructuredData() {
@@ -96,12 +100,13 @@ export function OrganizationStructuredData() {
     ].filter(Boolean),
   };
 
-  return (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
-    />
-  );
+  // Sanitize JSON to prevent XSS - escape any HTML entities
+  const jsonString = JSON.stringify(structuredData)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026');
+
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonString }} />;
 }
 
 export function WebsiteStructuredData() {
@@ -122,15 +127,20 @@ export function WebsiteStructuredData() {
     },
   };
 
-  return (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
-    />
-  );
+  // Sanitize JSON to prevent XSS - escape any HTML entities
+  const jsonString = JSON.stringify(structuredData)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026');
+
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonString }} />;
 }
 
-export function BreadcrumbStructuredData({ items }: { items: Array<{ name: string; url: string }> }) {
+export function BreadcrumbStructuredData({
+  items,
+}: {
+  items: Array<{ name: string; url: string }>;
+}) {
   const baseUrl = COMPANY_INFO.urls.website;
 
   const structuredData = {
@@ -144,11 +154,11 @@ export function BreadcrumbStructuredData({ items }: { items: Array<{ name: strin
     })),
   };
 
-  return (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
-    />
-  );
-}
+  // Sanitize JSON to prevent XSS - escape any HTML entities
+  const jsonString = JSON.stringify(structuredData)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026');
 
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonString }} />;
+}
