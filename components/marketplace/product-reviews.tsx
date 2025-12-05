@@ -8,11 +8,26 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Star, Send, Trash2, Edit2, Info } from 'lucide-react';
+import {
+  Star,
+  Send,
+  Trash2,
+  Edit2,
+  Info,
+  Upload,
+  X,
+  Image as ImageIcon,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
 import { useToast } from '@/contexts/toast-context';
 import { DateDisplay } from '@/components/date-display';
 import { createClient } from '@/lib/supabase/client';
 import { DIFFICULTY_LEVELS, getDifficultyLabel, getDifficultyColor } from '@/lib/constants';
+import Image from 'next/image';
+import { compressImage, validateImageFile } from '@/lib/image-compression';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface Review {
   id: string;
@@ -20,6 +35,7 @@ interface Review {
   difficulty_rating: string | null;
   title: string | null;
   comment: string | null;
+  images: string[] | null;
   created_at: string;
   updated_at: string;
   buyer_id: string;
@@ -50,6 +66,13 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
   const [difficultyRating, setDifficultyRating] = useState<string>('');
   const [title, setTitle] = useState('');
   const [comment, setComment] = useState('');
+  const [images, setImages] = useState<string[]>([]);
+  const [uploadingImages, setUploadingImages] = useState(false);
+
+  // Lightbox state
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxImages, setLightboxImages] = useState<string[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
 
   // Character limits
   const MAX_TITLE_LENGTH = 100;
@@ -113,6 +136,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
               setDifficultyRating(existingReview.difficulty_rating || '');
               setTitle(existingReview.title || '');
               setComment(existingReview.comment || '');
+              setImages(existingReview.images || []);
             }
           }
         }
@@ -171,6 +195,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
           difficultyRating: difficultyRating || null,
           title: title.trim() || null,
           comment: comment.trim() || null,
+          images: images.length > 0 ? images : null,
         }),
       });
 
@@ -205,6 +230,130 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
     }
   };
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    if (images.length + files.length > 5) {
+      showToast('Maximum 5 images allowed per review', 'error');
+      return;
+    }
+
+    // Validate file types
+    const allowedTypes = ['image/heif', 'image/heic', 'image/png', 'image/jpeg', 'image/jpg'];
+    const allowedExtensions = ['.heif', '.heic', '.png', '.jpg', '.jpeg'];
+
+    for (const file of files) {
+      const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+      const isValidType =
+        allowedTypes.includes(file.type.toLowerCase()) || allowedExtensions.includes(fileExtension);
+
+      if (!isValidType) {
+        showToast(
+          `Invalid file type. Only ${allowedExtensions.join(', ')} files are allowed.`,
+          'error'
+        );
+        return;
+      }
+    }
+
+    setUploadingImages(true);
+
+    try {
+      const supabase = createClient();
+      const newImageUrls: string[] = [];
+
+      for (const file of files) {
+        // Additional validation: check file extension
+        const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+        if (!allowedExtensions.includes(fileExtension)) {
+          showToast(
+            `Invalid file type: ${fileExtension}. Only ${allowedExtensions.join(', ')} files are allowed.`,
+            'error'
+          );
+          continue;
+        }
+
+        // Validate file size and other properties
+        const validation = validateImageFile(file);
+        if (!validation.isValid) {
+          showToast(validation.error || 'Invalid image file', 'error');
+          continue;
+        }
+
+        // Compress image
+        let processedFile = file;
+        try {
+          processedFile = await compressImage(file, {
+            maxSizeMB: 1,
+            maxWidthOrHeight: 1920,
+            useWebWorker: false,
+          });
+        } catch (compressionError) {
+          console.warn('Compression failed, using original file:', compressionError);
+        }
+
+        // Generate unique filename
+        const fileExt = file.name.split('.').pop() || 'jpg';
+        const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+        // Upload to review-images bucket
+        const { data, error } = await supabase.storage
+          .from('review-images')
+          .upload(fileName, processedFile, {
+            cacheControl: '3600',
+            upsert: false,
+          });
+
+        if (error) {
+          console.error('Upload error:', error);
+          showToast(`Failed to upload ${file.name}`, 'error');
+          continue;
+        }
+
+        // Get public URL
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from('review-images').getPublicUrl(data.path);
+
+        newImageUrls.push(publicUrl);
+      }
+
+      if (newImageUrls.length > 0) {
+        setImages([...images, ...newImageUrls]);
+        showToast(`${newImageUrls.length} image(s) uploaded successfully`, 'success');
+      }
+    } catch (error) {
+      console.error('Error uploading images:', error);
+      showToast('Failed to upload images', 'error');
+    } finally {
+      setUploadingImages(false);
+      // Reset file input
+      if (e.target) {
+        e.target.value = '';
+      }
+    }
+  };
+
+  const handleRemoveImage = (index: number) => {
+    const newImages = images.filter((_, i) => i !== index);
+    setImages(newImages);
+  };
+
+  const openLightbox = (imageUrls: string[], startIndex: number = 0) => {
+    setLightboxImages(imageUrls);
+    setLightboxIndex(startIndex);
+    setLightboxOpen(true);
+  };
+
+  const navigateLightbox = (direction: 'prev' | 'next') => {
+    if (direction === 'prev') {
+      setLightboxIndex(prev => (prev > 0 ? prev - 1 : lightboxImages.length - 1));
+    } else {
+      setLightboxIndex(prev => (prev < lightboxImages.length - 1 ? prev + 1 : 0));
+    }
+  };
+
   const handleDelete = async () => {
     if (!userReview || !user) return;
 
@@ -224,6 +373,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
       setRating(5);
       setTitle('');
       setComment('');
+      setImages([]);
 
       // Refresh reviews
       const reviewsResponse = await fetch(`/api/reviews?productId=${productId}`);
@@ -352,7 +502,26 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
                 {userReview.comment && (
                   <p className="text-muted-foreground">{userReview.comment}</p>
                 )}
-                <p className="text-xs text-muted-foreground">
+                {userReview.images && userReview.images.length > 0 && (
+                  <div className="mt-4 grid grid-cols-3 md:grid-cols-4 gap-2">
+                    {userReview.images.map((imageUrl, idx) => (
+                      <div
+                        key={idx}
+                        className="relative aspect-square rounded-lg overflow-hidden border cursor-pointer hover:opacity-90 transition-opacity"
+                        onClick={() => openLightbox(userReview.images || [], idx)}
+                      >
+                        <Image
+                          src={imageUrl}
+                          alt={`Review image ${idx + 1}`}
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 768px) 33vw, 25vw"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground mt-2">
                   <DateDisplay date={userReview.updated_at || userReview.created_at} />
                 </p>
               </div>
@@ -455,6 +624,70 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
                   </div>
                 </div>
 
+                <div>
+                  <Label>Images (optional, max 5)</Label>
+                  <div className="mt-2">
+                    {images.length > 0 && (
+                      <div className="grid grid-cols-3 md:grid-cols-4 gap-2 mb-3">
+                        {images.map((imageUrl, idx) => (
+                          <div
+                            key={idx}
+                            className="relative aspect-square rounded-lg overflow-hidden border group"
+                          >
+                            <div
+                              className="absolute inset-0 cursor-pointer z-0"
+                              onClick={() => openLightbox(images, idx)}
+                            >
+                              <Image
+                                src={imageUrl}
+                                alt={`Review image ${idx + 1}`}
+                                fill
+                                className="object-cover"
+                                sizes="(max-width: 768px) 33vw, 25vw"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={e => {
+                                e.stopPropagation();
+                                handleRemoveImage(idx);
+                              }}
+                              className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                              aria-label="Remove image"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {images.length < 5 && (
+                      <label className="flex items-center justify-center w-full h-32 border-2 border-dashed border-muted-foreground/25 rounded-lg cursor-pointer hover:border-muted-foreground/50 transition-colors">
+                        <div className="flex flex-col items-center gap-2">
+                          {uploadingImages ? (
+                            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                          ) : (
+                            <>
+                              <Upload className="h-6 w-6 text-muted-foreground" />
+                              <span className="text-sm text-muted-foreground">
+                                Upload images ({images.length}/5)
+                              </span>
+                            </>
+                          )}
+                        </div>
+                        <input
+                          type="file"
+                          accept=".heif,.heic,.png,.jpg,.jpeg,image/heif,image/heic,image/png,image/jpeg"
+                          multiple
+                          onChange={handleImageUpload}
+                          disabled={uploadingImages || images.length >= 5}
+                          className="hidden"
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
+
                 <div className="flex gap-2">
                   <Button type="submit" disabled={isSubmitting}>
                     <Send className="h-4 w-4 mr-2" />
@@ -475,6 +708,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
                           setDifficultyRating(userReview.difficulty_rating || '');
                           setTitle(userReview.title || '');
                           setComment(userReview.comment || '');
+                          setImages(userReview.images || []);
                         }
                       }}
                     >
@@ -550,11 +784,92 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
                 {review.comment && (
                   <p className="text-muted-foreground whitespace-pre-wrap">{review.comment}</p>
                 )}
+                {review.images && review.images.length > 0 && (
+                  <div className="mt-4 grid grid-cols-3 md:grid-cols-4 gap-2">
+                    {review.images.map((imageUrl, idx) => (
+                      <div
+                        key={idx}
+                        className="relative aspect-square rounded-lg overflow-hidden border cursor-pointer hover:opacity-90 transition-opacity"
+                        onClick={() => openLightbox(review.images || [], idx)}
+                      >
+                        <Image
+                          src={imageUrl}
+                          alt={`Review image ${idx + 1}`}
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 768px) 33vw, 25vw"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}
         </div>
       )}
+
+      {/* Image Lightbox Modal */}
+      <Dialog open={lightboxOpen} onOpenChange={setLightboxOpen}>
+        <DialogContent className="max-w-7xl w-full h-[90vh] p-0 bg-black/95">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Review Image</DialogTitle>
+          </DialogHeader>
+          {lightboxImages.length > 0 && (
+            <div className="relative w-full h-full flex items-center justify-center">
+              {/* Close button */}
+              <button
+                onClick={() => setLightboxOpen(false)}
+                className="absolute top-4 right-4 z-50 bg-black/50 text-white rounded-full p-2 hover:bg-black/70 transition-colors"
+                aria-label="Close"
+              >
+                <X className="h-6 w-6" />
+              </button>
+
+              {/* Previous button */}
+              {lightboxImages.length > 1 && (
+                <button
+                  onClick={() => navigateLightbox('prev')}
+                  className="absolute left-4 z-50 bg-black/50 text-white rounded-full p-2 hover:bg-black/70 transition-colors"
+                  aria-label="Previous image"
+                >
+                  <ChevronLeft className="h-6 w-6" />
+                </button>
+              )}
+
+              {/* Image */}
+              <div className="relative w-full h-full flex items-center justify-center p-4">
+                <Image
+                  src={lightboxImages[lightboxIndex]}
+                  alt={`Review image ${lightboxIndex + 1}`}
+                  fill
+                  className="object-contain"
+                  sizes="100vw"
+                  priority
+                />
+              </div>
+
+              {/* Next button */}
+              {lightboxImages.length > 1 && (
+                <button
+                  onClick={() => navigateLightbox('next')}
+                  className="absolute right-4 z-50 bg-black/50 text-white rounded-full p-2 hover:bg-black/70 transition-colors"
+                  aria-label="Next image"
+                >
+                  <ChevronRight className="h-6 w-6" />
+                </button>
+              )}
+
+              {/* Image counter */}
+              {lightboxImages.length > 1 && (
+                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/50 text-white px-4 py-2 rounded-full text-sm">
+                  {lightboxIndex + 1} / {lightboxImages.length}
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
         difficulty_rating,
         title,
         comment,
+        images,
         created_at,
         updated_at,
         buyer_id,
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { productId, rating, difficultyRating, title, comment, orderId } = body;
+    const { productId, rating, difficultyRating, title, comment, orderId, images } = body;
 
     // Validate input
     if (!productId || !rating) {
@@ -95,6 +96,8 @@ export async function POST(request: NextRequest) {
     // Validate character limits
     const MAX_TITLE_LENGTH = 100;
     const MAX_COMMENT_LENGTH = 2000;
+    const MAX_IMAGES = 5; // Limit to 5 images per review
+
     if (title && title.length > MAX_TITLE_LENGTH) {
       return NextResponse.json(
         { error: `Review title must be ${MAX_TITLE_LENGTH} characters or less` },
@@ -106,6 +109,26 @@ export async function POST(request: NextRequest) {
         { error: `Review comment must be ${MAX_COMMENT_LENGTH} characters or less` },
         { status: 400 }
       );
+    }
+
+    // Validate images
+    if (images) {
+      if (!Array.isArray(images)) {
+        return NextResponse.json({ error: 'Images must be an array' }, { status: 400 });
+      }
+      if (images.length > MAX_IMAGES) {
+        return NextResponse.json(
+          { error: `Maximum ${MAX_IMAGES} images allowed per review` },
+          { status: 400 }
+        );
+      }
+      // Validate that all images are valid URLs
+      const urlPattern = /^https?:\/\/.+/;
+      for (const imageUrl of images) {
+        if (typeof imageUrl !== 'string' || !urlPattern.test(imageUrl)) {
+          return NextResponse.json({ error: 'All images must be valid URLs' }, { status: 400 });
+        }
+      }
     }
 
     // Verify user has purchased this product
@@ -142,6 +165,7 @@ export async function POST(request: NextRequest) {
           difficulty_rating: difficultyRating || null,
           title: title || null,
           comment: comment || null,
+          images: images && images.length > 0 ? images : null,
           order_id: orderId || existingReview.order_id || null,
           updated_at: new Date().toISOString(),
         })
@@ -167,6 +191,7 @@ export async function POST(request: NextRequest) {
           difficulty_rating: difficultyRating || null,
           title: title || null,
           comment: comment || null,
+          images: images && images.length > 0 ? images : null,
         })
         .select()
         .single();
