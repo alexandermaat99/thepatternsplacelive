@@ -18,6 +18,7 @@ import { getDifficultyLabel, getDifficultyColor } from '@/lib/constants';
 import { ProductFilesDownload } from '@/components/marketplace/product-files-download';
 import { EditProductModal } from '@/components/edit-product-modal';
 import { ProductReviews } from '@/components/marketplace/product-reviews';
+import { ShareButton } from '@/components/marketplace/share-button';
 
 interface Category {
   id: string;
@@ -308,6 +309,18 @@ export function ProductDetail({ product }: ProductDetailProps) {
                 )}
               </Button>
             )}
+            <ShareButton
+              productId={product.id}
+              productTitle={product.title}
+              productImage={
+                product.images && Array.isArray(product.images) && product.images.length > 0
+                  ? product.images[0]
+                  : product.image_url || undefined
+              }
+              className="w-full"
+              variant="outline"
+              size="lg"
+            />
           </div>
 
           {/* Description Section */}

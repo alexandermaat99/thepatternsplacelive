@@ -57,6 +57,12 @@ export const COMPANY_INFO = {
     marketplace: '/marketplace',
   },
 
+  // Platform Features & Announcements
+  banner: {
+    // Toggle to show/hide the new platform banner
+    showNewPlatformBanner: true,
+  },
+
   // Platform Fees & Revenue
   // Etsy-style fee structure
   fees: {

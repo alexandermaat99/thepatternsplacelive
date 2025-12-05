@@ -55,6 +55,11 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
         throw new Error('Price must be at least $1.00');
       }
 
+      // Require at least one PDF file
+      if (!formData.files || formData.files.length === 0) {
+        throw new Error('Please upload at least one PDF file for your product');
+      }
+
       const supabase = createClient();
       const { data: product, error } = await supabase
         .from('products')

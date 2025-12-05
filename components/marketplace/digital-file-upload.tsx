@@ -43,12 +43,12 @@ export function DigitalFileUpload({
   const updateFiles = (newFiles: FileItem[]) => {
     setFiles(newFiles);
     // Return storage paths (not public URLs since bucket is private)
-    onChange(newFiles.map((f) => f.url).filter(Boolean));
+    onChange(newFiles.map(f => f.url).filter(Boolean));
   };
 
   // Sync files state with parent onChange callback
   React.useEffect(() => {
-    onChange(files.map((f) => f.url).filter(Boolean));
+    onChange(files.map(f => f.url).filter(Boolean));
   }, [files]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const formatFileSize = (bytes: number): string => {
@@ -60,7 +60,7 @@ export function DigitalFileUpload({
   const getFileIcon = (fileName: string) => {
     const ext = fileName.split('.').pop()?.toLowerCase();
     const iconClass = 'h-5 w-5 text-muted-foreground';
-    
+
     if (['pdf'].includes(ext || '')) {
       return <File className={`${iconClass} text-red-500`} />;
     }
@@ -110,7 +110,7 @@ export function DigitalFileUpload({
     }));
 
     // Add new items to state
-    setFiles((prevFiles) => [...prevFiles, ...newItems]);
+    setFiles(prevFiles => [...prevFiles, ...newItems]);
 
     // Upload each file
     for (let i = 0; i < newItems.length; i++) {
@@ -119,21 +119,21 @@ export function DigitalFileUpload({
 
       try {
         console.log(`Uploading file ${i + 1}/${newItems.length}: ${item.fileName}`);
-        
+
         const storagePath = await uploadFile(item.file, item.id);
-        
+
         if (!storagePath) {
           throw new Error('Upload failed: No path returned');
         }
 
         // Update item with final path
-        setFiles((prevFiles) => {
-          const finalIndex = prevFiles.findIndex((f) => f.id === item.id);
+        setFiles(prevFiles => {
+          const finalIndex = prevFiles.findIndex(f => f.id === item.id);
           if (finalIndex === -1) {
             console.warn('Item not found after upload:', item.id);
             return prevFiles;
           }
-          
+
           const updated = [...prevFiles];
           updated[finalIndex] = {
             ...updated[finalIndex],
@@ -146,8 +146,8 @@ export function DigitalFileUpload({
       } catch (error) {
         console.error('Error uploading file:', error);
         // Remove failed item and show error
-        setFiles((prevFiles) => {
-          return prevFiles.filter((f) => f.id !== item.id);
+        setFiles(prevFiles => {
+          return prevFiles.filter(f => f.id !== item.id);
         });
         const errorMsg = error instanceof Error ? error.message : 'Unknown error';
         alert(`Failed to upload ${item.fileName}: ${errorMsg}`);
@@ -160,29 +160,22 @@ export function DigitalFileUpload({
     }
   };
 
-  const uploadFile = async (
-    file: File,
-    itemId: string
-  ): Promise<string | null> => {
+  const uploadFile = async (file: File, itemId: string): Promise<string | null> => {
     try {
       const supabase = createClient();
 
       // Generate unique filename preserving original extension
       const fileExt = file.name.split('.').pop() || 'file';
-      const sanitizedFileName = file.name
-        .replace(/[^a-zA-Z0-9.-]/g, '_')
-        .substring(0, 100); // Limit filename length
+      const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_').substring(0, 100); // Limit filename length
       const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).substring(7)}-${sanitizedFileName}`;
 
       console.log('Uploading file:', fileName, 'Size:', file.size, 'Type:', file.type);
 
       // Upload file to product-files bucket (private)
-      const { data, error } = await supabase.storage
-        .from('product-files')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false,
-        });
+      const { data, error } = await supabase.storage.from('product-files').upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false,
+      });
 
       if (error) {
         console.error('Upload error:', error);
@@ -197,11 +190,11 @@ export function DigitalFileUpload({
               cacheControl: '3600',
               upsert: false,
             });
-          
+
           if (retryError) {
             throw retryError;
           }
-          
+
           return retryData.path;
         }
         throw error;
@@ -224,10 +217,8 @@ export function DigitalFileUpload({
     if (storagePath && !storagePath.startsWith('blob:')) {
       try {
         const supabase = createClient();
-        const { error } = await supabase.storage
-          .from('product-files')
-          .remove([storagePath]);
-        
+        const { error } = await supabase.storage.from('product-files').remove([storagePath]);
+
         if (error) {
           console.error('Error deleting file from storage:', error);
           // Continue to remove from UI anyway
@@ -236,14 +227,16 @@ export function DigitalFileUpload({
         console.error('Error deleting file:', error);
       }
     }
-    
-    setFiles((prevFiles) => prevFiles.filter((f) => f.id !== id));
+
+    setFiles(prevFiles => prevFiles.filter(f => f.id !== id));
   };
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <Label>Digital Files ({files.length}/{maxFiles})</Label>
+        <Label>
+          Digital Files ({files.length}/{maxFiles}) <span className="text-red-500">*</span>
+        </Label>
         {files.length < maxFiles && (
           <Button
             type="button"
@@ -270,7 +263,7 @@ export function DigitalFileUpload({
 
       {files.length > 0 ? (
         <div className="space-y-2">
-          {files.map((item) => (
+          {files.map(item => (
             <div
               key={item.id}
               className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
@@ -280,9 +273,7 @@ export function DigitalFileUpload({
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{item.fileName}</p>
                   {item.fileSize && (
-                    <p className="text-xs text-muted-foreground">
-                      {formatFileSize(item.fileSize)}
-                    </p>
+                    <p className="text-xs text-muted-foreground">{formatFileSize(item.fileSize)}</p>
                   )}
                 </div>
                 {item.uploading && (
@@ -314,6 +305,7 @@ export function DigitalFileUpload({
           <p className="text-xs text-muted-foreground">
             PDF files only, up to {maxFileSizeMB}MB each
           </p>
+          <p className="text-xs text-red-500 font-medium mt-1">At least one PDF file is required</p>
           <p className="text-xs text-muted-foreground mt-1">
             These files will be available for download after purchase
           </p>
@@ -335,4 +327,3 @@ export function DigitalFileUpload({
     </div>
   );
 }
-
