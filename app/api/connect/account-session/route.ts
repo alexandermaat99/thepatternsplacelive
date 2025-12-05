@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getStripe } from '@/lib/stripe';
 import { createClient } from '@/lib/supabase/server';
+import { COMPANY_INFO } from '@/lib/company-info';
 
 export async function POST() {
   try {
@@ -34,7 +35,7 @@ export async function POST() {
         },
         business_type: 'individual',
         business_profile: {
-          url: 'https://thepatternsplace.com',
+          url: COMPANY_INFO.urls.website,
           mcc: '5999',
           product_description: 'Digital products and services sold through ThePatternsPlace marketplace'
         },

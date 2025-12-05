@@ -64,7 +64,7 @@ Components are in `components/structured-data.tsx`:
 
 1. **Verify Site URL**
    - Set `NEXT_PUBLIC_SITE_URL` environment variable to your production domain
-   - Currently defaults to `https://thepatternsplace.com` from `company-info.ts`
+   - Currently defaults to `https://www.thepatternsplace.com` from `company-info.ts`
    - Update in Vercel/hosting environment variables
 
 2. **Google Search Console**
@@ -228,7 +228,7 @@ For better Google Ads performance, implement enhanced e-commerce:
 Add these to your production environment:
 
 ```env
-NEXT_PUBLIC_SITE_URL=https://thepatternsplace.com
+NEXT_PUBLIC_SITE_URL=https://www.thepatternsplace.com
 NEXT_PUBLIC_GA_ID=G-XXXXXXXXXX  # Google Analytics
 NEXT_PUBLIC_GTM_ID=GTM-XXXXXXX  # Google Tag Manager (optional)
 ```

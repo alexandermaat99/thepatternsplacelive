@@ -9,12 +9,11 @@ import './globals.css';
 import { COMPANY_INFO } from '@/lib/company-info';
 import { OrganizationStructuredData, WebsiteStructuredData } from '@/components/structured-data';
 
-const defaultUrl = process.env.NEXT_PUBLIC_SITE_URL || 
-  (process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : 'http://localhost:3000');
+const defaultUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
 
-const siteUrl = typeof defaultUrl === 'string' ? defaultUrl : 'https://thepatternsplace.com';
+const siteUrl = typeof defaultUrl === 'string' ? defaultUrl : 'https://www.thepatternsplace.com';
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -75,7 +74,9 @@ export const metadata: Metadata = {
     title: COMPANY_INFO.name,
     description: COMPANY_INFO.tagline,
     images: ['/twitter-image.png'],
-    creator: COMPANY_INFO.social.twitter ? `@${COMPANY_INFO.social.twitter.split('/').pop()}` : undefined,
+    creator: COMPANY_INFO.social.twitter
+      ? `@${COMPANY_INFO.social.twitter.split('/').pop()}`
+      : undefined,
   },
   robots: {
     index: true,

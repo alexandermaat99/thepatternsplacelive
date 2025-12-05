@@ -51,7 +51,7 @@ export const COMPANY_INFO = {
 
   // URLs
   urls: {
-    website: 'https://thepatternsplace.com',
+    website: 'https://www.thepatternsplace.com',
     privacy: '/privacy',
     terms: '/terms',
     marketplace: '/marketplace',
