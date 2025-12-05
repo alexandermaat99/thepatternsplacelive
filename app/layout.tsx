@@ -45,11 +45,13 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
+      { url: '/favicon.ico', sizes: 'any' },
       { url: '/icons/favicon.ico', sizes: 'any' },
       { url: '/icons/favicon.svg', type: 'image/svg+xml' },
       { url: '/icons/favicon-96x96.png', sizes: '96x96', type: 'image/png' },
     ],
     apple: '/icons/apple-touch-icon.png',
+    shortcut: '/favicon.ico',
   },
   manifest: '/icons/site.webmanifest',
   openGraph: {
