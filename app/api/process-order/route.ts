@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStripe } from '@/lib/stripe';
 import { createClient } from '@/lib/supabase/server';
+import { createServiceRoleClient } from '@/lib/supabase/service-role';
 import { calculateEtsyFees } from '@/lib/company-info';
 import { deliverProductsForOrders } from '@/lib/product-delivery';
+import { sendSellerSaleNotificationEmail } from '@/lib/email';
 
 // Calculate fees for an order using Etsy-style structure
 function calculateFees(amount: number) {
   const amountInCents = Math.round(amount * 100);
   const fees = calculateEtsyFees(amountInCents);
-  
+
   // Convert back to dollars for return value
   const platformFee = fees.totalFee / 100;
   const stripeFee = 0; // Payment processing is included in total fee
@@ -64,7 +66,7 @@ export async function POST(request: NextRequest) {
       try {
         const items = JSON.parse(cartItems);
         const productIds = items.map((item: { productId: string }) => item.productId);
-        
+
         const { data: products } = await supabase
           .from('products')
           .select('id, user_id, price, currency')
@@ -105,32 +107,37 @@ export async function POST(request: NextRequest) {
               console.error('Error creating cart orders:', orderError);
               return NextResponse.json({ error: 'Failed to create orders' }, { status: 500 });
             }
-            
+
             if (insertedOrders) {
               console.log(`✅ Created ${insertedOrders.length} order(s) for session ${session.id}`);
-              console.log('Orders created:', insertedOrders.map(o => ({
-                id: o.id,
-                product_id: o.product_id,
-                buyer_email: o.buyer_email || 'MISSING',
-                buyer_id: o.buyer_id || 'N/A',
-              })));
-              
+              console.log(
+                'Orders created:',
+                insertedOrders.map(o => ({
+                  id: o.id,
+                  product_id: o.product_id,
+                  buyer_email: o.buyer_email || 'MISSING',
+                  buyer_id: o.buyer_id || 'N/A',
+                }))
+              );
+
               // Verify buyer_email is set, and update if missing
               const ordersWithoutEmail = insertedOrders.filter(o => !o.buyer_email);
               if (ordersWithoutEmail.length > 0) {
                 console.error('❌ WARNING: Some orders have no buyer_email! Attempting to fix...');
                 console.error('Session customer_email:', session.customer_email);
                 console.error('Session metadata:', metadata);
-                
+
                 // Try to update orders with customer_email from session if available
                 if (session.customer_email) {
-                  console.log(`🔧 Updating ${ordersWithoutEmail.length} order(s) with customer_email from session...`);
+                  console.log(
+                    `🔧 Updating ${ordersWithoutEmail.length} order(s) with customer_email from session...`
+                  );
                   const orderIdsToUpdate = ordersWithoutEmail.map(o => o.id);
                   const { error: updateError } = await supabase
                     .from('orders')
                     .update({ buyer_email: session.customer_email })
                     .in('id', orderIdsToUpdate);
-                  
+
                   if (updateError) {
                     console.error('❌ Failed to update orders with customer_email:', updateError);
                   } else {
@@ -143,20 +150,142 @@ export async function POST(request: NextRequest) {
                     });
                   }
                 } else {
-                  console.error('❌ Session has no customer_email either! Email delivery will fail.');
+                  console.error(
+                    '❌ Session has no customer_email either! Email delivery will fail.'
+                  );
                 }
               }
-              
+
               // Deliver products via email (non-blocking)
               console.log('📧 Triggering email delivery for orders from process-order route...');
               deliverProductsForOrders(insertedOrders).catch(error => {
                 console.error('❌ FATAL ERROR in email delivery:', error);
-                console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+                console.error(
+                  'Error stack:',
+                  error instanceof Error ? error.stack : 'No stack trace'
+                );
               });
-              
-              return NextResponse.json({ 
-                success: true, 
-                ordersCreated: insertedOrders.length 
+
+              // Send seller notification emails (non-blocking)
+              (async () => {
+                try {
+                  console.log('📧 Sending seller notification emails...');
+                  const supabaseAdmin = createServiceRoleClient();
+                  const sellerNotifications = new Map<
+                    string,
+                    { orders: typeof insertedOrders; product: any }
+                  >();
+
+                  // Get products with titles for notifications
+                  const { data: productsWithTitles } = await supabase
+                    .from('products')
+                    .select('id, user_id, title')
+                    .in('id', productIds);
+
+                  // Group orders by seller
+                  for (const order of insertedOrders) {
+                    const product = productsWithTitles?.find(p => p.id === order.product_id);
+                    if (!product) continue;
+
+                    if (!sellerNotifications.has(product.user_id)) {
+                      sellerNotifications.set(product.user_id, { orders: [], product });
+                    }
+                    sellerNotifications.get(product.user_id)!.orders.push(order);
+                  }
+
+                  // Send notification for each seller
+                  for (const [
+                    sellerId,
+                    { orders: sellerOrders, product },
+                  ] of sellerNotifications.entries()) {
+                    try {
+                      // Get seller email from auth.users
+                      const { data: sellerUser, error: sellerUserError } =
+                        await supabaseAdmin.auth.admin.getUserById(sellerId);
+
+                      if (sellerUserError || !sellerUser?.user?.email) {
+                        console.error(
+                          `❌ Could not get seller email for ${sellerId}:`,
+                          sellerUserError
+                        );
+                        continue;
+                      }
+
+                      // Get seller profile for name
+                      const { data: sellerProfile } = await supabase
+                        .from('profiles')
+                        .select('full_name, username')
+                        .eq('id', sellerId)
+                        .single();
+                      const sellerName = sellerProfile?.full_name || sellerProfile?.username;
+
+                      // Get buyer info for first order
+                      let buyerName: string | undefined;
+                      let buyerEmail: string | undefined;
+                      if (sellerOrders[0]?.buyer_id) {
+                        const { data: buyerProfile } = await supabase
+                          .from('profiles')
+                          .select('full_name')
+                          .eq('id', sellerOrders[0].buyer_id)
+                          .single();
+                        buyerName = buyerProfile?.full_name;
+                      }
+                      buyerEmail = sellerOrders[0]?.buyer_email || undefined;
+
+                      // Calculate totals for all orders from this seller
+                      const totalSaleAmount = sellerOrders.reduce(
+                        (sum, o) => sum + (o.amount || 0),
+                        0
+                      );
+                      const totalPlatformFee = sellerOrders.reduce(
+                        (sum, o) => sum + (o.platform_fee || 0),
+                        0
+                      );
+                      const totalNetAmount = sellerOrders.reduce(
+                        (sum, o) => sum + (o.net_amount || 0),
+                        0
+                      );
+                      const currency = sellerOrders[0]?.currency || 'USD';
+
+                      // Send notification for the first order (representing the sale)
+                      const notificationResult = await sendSellerSaleNotificationEmail({
+                        sellerEmail: sellerUser.user.email,
+                        sellerName,
+                        productTitle: product.title || 'Product',
+                        orderId: sellerOrders[0].id,
+                        saleAmount: totalSaleAmount,
+                        currency,
+                        platformFee: totalPlatformFee,
+                        netAmount: totalNetAmount,
+                        buyerName,
+                        buyerEmail,
+                      });
+
+                      if (notificationResult.success) {
+                        console.log(
+                          `✅ Seller notification sent to ${sellerUser.user.email} for order ${sellerOrders[0].id}`
+                        );
+                      } else {
+                        console.error(
+                          `❌ Failed to send seller notification:`,
+                          notificationResult.error
+                        );
+                      }
+                    } catch (sellerError) {
+                      console.error(
+                        `❌ Error sending seller notification for ${sellerId}:`,
+                        sellerError
+                      );
+                    }
+                  }
+                } catch (error) {
+                  console.error('❌ Error in seller notification process:', error);
+                }
+              })();
+
+              return NextResponse.json({
+                success: true,
+                ordersCreated: insertedOrders.length,
               });
             }
           }
@@ -169,7 +298,7 @@ export async function POST(request: NextRequest) {
       // Single product checkout
       const { data: product } = await supabase
         .from('products')
-        .select('user_id, price, currency')
+        .select('id, user_id, title, price, currency')
         .eq('id', metadata.productId)
         .single();
 
@@ -198,7 +327,7 @@ export async function POST(request: NextRequest) {
           console.error('Error creating order:', orderError);
           return NextResponse.json({ error: 'Failed to create order' }, { status: 500 });
         }
-        
+
         if (insertedOrders && insertedOrders.length > 0) {
           console.log(`✅ Created order ${insertedOrders[0].id} for session ${session.id}`);
           console.log('Order created:', {
@@ -207,13 +336,13 @@ export async function POST(request: NextRequest) {
             buyer_email: insertedOrders[0].buyer_email || 'MISSING',
             buyer_id: insertedOrders[0].buyer_id || 'N/A',
           });
-          
+
           // Verify buyer_email is set, and update if missing
           if (!insertedOrders[0].buyer_email) {
             console.error('❌ WARNING: Order has no buyer_email! Attempting to fix...');
             console.error('Session customer_email:', session.customer_email);
             console.error('Session metadata:', metadata);
-            
+
             // Try to update order with customer_email from session if available
             if (session.customer_email) {
               console.log('🔧 Updating order with customer_email from session...');
@@ -221,7 +350,7 @@ export async function POST(request: NextRequest) {
                 .from('orders')
                 .update({ buyer_email: session.customer_email })
                 .eq('id', insertedOrders[0].id);
-              
+
               if (updateError) {
                 console.error('❌ Failed to update order with customer_email:', updateError);
               } else {
@@ -232,29 +361,90 @@ export async function POST(request: NextRequest) {
               console.error('❌ Session has no customer_email either! Email delivery will fail.');
             }
           }
-          
+
           // Deliver product via email (non-blocking)
           console.log('📧 Triggering email delivery for order from process-order route...');
           deliverProductsForOrders(insertedOrders).catch(error => {
             console.error('❌ FATAL ERROR in email delivery:', error);
             console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
           });
-          
-          return NextResponse.json({ 
-            success: true, 
-            ordersCreated: 1 
+
+          // Send seller notification email (non-blocking)
+          (async () => {
+            try {
+              console.log('📧 Sending seller notification email...');
+              const supabaseAdmin = createServiceRoleClient();
+
+              // Get seller email from auth.users
+              const { data: sellerUser, error: sellerUserError } =
+                await supabaseAdmin.auth.admin.getUserById(product.user_id);
+
+              if (sellerUserError || !sellerUser?.user?.email) {
+                console.error(
+                  `❌ Could not get seller email for ${product.user_id}:`,
+                  sellerUserError
+                );
+                return;
+              }
+
+              // Get seller profile for name
+              const { data: sellerProfile } = await supabase
+                .from('profiles')
+                .select('full_name, username')
+                .eq('id', product.user_id)
+                .single();
+              const sellerName = sellerProfile?.full_name || sellerProfile?.username;
+
+              // Get buyer info
+              let buyerName: string | undefined;
+              if (insertedOrders[0].buyer_id) {
+                const { data: buyerProfile } = await supabase
+                  .from('profiles')
+                  .select('full_name')
+                  .eq('id', insertedOrders[0].buyer_id)
+                  .single();
+                buyerName = buyerProfile?.full_name;
+              }
+
+              const notificationResult = await sendSellerSaleNotificationEmail({
+                sellerEmail: sellerUser.user.email,
+                sellerName,
+                productTitle: product.title || 'Product',
+                orderId: insertedOrders[0].id,
+                saleAmount: insertedOrders[0].amount || 0,
+                currency: insertedOrders[0].currency || 'USD',
+                platformFee: insertedOrders[0].platform_fee || 0,
+                netAmount: insertedOrders[0].net_amount || 0,
+                buyerName,
+                buyerEmail: insertedOrders[0].buyer_email || undefined,
+              });
+
+              if (notificationResult.success) {
+                console.log(
+                  `✅ Seller notification sent to ${sellerUser.user.email} for order ${insertedOrders[0].id}`
+                );
+              } else {
+                console.error(`❌ Failed to send seller notification:`, notificationResult.error);
+              }
+            } catch (sellerError) {
+              console.error(`❌ Error sending seller notification:`, sellerError);
+            }
+          })();
+
+          return NextResponse.json({
+            success: true,
+            ordersCreated: 1,
           });
         }
       }
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      message: 'No products to process' 
+    return NextResponse.json({
+      success: true,
+      message: 'No products to process',
     });
   } catch (error) {
     console.error('Process order error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
-
