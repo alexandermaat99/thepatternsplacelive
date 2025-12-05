@@ -155,7 +155,7 @@ export async function POST(request: NextRequest) {
     const sanitizedTitle = title ? sanitizeString(title, MAX_TITLE_LENGTH) : null;
     const sanitizedComment = comment ? sanitizeString(comment, MAX_COMMENT_LENGTH) : null;
 
-    if (title && sanitizedTitle.length < title.length) {
+    if (title && sanitizedTitle && sanitizedTitle.length < title.length) {
       return NextResponse.json(
         {
           error: `Review title contains invalid characters or exceeds ${MAX_TITLE_LENGTH} characters`,
@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    if (comment && sanitizedComment.length < comment.length) {
+    if (comment && sanitizedComment && sanitizedComment.length < comment.length) {
       return NextResponse.json(
         {
           error: `Review comment contains invalid characters or exceeds ${MAX_COMMENT_LENGTH} characters`,
