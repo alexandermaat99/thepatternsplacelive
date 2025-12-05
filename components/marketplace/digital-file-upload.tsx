@@ -4,7 +4,8 @@ import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { createClient } from '@/lib/supabase/client';
-import { Upload, X, File, Loader2, Download } from 'lucide-react';
+import { Upload, X, File, Loader2, Download, Info } from 'lucide-react';
+import Link from 'next/link';
 
 interface FileItem {
   id: string;
@@ -234,9 +235,19 @@ export function DigitalFileUpload({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <Label>
-          Digital Files ({files.length}/{maxFiles}) <span className="text-red-500">*</span>
-        </Label>
+        <div className="flex items-center gap-2">
+          <Label>
+            Digital Files ({files.length}/{maxFiles}) <span className="text-red-500">*</span>
+          </Label>
+          <Link
+            href="/marketplace/watermarking-info"
+            target="_blank"
+            className="text-muted-foreground hover:text-primary transition-colors"
+            title="Learn about file delivery and watermarking"
+          >
+            <Info className="h-4 w-4" />
+          </Link>
+        </div>
         {files.length < maxFiles && (
           <Button
             type="button"
