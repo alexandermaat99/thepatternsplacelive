@@ -20,6 +20,9 @@ const siteUrl = typeof defaultUrl === 'string' ? defaultUrl : 'https://www.thepa
 // Google Analytics Measurement ID
 const gaId = process.env.NEXT_PUBLIC_GA_ID || 'G-41YY2ZJVNN';
 
+// Google Tag Manager Container ID
+const gtmId = process.env.NEXT_PUBLIC_GTM_ID || 'GTM-MVJ3TWSH';
+
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
@@ -115,7 +118,30 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      {/* Google Tag Manager - loads in head via Next.js Script component */}
+      <Script
+        id="google-tag-manager"
+        strategy="afterInteractive"
+        dangerouslySetInnerHTML={{
+          __html: `
+            (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+            new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+            j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+            'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+            })(window,document,'script','dataLayer','${gtmId}');
+          `,
+        }}
+      />
       <body className={`${geistSans.className} antialiased flex flex-col min-h-screen`}>
+        {/* Google Tag Manager (noscript) */}
+        <noscript>
+          <iframe
+            src={`https://www.googletagmanager.com/ns.html?id=${gtmId}`}
+            height="0"
+            width="0"
+            style={{ display: 'none', visibility: 'hidden' }}
+          />
+        </noscript>
         <OrganizationStructuredData />
         <WebsiteStructuredData />
         <ThemeProvider
