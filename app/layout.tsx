@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Script from 'next/script';
 import { Geist } from 'next/font/google';
 import { ThemeProvider } from 'next-themes';
 import { Providers } from '@/components/providers';
@@ -8,12 +9,16 @@ import './globals.css';
 
 import { COMPANY_INFO } from '@/lib/company-info';
 import { OrganizationStructuredData, WebsiteStructuredData } from '@/components/structured-data';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 const defaultUrl =
   process.env.NEXT_PUBLIC_SITE_URL ||
   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
 
 const siteUrl = typeof defaultUrl === 'string' ? defaultUrl : 'https://www.thepatternsplace.com';
+
+// Google Analytics Measurement ID
+const gaId = process.env.NEXT_PUBLIC_GA_ID || 'G-41YY2ZJVNN';
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -125,6 +130,20 @@ export default function RootLayout({
             <CookieConsent />
           </Providers>
         </ThemeProvider>
+        <SpeedInsights />
+        {/* Google Analytics */}
+        <Script
+          strategy="afterInteractive"
+          src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', '${gaId}');
+          `}
+        </Script>
       </body>
     </html>
   );
