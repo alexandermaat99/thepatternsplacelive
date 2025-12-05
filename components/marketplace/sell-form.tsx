@@ -100,11 +100,20 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
         }
       }
 
-      // Award pattern points for listing (non-blocking)
+      // Award pattern points for listing (non-blocking) - call API route instead
       if (product && user) {
         try {
-          const { awardPointsForListing } = await import('@/lib/pattern-points');
-          await awardPointsForListing(user.id);
+          // Call API route to award points server-side
+          fetch('/api/pattern-points/award', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ action: 'list' }),
+          }).catch(error => {
+            console.error('Error awarding pattern points for listing:', error);
+            // Don't fail the operation if points fail
+          });
         } catch (error) {
           console.error('Error awarding pattern points for listing:', error);
           // Don't fail the operation if points fail
