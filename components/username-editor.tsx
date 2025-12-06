@@ -132,14 +132,21 @@ export function UsernameEditor({ currentUsername, onUpdate }: UsernameEditorProp
 
   if (!isEditing) {
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex items-start gap-2">
         <div className="flex-1">
-          <span className="text-sm font-medium">Username:</span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">Username:</span>
+          </div>
           <p className="text-sm text-muted-foreground">
             {currentUsername ? `@${currentUsername}` : 'Not set'}
           </p>
         </div>
-        <Button variant="ghost" size="sm" onClick={handleStartEdit} className="h-8 w-8 p-0">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleStartEdit}
+          className="h-8 w-8 p-0 flex-shrink-0"
+        >
           <Edit2 className="h-4 w-4" />
         </Button>
       </div>

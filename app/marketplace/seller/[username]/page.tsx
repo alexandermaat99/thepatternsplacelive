@@ -17,7 +17,7 @@ export default async function SellerPage({ params }: SellerPageProps) {
   // First, find the user by username
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('id, full_name, username, avatar_url')
+    .select('id, full_name, username, avatar_url, bio')
     .ilike('username', username)
     .single();
 
@@ -28,14 +28,16 @@ export default async function SellerPage({ params }: SellerPageProps) {
   // Fetch products by this seller
   const { data: products, error: productsError } = await supabase
     .from('products')
-    .select(`
+    .select(
+      `
       *,
       profiles:user_id (
         full_name,
         username,
         avatar_url
       )
-    `)
+    `
+    )
     .eq('user_id', profile.id)
     .eq('is_active', true)
     .order('created_at', { ascending: false });
@@ -50,21 +52,58 @@ export default async function SellerPage({ params }: SellerPageProps) {
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
       <BackButton />
-      <div className="mb-8">
-        <h1 className="text-3xl sm:text-4xl font-bold mb-2">
-          {profile.username ? `@${profile.username}` : sellerName}
-        </h1>
-        {profile.full_name && profile.username && (
-          <p className="text-muted-foreground">{profile.full_name}</p>
-        )}
-        <p className="text-muted-foreground mt-2">
-          {productCount} {productCount === 1 ? 'product' : 'products'} available
-        </p>
-      </div>
+
+      {/* Seller Profile Header */}
+      <Card className="mb-8">
+        <CardContent className="pt-6">
+          <div className="flex flex-col sm:flex-row gap-6">
+            {/* Avatar */}
+            <div className="flex-shrink-0">
+              {profile.avatar_url ? (
+                <img
+                  src={profile.avatar_url}
+                  alt={profile.full_name || profile.username || 'Seller'}
+                  className="w-24 h-24 rounded-full object-cover border-2 border-gray-200"
+                />
+              ) : (
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-rose-300 to-rose-500 flex items-center justify-center text-white text-2xl font-bold border-2 border-gray-200">
+                  {(profile.full_name || profile.username || 'U').charAt(0).toUpperCase()}
+                </div>
+              )}
+            </div>
+
+            {/* Seller Info */}
+            <div className="flex-1">
+              <h1 className="text-3xl sm:text-4xl font-bold mb-2">
+                {profile.username ? `@${profile.username}` : sellerName}
+              </h1>
+              {profile.full_name && profile.username && (
+                <p className="text-muted-foreground text-lg">{profile.full_name}</p>
+              )}
+              <p className="text-muted-foreground mt-2 mb-4">
+                {productCount} {productCount === 1 ? 'product' : 'products'} available
+              </p>
+
+              {/* Bio */}
+              {profile.bio ? (
+                <div className="mt-4">
+                  <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                    {profile.bio}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground italic mt-4">
+                  This seller hasn't added a bio yet.
+                </p>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {products && products.length > 0 ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {products.map((product) => (
+          {products.map(product => (
             <ProductCard key={product.id} product={product} />
           ))}
         </div>
@@ -83,4 +122,3 @@ export default async function SellerPage({ params }: SellerPageProps) {
     </div>
   );
 }
-

@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { UserProfile as UserProfileType, StripeAccountStatus } from '@/lib/auth-helpers';
 import { UsernameEditor } from '@/components/username-editor';
+import { BioEditor } from '@/components/bio-editor';
 
 interface UserProfileProps {
   // Optional props from server component - if provided, use these instead of useAuth
@@ -141,6 +142,30 @@ export function UserProfile({
     }
   };
 
+  const handleBioUpdate = async (newBio: string) => {
+    const response = await fetch('/api/profile/bio', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bio: newBio || null }),
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Failed to update bio');
+    }
+
+    // Wait for database to be ready
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    // Refresh profile and get the updated profile
+    const updatedProfile = await refreshProfile();
+
+    if (updatedProfile) {
+      // Update local state immediately
+      setCurrentProfile(updatedProfile);
+    }
+  };
+
   if (loading) {
     return (
       <Card>
@@ -198,6 +223,11 @@ export function UserProfile({
             <UsernameEditor
               currentUsername={currentProfile?.username || profile?.username || null}
               onUpdate={handleUsernameUpdate}
+            />
+
+            <BioEditor
+              currentBio={currentProfile?.bio || profile?.bio || null}
+              onUpdate={handleBioUpdate}
             />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
