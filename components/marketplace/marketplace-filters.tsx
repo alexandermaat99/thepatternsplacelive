@@ -16,6 +16,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 // Price range will use Input fields instead of Slider
 import { Filter, X, ChevronDown, Info } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import Link from 'next/link';
 import { DIFFICULTY_LEVELS } from '@/lib/constants';
 import type { Category } from '@/lib/types/categories';
@@ -49,6 +50,7 @@ export function MarketplaceFilters({
     ? Number(searchParams.get('maxPrice'))
     : maxPrice;
   const appliedSort = searchParams.get('sort') || 'popular';
+  const appliedFreeOnly = searchParams.get('free') === 'true';
 
   // Local state for pending filters (not yet applied)
   const [isOpen, setIsOpen] = useState(false);
@@ -59,6 +61,7 @@ export function MarketplaceFilters({
     appliedPriceMax,
   ]);
   const [localSort, setLocalSort] = useState<string>(appliedSort);
+  const [localFreeOnly, setLocalFreeOnly] = useState<boolean>(appliedFreeOnly);
 
   // Track previous applied values to avoid unnecessary updates
   const prevAppliedRef = useRef({
@@ -67,6 +70,7 @@ export function MarketplaceFilters({
     priceMin: appliedPriceMin,
     priceMax: appliedPriceMax,
     sort: appliedSort,
+    freeOnly: appliedFreeOnly,
   });
 
   // Sync local state when URL changes (e.g., back button, clear filters)
@@ -98,7 +102,19 @@ export function MarketplaceFilters({
       setLocalSort(appliedSort);
       prevAppliedRef.current.sort = appliedSort;
     }
-  }, [appliedCategories, appliedDifficulties, appliedPriceMin, appliedPriceMax, appliedSort]);
+
+    if (prevAppliedRef.current.freeOnly !== appliedFreeOnly) {
+      setLocalFreeOnly(appliedFreeOnly);
+      prevAppliedRef.current.freeOnly = appliedFreeOnly;
+    }
+  }, [
+    appliedCategories,
+    appliedDifficulties,
+    appliedPriceMin,
+    appliedPriceMax,
+    appliedSort,
+    appliedFreeOnly,
+  ]);
 
   // Check if there are pending changes
   const hasPendingChanges =
@@ -106,7 +122,8 @@ export function MarketplaceFilters({
     JSON.stringify(localDifficulties.sort()) !== JSON.stringify(appliedDifficulties.sort()) ||
     localPriceRange[0] !== appliedPriceMin ||
     localPriceRange[1] !== appliedPriceMax ||
-    localSort !== appliedSort;
+    localSort !== appliedSort ||
+    localFreeOnly !== appliedFreeOnly;
 
   const applyFilters = () => {
     const params = new URLSearchParams(searchParams.toString());
@@ -143,6 +160,13 @@ export function MarketplaceFilters({
       params.set('sort', localSort);
     } else {
       params.delete('sort');
+    }
+
+    // Apply free filter
+    if (localFreeOnly) {
+      params.set('free', 'true');
+    } else {
+      params.delete('free');
     }
 
     params.delete('page');
@@ -191,6 +215,7 @@ export function MarketplaceFilters({
     setLocalDifficulties([]);
     setLocalPriceRange([minPrice, maxPrice]);
     setLocalSort('popular');
+    setLocalFreeOnly(false);
 
     // Clear URL filters
     const params = new URLSearchParams();
@@ -206,7 +231,8 @@ export function MarketplaceFilters({
     appliedDifficulties.length > 0 ||
     appliedPriceMin !== minPrice ||
     appliedPriceMax !== maxPrice ||
-    appliedSort !== 'popular';
+    appliedSort !== 'popular' ||
+    appliedFreeOnly;
 
   return (
     <div className="space-y-4 lg:space-y-0">
@@ -225,7 +251,8 @@ export function MarketplaceFilters({
                 {appliedCategories.length +
                   appliedDifficulties.length +
                   (appliedPriceMin !== minPrice || appliedPriceMax !== maxPrice ? 1 : 0) +
-                  (appliedSort !== 'newest' ? 1 : 0)}
+                  (appliedSort !== 'popular' ? 1 : 0) +
+                  (appliedFreeOnly ? 1 : 0)}
                 {hasPendingChanges && '+'}
               </Badge>
             )}
@@ -300,7 +327,22 @@ export function MarketplaceFilters({
 
           {/* Price Range */}
           <div>
-            <Label className="text-base font-semibold mb-3 block">Price Range</Label>
+            <div className="flex items-center justify-between mb-3">
+              <Label className="text-base font-semibold">Price Range</Label>
+              <div className="flex items-center gap-2">
+                <Label
+                  htmlFor="free-toggle"
+                  className="text-sm text-muted-foreground cursor-pointer"
+                >
+                  Free
+                </Label>
+                <Switch
+                  id="free-toggle"
+                  checked={localFreeOnly}
+                  onCheckedChange={setLocalFreeOnly}
+                />
+              </div>
+            </div>
             <div className="flex gap-2">
               <div className="flex-1">
                 <Label htmlFor="min-price" className="text-sm text-muted-foreground">
@@ -317,6 +359,7 @@ export function MarketplaceFilters({
                   }}
                   className="mt-1"
                   placeholder={`$${minPrice}`}
+                  disabled={localFreeOnly}
                 />
               </div>
               <div className="flex-1">
@@ -334,6 +377,7 @@ export function MarketplaceFilters({
                   }}
                   className="mt-1"
                   placeholder={`$${maxPrice}`}
+                  disabled={localFreeOnly}
                 />
               </div>
             </div>

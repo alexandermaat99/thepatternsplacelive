@@ -12,10 +12,12 @@ import { COMPANY_INFO } from '@/lib/company-info';
 
 export const metadata: Metadata = {
   title: 'Marketplace',
-  description: 'Browse and discover unique sewing and crafting patterns from independent creators. Find digital patterns for your next project.',
+  description:
+    'Browse and discover unique sewing and crafting patterns from independent creators. Find digital patterns for your next project.',
   openGraph: {
     title: `Marketplace | ${COMPANY_INFO.name}`,
-    description: 'Browse and discover unique sewing and crafting patterns from independent creators.',
+    description:
+      'Browse and discover unique sewing and crafting patterns from independent creators.',
     url: `${COMPANY_INFO.urls.website}${COMPANY_INFO.urls.marketplace}`,
     type: 'website',
   },
@@ -33,6 +35,7 @@ interface MarketplacePageProps {
     maxPrice?: string;
     sort?: string;
     page?: string;
+    free?: string;
   }>;
 }
 
@@ -208,6 +211,11 @@ async function MarketplaceContent({ searchParams }: MarketplacePageProps) {
     if (difficulties.length > 0) {
       query = query.in('difficulty', difficulties);
     }
+  }
+
+  // Apply free filter
+  if (params.free === 'true') {
+    query = query.eq('is_free', true);
   }
 
   // Apply price filter
@@ -412,13 +420,10 @@ async function MarketplaceContent({ searchParams }: MarketplacePageProps) {
   let popularityScores: Map<string, number> = new Map();
   if (sortBy === 'popular' && products && products.length > 0) {
     const productIds = products.map((p: any) => p.id);
-    
+
     // Fetch favorites, orders, and views counts in parallel
     const [favoritesData, ordersData, viewsData] = await Promise.all([
-      supabase
-        .from('favorites')
-        .select('product_id')
-        .in('product_id', productIds),
+      supabase.from('favorites').select('product_id').in('product_id', productIds),
       supabase
         .from('orders')
         .select('product_id')
@@ -455,12 +460,12 @@ async function MarketplaceContent({ searchParams }: MarketplacePageProps) {
       const views = viewCounts.get(product.id) || 0;
       const favorites = favoriteCounts.get(product.id) || 0;
       const orders = orderCounts.get(product.id) || 0;
-      
+
       // Freshness bonus: 10 points at 0 days, decaying to 0 over 30 days
       const ageInDays = (now - new Date(product.created_at).getTime()) / (1000 * 60 * 60 * 24);
-      const freshnessBonus = Math.max(0, 10 - (ageInDays / 3));
-      
-      const score = (views * 0.1) + (favorites * 2) + (orders * 5) + freshnessBonus;
+      const freshnessBonus = Math.max(0, 10 - ageInDays / 3);
+
+      const score = views * 0.1 + favorites * 2 + orders * 5 + freshnessBonus;
       popularityScores.set(product.id, score);
     });
   }
@@ -503,7 +508,7 @@ async function MarketplaceContent({ searchParams }: MarketplacePageProps) {
   // Get total count before pagination
   const totalProducts = products.length;
   const totalPages = Math.ceil(totalProducts / PRODUCTS_PER_PAGE);
-  
+
   // Apply pagination
   const paginatedProducts = products.slice(from, to + 1);
 

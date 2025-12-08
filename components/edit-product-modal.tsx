@@ -23,6 +23,7 @@ import { COMPANY_INFO, calculateEtsyFees } from '@/lib/company-info';
 import { Info } from 'lucide-react';
 import Link from 'next/link';
 import { FeesInfoModal } from '@/components/marketplace/fees-info-modal';
+import { Switch } from '@/components/ui/switch';
 
 interface Product {
   id: string;
@@ -34,6 +35,7 @@ interface Product {
   category: string;
   difficulty?: string | null;
   is_active: boolean;
+  is_free?: boolean;
 }
 
 interface EditProductModalProps {
@@ -58,6 +60,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
     image_url: '',
     files: [] as string[],
     is_active: true,
+    is_free: false,
   });
 
   // Update form data when product changes
@@ -113,6 +116,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
             image_url: product.image_url || '',
             files,
             is_active: product.is_active,
+            is_free: (product as any).is_free || false,
           });
         } catch (error) {
           console.error('Error loading categories:', error);
@@ -128,6 +132,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
             image_url: product.image_url || '',
             files,
             is_active: product.is_active,
+            is_free: (product as any).is_free || false,
           });
         }
       };
@@ -141,8 +146,8 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
     setIsLoading(true);
 
     try {
-      const price = parseFloat(formData.price);
-      if (isNaN(price) || price < 1.0) {
+      const price = formData.is_free ? 0 : parseFloat(formData.price);
+      if (!formData.is_free && (isNaN(price) || price < 1.0)) {
         throw new Error('Price must be at least $1.00');
       }
 
@@ -272,6 +277,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
         image_url: validImages[0] || null,
         files: formData.files.length > 0 ? formData.files : [],
         is_active: formData.is_active,
+        is_free: formData.is_free,
         updated_at: new Date().toISOString(),
       };
 
@@ -519,18 +525,56 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="price">Price (USD) - Minimum $1.00</Label>
+                <div className="flex items-center justify-between mb-2">
+                  <Label htmlFor="price">Price (USD)</Label>
+                  <div className="flex items-center space-x-2">
+                    <Label htmlFor="is_free" className="text-sm font-normal cursor-pointer">
+                      Free Pattern
+                    </Label>
+                    <Switch
+                      id="is_free"
+                      checked={formData.is_free}
+                      onCheckedChange={checked => {
+                        // When switching from free to paid, ensure price is at least 1.00
+                        // When switching from paid to free, set price to 0
+                        const newPrice = checked
+                          ? '0'
+                          : formData.price && parseFloat(formData.price) >= 1.0
+                            ? formData.price
+                            : '1.00';
+                        setFormData({
+                          ...formData,
+                          is_free: checked,
+                          price: newPrice,
+                        });
+                      }}
+                    />
+                  </div>
+                </div>
                 <Input
                   id="price"
-                  type="number"
+                  type={formData.is_free ? 'text' : 'number'}
                   step="0.01"
-                  min="1.00"
-                  value={formData.price}
-                  onChange={e => setFormData({ ...formData, price: e.target.value })}
-                  required
-                  placeholder="1.00"
+                  min={formData.is_free ? undefined : '1.00'}
+                  value={formData.is_free ? 'Free' : formData.price}
+                  onChange={e => {
+                    if (!formData.is_free) {
+                      setFormData({ ...formData, price: e.target.value });
+                    }
+                  }}
+                  required={!formData.is_free}
+                  disabled={formData.is_free}
+                  placeholder={formData.is_free ? 'Free' : '1.00'}
+                  readOnly={formData.is_free}
                 />
-                {formData.price &&
+                {formData.is_free ? (
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    <p className="text-green-600 font-medium">
+                      This is a free pattern. Buyers will be able to download it without payment.
+                    </p>
+                  </div>
+                ) : (
+                  formData.price &&
                   !isNaN(parseFloat(formData.price)) &&
                   parseFloat(formData.price) >= 1.0 && (
                     <div className="mt-2 text-xs text-muted-foreground space-y-1">
@@ -576,7 +620,8 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
                         </span>
                       </div>
                     </div>
-                  )}
+                  )
+                )}
               </div>
 
               <CategoryInput

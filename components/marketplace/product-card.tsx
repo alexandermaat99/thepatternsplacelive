@@ -37,6 +37,7 @@ interface Product {
   product_categories?: Array<{
     category: Category;
   }>;
+  is_free?: boolean;
 }
 
 interface ProductCardProps {
@@ -150,8 +151,10 @@ export function ProductCard({ product, hideFavorite = false }: ProductCardProps)
 
           {/* Price overlay bubble */}
           <div className="absolute bottom-2 right-2 bg-background/40 backdrop-blur-sm rounded-full px-3 py-1 shadow-md border border-border/50">
-            <span className="text-xs font-bold text-foreground">
-              {formatAmountForDisplay(product.price, product.currency)}
+            <span
+              className={`text-xs font-bold ${product.is_free ? 'text-green-600' : 'text-foreground'}`}
+            >
+              {product.is_free ? 'Free' : formatAmountForDisplay(product.price, product.currency)}
             </span>
           </div>
 

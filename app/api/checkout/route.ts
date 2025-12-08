@@ -27,6 +27,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 });
     }
 
+    // Check if product is free - redirect to free checkout
+    if (product.is_free || product.price === 0) {
+      return NextResponse.json(
+        { error: 'This is a free product. Please use the free checkout endpoint.' },
+        { status: 400 }
+      );
+    }
+
     // Get seller's profile with Stripe account ID
     const { data: sellerProfile, error: sellerError } = await supabase
       .from('profiles')
