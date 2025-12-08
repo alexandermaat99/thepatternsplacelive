@@ -16,7 +16,6 @@ import {
 import { Badge } from '@/components/ui/badge';
 // Price range will use Input fields instead of Slider
 import { Filter, X, ChevronDown, Info } from 'lucide-react';
-import { Switch } from '@/components/ui/switch';
 import Link from 'next/link';
 import { DIFFICULTY_LEVELS } from '@/lib/constants';
 import type { Category } from '@/lib/types/categories';
@@ -50,7 +49,6 @@ export function MarketplaceFilters({
     ? Number(searchParams.get('maxPrice'))
     : maxPrice;
   const appliedSort = searchParams.get('sort') || 'popular';
-  const appliedFreeOnly = searchParams.get('free') === 'true';
 
   // Local state for pending filters (not yet applied)
   const [isOpen, setIsOpen] = useState(false);
@@ -61,7 +59,6 @@ export function MarketplaceFilters({
     appliedPriceMax,
   ]);
   const [localSort, setLocalSort] = useState<string>(appliedSort);
-  const [localFreeOnly, setLocalFreeOnly] = useState<boolean>(appliedFreeOnly);
 
   // Track previous applied values to avoid unnecessary updates
   const prevAppliedRef = useRef({
@@ -70,7 +67,7 @@ export function MarketplaceFilters({
     priceMin: appliedPriceMin,
     priceMax: appliedPriceMax,
     sort: appliedSort,
-    freeOnly: appliedFreeOnly,
+    freeOnly: appliedCategories.includes('free'),
   });
 
   // Sync local state when URL changes (e.g., back button, clear filters)
@@ -103,9 +100,15 @@ export function MarketplaceFilters({
       prevAppliedRef.current.sort = appliedSort;
     }
 
-    if (prevAppliedRef.current.freeOnly !== appliedFreeOnly) {
-      setLocalFreeOnly(appliedFreeOnly);
-      prevAppliedRef.current.freeOnly = appliedFreeOnly;
+    // Update localCategories if "free" was added/removed from applied categories
+    const currentFreeOnly = appliedCategories.includes('free');
+    if (prevAppliedRef.current.freeOnly !== currentFreeOnly) {
+      if (currentFreeOnly && !localCategories.includes('free')) {
+        setLocalCategories(prev => [...prev, 'free']);
+      } else if (!currentFreeOnly && localCategories.includes('free')) {
+        setLocalCategories(prev => prev.filter(c => c !== 'free'));
+      }
+      prevAppliedRef.current.freeOnly = currentFreeOnly;
     }
   }, [
     appliedCategories,
@@ -113,7 +116,7 @@ export function MarketplaceFilters({
     appliedPriceMin,
     appliedPriceMax,
     appliedSort,
-    appliedFreeOnly,
+    localCategories,
   ]);
 
   // Check if there are pending changes
@@ -122,8 +125,7 @@ export function MarketplaceFilters({
     JSON.stringify(localDifficulties.sort()) !== JSON.stringify(appliedDifficulties.sort()) ||
     localPriceRange[0] !== appliedPriceMin ||
     localPriceRange[1] !== appliedPriceMax ||
-    localSort !== appliedSort ||
-    localFreeOnly !== appliedFreeOnly;
+    localSort !== appliedSort;
 
   const applyFilters = () => {
     const params = new URLSearchParams(searchParams.toString());
@@ -162,12 +164,15 @@ export function MarketplaceFilters({
       params.delete('sort');
     }
 
-    // Apply free filter
-    if (localFreeOnly) {
-      params.set('free', 'true');
+    // Free filter is now handled via categories, so just ensure categories are set correctly
+    if (localCategories.length > 0) {
+      params.set('categories', localCategories.join(','));
     } else {
-      params.delete('free');
+      params.delete('categories');
     }
+
+    // Remove old free parameter if it exists
+    params.delete('free');
 
     params.delete('page');
     router.push(`/marketplace?${params.toString()}`, { scroll: false });
@@ -215,7 +220,6 @@ export function MarketplaceFilters({
     setLocalDifficulties([]);
     setLocalPriceRange([minPrice, maxPrice]);
     setLocalSort('popular');
-    setLocalFreeOnly(false);
 
     // Clear URL filters
     const params = new URLSearchParams();
@@ -231,8 +235,7 @@ export function MarketplaceFilters({
     appliedDifficulties.length > 0 ||
     appliedPriceMin !== minPrice ||
     appliedPriceMax !== maxPrice ||
-    appliedSort !== 'popular' ||
-    appliedFreeOnly;
+    appliedSort !== 'popular';
 
   return (
     <div className="space-y-4 lg:space-y-0">
@@ -251,8 +254,7 @@ export function MarketplaceFilters({
                 {appliedCategories.length +
                   appliedDifficulties.length +
                   (appliedPriceMin !== minPrice || appliedPriceMax !== maxPrice ? 1 : 0) +
-                  (appliedSort !== 'popular' ? 1 : 0) +
-                  (appliedFreeOnly ? 1 : 0)}
+                  (appliedSort !== 'popular' ? 1 : 0)}
                 {hasPendingChanges && '+'}
               </Badge>
             )}
@@ -327,22 +329,7 @@ export function MarketplaceFilters({
 
           {/* Price Range */}
           <div>
-            <div className="flex items-center justify-between mb-3">
-              <Label className="text-base font-semibold">Price Range</Label>
-              <div className="flex items-center gap-2">
-                <Label
-                  htmlFor="free-toggle"
-                  className="text-sm text-muted-foreground cursor-pointer"
-                >
-                  Free
-                </Label>
-                <Switch
-                  id="free-toggle"
-                  checked={localFreeOnly}
-                  onCheckedChange={setLocalFreeOnly}
-                />
-              </div>
-            </div>
+            <Label className="text-base font-semibold mb-3 block">Price Range</Label>
             <div className="flex gap-2">
               <div className="flex-1">
                 <Label htmlFor="min-price" className="text-sm text-muted-foreground">
@@ -359,7 +346,6 @@ export function MarketplaceFilters({
                   }}
                   className="mt-1"
                   placeholder={`$${minPrice}`}
-                  disabled={localFreeOnly}
                 />
               </div>
               <div className="flex-1">
@@ -377,7 +363,6 @@ export function MarketplaceFilters({
                   }}
                   className="mt-1"
                   placeholder={`$${maxPrice}`}
-                  disabled={localFreeOnly}
                 />
               </div>
             </div>

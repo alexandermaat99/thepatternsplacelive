@@ -13,6 +13,7 @@ import { useCart } from '@/contexts/cart-context';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useToast } from '@/contexts/toast-context';
 import { AuthPromptDialog } from '@/components/auth-prompt-dialog';
+import { FreeDownloadDialog } from '@/components/free-download-dialog';
 import { linkifyText } from '@/lib/text-utils';
 import { getDifficultyLabel, getDifficultyColor } from '@/lib/constants';
 import { ProductFilesDownload } from '@/components/marketplace/product-files-download';
@@ -63,6 +64,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
   const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
   const [fromCart, setFromCart] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [showFreeDownloadDialog, setShowFreeDownloadDialog] = useState(false);
   const { user, isAuthenticated } = useAuth();
   const { addItem } = useCart();
   const { isFavorite, toggleFavorite } = useFavorites();
@@ -70,6 +72,15 @@ export function ProductDetail({ product }: ProductDetailProps) {
 
   const favorited = isFavorite(product.id);
   const isOwner = user?.id === product.user_id;
+
+  // Check if product is free (either by is_free field or "free" category)
+  const isFree =
+    product.is_free ||
+    product.price === 0 ||
+    (product.product_categories &&
+      product.product_categories.some(
+        (pc: any) => pc.category?.slug === 'free' || pc.category?.name?.toLowerCase() === 'free'
+      ));
 
   // Check if user came from cart or auth pages
   useEffect(() => {
@@ -137,7 +148,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
 
   const handleFreeDownload = async () => {
     if (!isAuthenticated) {
-      setShowAuthDialog(true);
+      setShowFreeDownloadDialog(true);
       return;
     }
 
@@ -265,7 +276,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <p className="text-3xl font-bold text-primary">
-                  {product.is_free ? (
+                  {isFree ? (
                     <span className="text-green-600">Free</span>
                   ) : (
                     formatAmountForDisplay(product.price, product.currency)
@@ -344,7 +355,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
                 <Edit className="h-4 w-4 mr-2" />
                 Edit Product
               </Button>
-            ) : product.is_free ? (
+            ) : isFree ? (
               <Button
                 onClick={handleFreeDownload}
                 className="w-full bg-green-600 hover:bg-green-700"
@@ -446,6 +457,13 @@ export function ProductDetail({ product }: ProductDetailProps) {
       <ProductReviews productId={product.id} />
 
       <AuthPromptDialog isOpen={showAuthDialog} onClose={() => setShowAuthDialog(false)} />
+
+      <FreeDownloadDialog
+        isOpen={showFreeDownloadDialog}
+        onClose={() => setShowFreeDownloadDialog(false)}
+        productId={product.id}
+        productTitle={product.title}
+      />
 
       {isOwner && (
         <EditProductModal

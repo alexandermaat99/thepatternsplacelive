@@ -20,7 +20,6 @@ export function ActiveFilters({ categories }: ActiveFiltersProps) {
   const priceMin = searchParams.get('minPrice');
   const priceMax = searchParams.get('maxPrice');
   const sortBy = searchParams.get('sort');
-  const freeOnly = searchParams.get('free') === 'true';
 
   const removeFilter = (type: string, value?: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -45,8 +44,6 @@ export function ActiveFilters({ categories }: ActiveFiltersProps) {
       params.delete('maxPrice');
     } else if (type === 'sort') {
       params.delete('sort');
-    } else if (type === 'free') {
-      params.delete('free');
     }
 
     params.delete('page');
@@ -68,8 +65,7 @@ export function ActiveFilters({ categories }: ActiveFiltersProps) {
     selectedDifficulties.length +
     (priceMin ? 1 : 0) +
     (priceMax ? 1 : 0) +
-    (sortBy && sortBy !== 'popular' ? 1 : 0) +
-    (freeOnly ? 1 : 0);
+    (sortBy && sortBy !== 'popular' ? 1 : 0);
 
   if (activeFiltersCount === 0) {
     return null;
@@ -139,20 +135,6 @@ export function ActiveFilters({ categories }: ActiveFiltersProps) {
             onClick={() => removeFilter('maxPrice')}
             className="ml-1 hover:bg-muted-foreground/20 rounded-full p-0.5"
             aria-label="Remove maximum price filter"
-          >
-            <X className="h-3 w-3" />
-          </button>
-        </Badge>
-      )}
-
-      {/* Free filter */}
-      {freeOnly && (
-        <Badge variant="secondary" className="flex items-center gap-1 pr-1">
-          Free Patterns Only
-          <button
-            onClick={() => removeFilter('free')}
-            className="ml-1 hover:bg-muted-foreground/20 rounded-full p-0.5"
-            aria-label="Remove free filter"
           >
             <X className="h-3 w-3" />
           </button>

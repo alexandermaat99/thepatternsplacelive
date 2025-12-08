@@ -213,10 +213,8 @@ async function MarketplaceContent({ searchParams }: MarketplacePageProps) {
     }
   }
 
-  // Apply free filter
-  if (params.free === 'true') {
-    query = query.eq('is_free', true);
-  }
+  // Free filter is now handled via categories - if "free" category is selected,
+  // it will be included in categoryFilterData automatically via the category filter system
 
   // Apply price filter
   if (params.minPrice) {

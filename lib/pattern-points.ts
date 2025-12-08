@@ -3,7 +3,9 @@ import { createServiceRoleClient } from '@/lib/supabase/service-role';
 // Pattern points values for different actions
 export const PATTERN_POINTS = {
   BUY_PRODUCT: 10,
+  DOWNLOAD_FREE_PATTERN: 5, // When someone downloads a free pattern
   SELL_PRODUCT: 10, // When someone buys your product
+  SELL_FREE_PATTERN: 8, // When someone downloads your free pattern
   LIST_PRODUCT: 15, // When you list a new product
   LEAVE_REVIEW: 10,
 } as const;
@@ -68,6 +70,41 @@ export async function awardPointsForSale(sellerId: string): Promise<void> {
     console.log(`✅ Awarded ${PATTERN_POINTS.SELL_PRODUCT} pattern points to seller ${sellerId}`);
   } catch (error) {
     console.error('Error awarding points for sale:', error);
+    // Don't throw - points are non-critical
+  }
+}
+
+/**
+ * Award points for downloading a free pattern
+ */
+export async function awardPointsForFreeDownload(buyerId: string | null): Promise<void> {
+  if (!buyerId) {
+    // Guest download - no points awarded
+    return;
+  }
+
+  try {
+    await awardPatternPoints(buyerId, PATTERN_POINTS.DOWNLOAD_FREE_PATTERN);
+    console.log(
+      `✅ Awarded ${PATTERN_POINTS.DOWNLOAD_FREE_PATTERN} pattern points to buyer ${buyerId} for free download`
+    );
+  } catch (error) {
+    console.error('Error awarding points for free download:', error);
+    // Don't throw - points are non-critical
+  }
+}
+
+/**
+ * Award points for selling a free pattern (when someone downloads your free pattern)
+ */
+export async function awardPointsForFreeSale(sellerId: string): Promise<void> {
+  try {
+    await awardPatternPoints(sellerId, PATTERN_POINTS.SELL_FREE_PATTERN);
+    console.log(
+      `✅ Awarded ${PATTERN_POINTS.SELL_FREE_PATTERN} pattern points to seller ${sellerId} for free pattern download`
+    );
+  } catch (error) {
+    console.error('Error awarding points for free sale:', error);
     // Don't throw - points are non-critical
   }
 }

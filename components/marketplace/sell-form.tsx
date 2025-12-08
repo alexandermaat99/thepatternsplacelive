@@ -59,6 +59,8 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
         throw new Error('Price must be at least $1.00');
       }
 
+      const isFree = formData.is_free;
+
       // Require at least one PDF file
       if (!formData.files || formData.files.length === 0) {
         throw new Error('Please upload at least one PDF file for your product');
@@ -80,7 +82,7 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
           files: formData.files.length > 0 ? formData.files : [],
           user_id: user.id,
           is_active: true,
-          is_free: formData.is_free,
+          is_free: isFree,
         })
         .select()
         .single();
@@ -88,10 +90,27 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
       if (error) throw error;
 
       // Link categories to the product (comma-separated input)
-      if (formData.category && product) {
+      // Also automatically add "free" category if product is free
+      if (product) {
         try {
-          await linkCategoriesToProduct(product.id, formData.category);
-          console.log('Categories linked successfully');
+          let categoriesToLink = formData.category || '';
+
+          // If product is free, add "free" category if not already present
+          if (isFree) {
+            const categoryList = categoriesToLink
+              .split(',')
+              .map(c => c.trim().toLowerCase())
+              .filter(c => c.length > 0);
+
+            if (!categoryList.includes('free')) {
+              categoriesToLink = categoriesToLink ? `${categoriesToLink}, free` : 'free';
+            }
+          }
+
+          if (categoriesToLink) {
+            await linkCategoriesToProduct(product.id, categoriesToLink);
+            console.log('Categories linked successfully');
+          }
         } catch (categoryError) {
           console.error('Error linking categories:', categoryError);
           const errorMessage =
@@ -258,11 +277,14 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                   <div className="flex items-center justify-between mb-2">
                     <Label htmlFor="price">Price (USD)</Label>
                     <div className="flex items-center space-x-2">
-                      <Label htmlFor="is_free" className="text-sm font-normal cursor-pointer">
+                      <Label
+                        htmlFor="free-toggle"
+                        className="text-sm text-muted-foreground cursor-pointer"
+                      >
                         Free Pattern
                       </Label>
                       <Switch
-                        id="is_free"
+                        id="free-toggle"
                         checked={formData.is_free}
                         onCheckedChange={checked => {
                           // When switching from free to paid, ensure price is at least 1.00
@@ -301,6 +323,7 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                     <div className="mt-2 text-xs text-muted-foreground">
                       <p className="text-green-600 font-medium">
                         This is a free pattern. Buyers will be able to download it without payment.
+                        The "free" category will be added automatically.
                       </p>
                     </div>
                   ) : (

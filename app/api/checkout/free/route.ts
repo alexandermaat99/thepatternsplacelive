@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceRoleClient } from '@/lib/supabase/service-role';
 import { deliverProductToCustomer } from '@/lib/product-delivery';
-import { awardPointsForPurchase, awardPointsForSale } from '@/lib/pattern-points';
+import { awardPointsForFreeDownload, awardPointsForFreeSale } from '@/lib/pattern-points';
 
 export async function POST(request: NextRequest) {
   try {
-    const { productId } = await request.json();
+    const { productId, email: guestEmail } = await request.json();
 
     const supabase = await createClient();
 
@@ -39,12 +39,13 @@ export async function POST(request: NextRequest) {
     let buyerEmail: string;
     if (user?.email) {
       buyerEmail = user.email;
+    } else if (guestEmail && typeof guestEmail === 'string' && guestEmail.includes('@')) {
+      // Guest checkout with email provided
+      buyerEmail = guestEmail.trim();
     } else {
-      // For guest checkout, we'd need email from request
-      // For now, require authentication for free products
       return NextResponse.json(
-        { error: 'Please sign in to download free patterns' },
-        { status: 401 }
+        { error: 'Please sign in or provide an email address to download free patterns' },
+        { status: 400 }
       );
     }
 
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
       .from('orders')
       .insert({
         product_id: product.id,
-        buyer_id: user.id,
+        buyer_id: user?.id || null, // null for guest buyers
         buyer_email: buyerEmail,
         seller_id: product.user_id,
         stripe_session_id: null, // No Stripe session for free products
@@ -84,13 +85,13 @@ export async function POST(request: NextRequest) {
     // Award pattern points (non-blocking)
     (async () => {
       try {
-        // Award points to buyer
-        if (user.id) {
-          await awardPointsForPurchase(user.id);
+        // Award points to buyer for downloading free pattern
+        if (user?.id) {
+          await awardPointsForFreeDownload(user.id);
         }
 
-        // Award points to seller
-        await awardPointsForSale(product.user_id);
+        // Award points to seller for free pattern download
+        await awardPointsForFreeSale(product.user_id);
       } catch (error) {
         console.error('Error awarding pattern points for free product:', error);
         // Don't throw - points are non-critical
