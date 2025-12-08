@@ -12,6 +12,7 @@ interface Product {
   images?: string[];
   category: string;
   difficulty?: string | null;
+  is_free?: boolean;
 }
 
 interface CartState {
@@ -40,49 +41,49 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
     case 'ADD_ITEM': {
       // For digital products, don't allow duplicates
       const existingItem = state.items.find(item => item.id === action.payload.id);
-      
+
       if (existingItem) {
         // Product already in cart, don't add again
         return state;
       }
-      
+
       const newItems = [...state.items, action.payload];
       return {
         ...state,
         items: newItems,
         total: newItems.reduce((sum, item) => sum + item.price, 0),
-        itemCount: newItems.length
+        itemCount: newItems.length,
       };
     }
-    
+
     case 'REMOVE_ITEM': {
       const updatedItems = state.items.filter(item => item.id !== action.payload);
       return {
         ...state,
         items: updatedItems,
         total: updatedItems.reduce((sum, item) => sum + item.price, 0),
-        itemCount: updatedItems.length
+        itemCount: updatedItems.length,
       };
     }
-    
+
     case 'CLEAR_CART':
       return {
         items: [],
         total: 0,
-        itemCount: 0
+        itemCount: 0,
       };
-    
+
     case 'LOAD_CART':
       // Handle both old format (with quantity) and new format (without)
-      const normalizedItems = action.payload.map((item: any) => 
+      const normalizedItems = action.payload.map((item: any) =>
         item.product ? item.product : item
       );
       return {
         items: normalizedItems,
         total: normalizedItems.reduce((sum: number, item: Product) => sum + item.price, 0),
-        itemCount: normalizedItems.length
+        itemCount: normalizedItems.length,
       };
-    
+
     default:
       return state;
   }
@@ -91,7 +92,7 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
 const initialState: CartState = {
   items: [],
   total: 0,
-  itemCount: 0
+  itemCount: 0,
 };
 
 export function CartProvider({ children }: { children: ReactNode }) {
@@ -115,18 +116,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('cart', JSON.stringify(state.items));
   }, [state.items]);
 
-  const addItem = useCallback((product: Product): boolean => {
-    // Check if item already exists before dispatching
-    const existingItem = state.items.find(item => item.id === product.id);
-    
-    if (existingItem) {
-      // Product already in cart
-      return false;
-    }
-    
-    dispatch({ type: 'ADD_ITEM', payload: product });
-    return true;
-  }, [state.items]);
+  const addItem = useCallback(
+    (product: Product): boolean => {
+      // Check if item already exists before dispatching
+      const existingItem = state.items.find(item => item.id === product.id);
+
+      if (existingItem) {
+        // Product already in cart
+        return false;
+      }
+
+      dispatch({ type: 'ADD_ITEM', payload: product });
+      return true;
+    },
+    [state.items]
+  );
 
   const removeItem = useCallback((productId: string) => {
     dispatch({ type: 'REMOVE_ITEM', payload: productId });
@@ -137,12 +141,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <CartContext.Provider value={{
-      state,
-      addItem,
-      removeItem,
-      clearCart
-    }}>
+    <CartContext.Provider
+      value={{
+        state,
+        addItem,
+        removeItem,
+        clearCart,
+      }}
+    >
       {children}
     </CartContext.Provider>
   );

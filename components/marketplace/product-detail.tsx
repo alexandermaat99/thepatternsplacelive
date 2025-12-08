@@ -13,12 +13,14 @@ import { useCart } from '@/contexts/cart-context';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useToast } from '@/contexts/toast-context';
 import { AuthPromptDialog } from '@/components/auth-prompt-dialog';
+import { FreeDownloadDialog } from '@/components/free-download-dialog';
 import { linkifyText } from '@/lib/text-utils';
 import { getDifficultyLabel, getDifficultyColor } from '@/lib/constants';
 import { ProductFilesDownload } from '@/components/marketplace/product-files-download';
 import { EditProductModal } from '@/components/edit-product-modal';
 import { ProductReviews } from '@/components/marketplace/product-reviews';
 import { ShareButton } from '@/components/marketplace/share-button';
+import { Download } from 'lucide-react';
 
 interface Category {
   id: string;
@@ -47,6 +49,7 @@ interface Product {
   product_categories?: Array<{
     category: Category;
   }>;
+  is_free?: boolean;
 }
 
 interface ProductDetailProps {
@@ -61,6 +64,7 @@ export function ProductDetail({ product }: ProductDetailProps) {
   const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
   const [fromCart, setFromCart] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [showFreeDownloadDialog, setShowFreeDownloadDialog] = useState(false);
   const { user, isAuthenticated } = useAuth();
   const { addItem } = useCart();
   const { isFavorite, toggleFavorite } = useFavorites();
@@ -68,6 +72,15 @@ export function ProductDetail({ product }: ProductDetailProps) {
 
   const favorited = isFavorite(product.id);
   const isOwner = user?.id === product.user_id;
+
+  // Check if product is free (either by is_free field or "free" category)
+  const isFree =
+    product.is_free ||
+    product.price === 0 ||
+    (product.product_categories &&
+      product.product_categories.some(
+        (pc: any) => pc.category?.slug === 'free' || pc.category?.name?.toLowerCase() === 'free'
+      ));
 
   // Check if user came from cart or auth pages
   useEffect(() => {
@@ -129,6 +142,47 @@ export function ProductDetail({ product }: ProductDetailProps) {
     } catch (error) {
       console.error('Add to cart error:', error);
       showToast('Failed to add item to cart. Please try again.', 'error');
+      setIsLoading(false);
+    }
+  };
+
+  const handleFreeDownload = async () => {
+    if (!isAuthenticated) {
+      setShowFreeDownloadDialog(true);
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await fetch('/api/checkout/free', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ productId: product.id }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to download free pattern');
+      }
+
+      showToast('Free pattern downloaded! Check your email for the files.', 'success');
+
+      // Redirect to success page or refresh
+      setTimeout(() => {
+        router.push(`/marketplace/success?order_id=${data.orderId}`);
+      }, 1000);
+    } catch (error) {
+      console.error('Free download error:', error);
+      showToast(
+        error instanceof Error
+          ? error.message
+          : 'Failed to download free pattern. Please try again.',
+        'error'
+      );
       setIsLoading(false);
     }
   };
@@ -222,7 +276,11 @@ export function ProductDetail({ product }: ProductDetailProps) {
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <p className="text-3xl font-bold text-primary">
-                  {formatAmountForDisplay(product.price, product.currency)}
+                  {isFree ? (
+                    <span className="text-green-600">Free</span>
+                  ) : (
+                    formatAmountForDisplay(product.price, product.currency)
+                  )}
                 </p>
                 <h1 className="text-2xl mt-2">{product.title}</h1>
                 {product.profiles && (
@@ -296,6 +354,22 @@ export function ProductDetail({ product }: ProductDetailProps) {
               >
                 <Edit className="h-4 w-4 mr-2" />
                 Edit Product
+              </Button>
+            ) : isFree ? (
+              <Button
+                onClick={handleFreeDownload}
+                className="w-full bg-green-600 hover:bg-green-700"
+                size="lg"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  'Downloading...'
+                ) : (
+                  <>
+                    <Download className="h-4 w-4 mr-2" />
+                    Download Free Pattern
+                  </>
+                )}
               </Button>
             ) : (
               <Button onClick={handleAddToCart} className="w-full" size="lg" disabled={isLoading}>
@@ -383,6 +457,13 @@ export function ProductDetail({ product }: ProductDetailProps) {
       <ProductReviews productId={product.id} />
 
       <AuthPromptDialog isOpen={showAuthDialog} onClose={() => setShowAuthDialog(false)} />
+
+      <FreeDownloadDialog
+        isOpen={showFreeDownloadDialog}
+        onClose={() => setShowFreeDownloadDialog(false)}
+        productId={product.id}
+        productTitle={product.title}
+      />
 
       {isOwner && (
         <EditProductModal

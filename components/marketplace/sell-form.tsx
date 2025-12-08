@@ -20,6 +20,7 @@ import { COMPANY_INFO, calculateEtsyFees } from '@/lib/company-info';
 import { FeesInfoModal } from '@/components/marketplace/fees-info-modal';
 import { PATTERN_POINTS } from '@/lib/pattern-points';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 
 interface SellFormProps {
   user: any;
@@ -41,6 +42,7 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
     difficulty: '' as string,
     images: [] as string[],
     files: [] as string[],
+    is_free: false,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -52,10 +54,12 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
         throw new Error('You must be logged in to list a product');
       }
 
-      const price = parseFloat(formData.price);
-      if (isNaN(price) || price < 1.0) {
+      const price = formData.is_free ? 0 : parseFloat(formData.price);
+      if (!formData.is_free && (isNaN(price) || price < 1.0)) {
         throw new Error('Price must be at least $1.00');
       }
+
+      const isFree = formData.is_free;
 
       // Require at least one PDF file
       if (!formData.files || formData.files.length === 0) {
@@ -78,6 +82,7 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
           files: formData.files.length > 0 ? formData.files : [],
           user_id: user.id,
           is_active: true,
+          is_free: isFree,
         })
         .select()
         .single();
@@ -85,10 +90,27 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
       if (error) throw error;
 
       // Link categories to the product (comma-separated input)
-      if (formData.category && product) {
+      // Also automatically add "free" category if product is free
+      if (product) {
         try {
-          await linkCategoriesToProduct(product.id, formData.category);
-          console.log('Categories linked successfully');
+          let categoriesToLink = formData.category || '';
+
+          // If product is free, add "free" category if not already present
+          if (isFree) {
+            const categoryList = categoriesToLink
+              .split(',')
+              .map(c => c.trim().toLowerCase())
+              .filter(c => c.length > 0);
+
+            if (!categoryList.includes('free')) {
+              categoriesToLink = categoriesToLink ? `${categoriesToLink}, free` : 'free';
+            }
+          }
+
+          if (categoriesToLink) {
+            await linkCategoriesToProduct(product.id, categoriesToLink);
+            console.log('Categories linked successfully');
+          }
         } catch (categoryError) {
           console.error('Error linking categories:', categoryError);
           const errorMessage =
@@ -154,16 +176,17 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
             </p>
           </CardHeader>
           <CardContent>
-            {!canSell ? (
+            {!canSell && !formData.is_free ? (
               <div className="space-y-4">
                 {!stripeStatus.isConnected ? (
                   <p className="text-red-500 font-medium">
-                    You must connect your Stripe account before listing a product.
+                    You must connect your Stripe account before listing a paid product. Free
+                    patterns don't require Stripe.
                   </p>
                 ) : (
                   <p className="text-orange-500 font-medium">
                     Your Stripe account is not fully set up yet. Please complete the onboarding
-                    process.
+                    process. Free patterns don't require Stripe.
                   </p>
                 )}
                 <StripeConnectButton userId={user.id} />
@@ -251,18 +274,60 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                 </div>
 
                 <div>
-                  <Label htmlFor="price">Price (USD) - Minimum $1.00</Label>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label htmlFor="price">Price (USD)</Label>
+                    <div className="flex items-center space-x-2">
+                      <Label
+                        htmlFor="free-toggle"
+                        className="text-sm text-muted-foreground cursor-pointer"
+                      >
+                        Free Pattern
+                      </Label>
+                      <Switch
+                        id="free-toggle"
+                        checked={formData.is_free}
+                        onCheckedChange={checked => {
+                          // When switching from free to paid, ensure price is at least 1.00
+                          // When switching from paid to free, set price to 0
+                          const newPrice = checked
+                            ? '0'
+                            : formData.price && parseFloat(formData.price) >= 1.0
+                              ? formData.price
+                              : '1.00';
+                          setFormData({
+                            ...formData,
+                            is_free: checked,
+                            price: newPrice,
+                          });
+                        }}
+                      />
+                    </div>
+                  </div>
                   <Input
                     id="price"
-                    type="number"
+                    type={formData.is_free ? 'text' : 'number'}
                     step="0.01"
-                    min="1.00"
-                    value={formData.price}
-                    onChange={e => setFormData({ ...formData, price: e.target.value })}
-                    required
-                    placeholder="1.00"
+                    min={formData.is_free ? undefined : '1.00'}
+                    value={formData.is_free ? 'Free' : formData.price}
+                    onChange={e => {
+                      if (!formData.is_free) {
+                        setFormData({ ...formData, price: e.target.value });
+                      }
+                    }}
+                    required={!formData.is_free}
+                    disabled={formData.is_free}
+                    placeholder={formData.is_free ? 'Free' : '1.00'}
+                    readOnly={formData.is_free}
                   />
-                  {formData.price &&
+                  {formData.is_free ? (
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      <p className="text-green-600 font-medium">
+                        This is a free pattern. Buyers will be able to download it without payment.
+                        The "free" category will be added automatically.
+                      </p>
+                    </div>
+                  ) : (
+                    formData.price &&
                     !isNaN(parseFloat(formData.price)) &&
                     parseFloat(formData.price) >= 1.0 && (
                       <div className="mt-2 text-xs text-muted-foreground space-y-1">
@@ -308,7 +373,8 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                           </span>
                         </div>
                       </div>
-                    )}
+                    )
+                  )}
                 </div>
 
                 <CategoryInput

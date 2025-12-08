@@ -23,6 +23,9 @@ import { COMPANY_INFO, calculateEtsyFees } from '@/lib/company-info';
 import { Info } from 'lucide-react';
 import Link from 'next/link';
 import { FeesInfoModal } from '@/components/marketplace/fees-info-modal';
+import { DeleteProductDialog } from '@/components/delete-product-dialog';
+import { Trash2 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 
 interface Product {
   id: string;
@@ -34,6 +37,7 @@ interface Product {
   category: string;
   difficulty?: string | null;
   is_active: boolean;
+  is_free?: boolean;
 }
 
 interface EditProductModalProps {
@@ -47,6 +51,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
   const { user, loading: authLoading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [showFeesModal, setShowFeesModal] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -58,6 +63,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
     image_url: '',
     files: [] as string[],
     is_active: true,
+    is_free: false,
   });
 
   // Update form data when product changes
@@ -113,6 +119,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
             image_url: product.image_url || '',
             files,
             is_active: product.is_active,
+            is_free: (product as any).is_free || false,
           });
         } catch (error) {
           console.error('Error loading categories:', error);
@@ -128,6 +135,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
             image_url: product.image_url || '',
             files,
             is_active: product.is_active,
+            is_free: (product as any).is_free || false,
           });
         }
       };
@@ -141,10 +149,12 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
     setIsLoading(true);
 
     try {
-      const price = parseFloat(formData.price);
-      if (isNaN(price) || price < 1.0) {
+      const price = formData.is_free ? 0 : parseFloat(formData.price);
+      if (!formData.is_free && (isNaN(price) || price < 1.0)) {
         throw new Error('Price must be at least $1.00');
       }
+
+      const isFree = formData.is_free;
 
       // Require at least one PDF file
       if (!formData.files || formData.files.length === 0) {
@@ -272,6 +282,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
         image_url: validImages[0] || null,
         files: formData.files.length > 0 ? formData.files : [],
         is_active: formData.is_active,
+        is_free: isFree,
         updated_at: new Date().toISOString(),
       };
 
@@ -346,19 +357,41 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
       console.log('All updates successful');
 
       // Link categories to the product (comma-separated input)
-      if (formData.category) {
-        try {
-          await linkCategoriesToProduct(product.id, formData.category);
-          console.log('Categories linked successfully');
-        } catch (categoryError) {
-          console.error('Error linking categories:', categoryError);
-          const errorMessage =
-            categoryError instanceof Error ? categoryError.message : 'Unknown error';
-          alert(
-            `Product updated successfully, but there was an issue linking categories: ${errorMessage}. Please check the console for details.`
-          );
-          // Don't fail the whole operation if category linking fails
+      // Also automatically add/remove "free" category based on price
+      try {
+        let categoriesToLink = formData.category || '';
+        const categoryList = categoriesToLink
+          .split(',')
+          .map(c => c.trim().toLowerCase())
+          .filter(c => c.length > 0);
+
+        // If product is free, add "free" category if not already present
+        if (isFree) {
+          if (!categoryList.includes('free')) {
+            categoriesToLink = categoriesToLink ? `${categoriesToLink}, free` : 'free';
+          }
+        } else {
+          // If product is paid, remove "free" category if present
+          const filteredCategories = categoryList.filter(c => c !== 'free');
+          categoriesToLink = filteredCategories.join(', ');
         }
+
+        if (categoriesToLink) {
+          await linkCategoriesToProduct(product.id, categoriesToLink);
+          console.log('Categories linked successfully');
+        } else {
+          // If no categories, remove all category links (including "free" if it was there)
+          const supabase = createClient();
+          await supabase.from('product_categories').delete().eq('product_id', product.id);
+        }
+      } catch (categoryError) {
+        console.error('Error linking categories:', categoryError);
+        const errorMessage =
+          categoryError instanceof Error ? categoryError.message : 'Unknown error';
+        alert(
+          `Product updated successfully, but there was an issue linking categories: ${errorMessage}. Please check the console for details.`
+        );
+        // Don't fail the whole operation if category linking fails
       }
 
       // Success - close modal first, then refresh
@@ -519,18 +552,57 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="price">Price (USD) - Minimum $1.00</Label>
+                <div className="flex items-center justify-between mb-2">
+                  <Label htmlFor="price">Price (USD)</Label>
+                  <div className="flex items-center space-x-2">
+                    <Label htmlFor="is_free" className="text-sm font-normal cursor-pointer">
+                      Free Pattern
+                    </Label>
+                    <Switch
+                      id="is_free"
+                      checked={formData.is_free}
+                      onCheckedChange={checked => {
+                        // When switching from free to paid, ensure price is at least 1.00
+                        // When switching from paid to free, set price to 0
+                        const newPrice = checked
+                          ? '0'
+                          : formData.price && parseFloat(formData.price) >= 1.0
+                            ? formData.price
+                            : '1.00';
+                        setFormData({
+                          ...formData,
+                          is_free: checked,
+                          price: newPrice,
+                        });
+                      }}
+                    />
+                  </div>
+                </div>
                 <Input
                   id="price"
-                  type="number"
+                  type={formData.is_free ? 'text' : 'number'}
                   step="0.01"
-                  min="1.00"
-                  value={formData.price}
-                  onChange={e => setFormData({ ...formData, price: e.target.value })}
-                  required
-                  placeholder="1.00"
+                  min={formData.is_free ? undefined : '1.00'}
+                  value={formData.is_free ? 'Free' : formData.price}
+                  onChange={e => {
+                    if (!formData.is_free) {
+                      setFormData({ ...formData, price: e.target.value });
+                    }
+                  }}
+                  required={!formData.is_free}
+                  disabled={formData.is_free}
+                  placeholder={formData.is_free ? 'Free' : '1.00'}
+                  readOnly={formData.is_free}
                 />
-                {formData.price &&
+                {formData.is_free ? (
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    <p className="text-green-600 font-medium">
+                      This is a free pattern. Buyers will be able to download it without payment.
+                      The "free" category will be added automatically.
+                    </p>
+                  </div>
+                ) : (
+                  formData.price &&
                   !isNaN(parseFloat(formData.price)) &&
                   parseFloat(formData.price) >= 1.0 && (
                     <div className="mt-2 text-xs text-muted-foreground space-y-1">
@@ -576,7 +648,8 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
                         </span>
                       </div>
                     </div>
-                  )}
+                  )
+                )}
               </div>
 
               <CategoryInput
@@ -651,20 +724,45 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
             <DialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-0">
               <Button
                 type="button"
-                variant="outline"
-                onClick={onClose}
+                variant="destructive"
+                onClick={() => {
+                  setIsDeleteDialogOpen(true);
+                }}
                 disabled={isLoading}
                 className="w-full sm:w-auto"
               >
-                Cancel
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
               </Button>
-              <Button type="submit" disabled={isLoading} className="w-full sm:w-auto">
-                {isLoading ? 'Updating...' : 'Update Product'}
-              </Button>
+              <div className="flex gap-2 w-full sm:w-auto">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onClose}
+                  disabled={isLoading}
+                  className="flex-1 sm:flex-none"
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isLoading} className="flex-1 sm:flex-none">
+                  {isLoading ? 'Updating...' : 'Update Product'}
+                </Button>
+              </div>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
+
+      <DeleteProductDialog
+        product={product}
+        isOpen={isDeleteDialogOpen}
+        onClose={() => {
+          setIsDeleteDialogOpen(false);
+        }}
+        onDeleteSuccess={() => {
+          onClose(); // Close edit modal after successful delete
+        }}
+      />
     </>
   );
 }

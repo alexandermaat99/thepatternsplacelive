@@ -37,6 +37,7 @@ interface Product {
   product_categories?: Array<{
     category: Category;
   }>;
+  is_free?: boolean;
 }
 
 interface ProductCardProps {
@@ -65,6 +66,15 @@ export function ProductCard({ product, hideFavorite = false }: ProductCardProps)
 
   const imageUrl = getImageUrl();
   const favorited = isFavorite(product.id);
+
+  // Check if product is free (either by is_free field or "free" category)
+  const isFree =
+    product.is_free ||
+    product.price === 0 ||
+    (product.product_categories &&
+      product.product_categories.some(
+        (pc: any) => pc.category?.slug === 'free' || pc.category?.name?.toLowerCase() === 'free'
+      ));
 
   // Fetch reviews to calculate average rating
   useEffect(() => {
@@ -150,8 +160,8 @@ export function ProductCard({ product, hideFavorite = false }: ProductCardProps)
 
           {/* Price overlay bubble */}
           <div className="absolute bottom-2 right-2 bg-background/40 backdrop-blur-sm rounded-full px-3 py-1 shadow-md border border-border/50">
-            <span className="text-xs font-bold text-foreground">
-              {formatAmountForDisplay(product.price, product.currency)}
+            <span className={`text-xs font-bold ${isFree ? 'text-green-600' : 'text-foreground'}`}>
+              {isFree ? 'Free' : formatAmountForDisplay(product.price, product.currency)}
             </span>
           </div>
 

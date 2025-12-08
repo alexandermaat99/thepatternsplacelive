@@ -67,6 +67,7 @@ export function MarketplaceFilters({
     priceMin: appliedPriceMin,
     priceMax: appliedPriceMax,
     sort: appliedSort,
+    freeOnly: appliedCategories.includes('free'),
   });
 
   // Sync local state when URL changes (e.g., back button, clear filters)
@@ -98,7 +99,25 @@ export function MarketplaceFilters({
       setLocalSort(appliedSort);
       prevAppliedRef.current.sort = appliedSort;
     }
-  }, [appliedCategories, appliedDifficulties, appliedPriceMin, appliedPriceMax, appliedSort]);
+
+    // Update localCategories if "free" was added/removed from applied categories
+    const currentFreeOnly = appliedCategories.includes('free');
+    if (prevAppliedRef.current.freeOnly !== currentFreeOnly) {
+      if (currentFreeOnly && !localCategories.includes('free')) {
+        setLocalCategories(prev => [...prev, 'free']);
+      } else if (!currentFreeOnly && localCategories.includes('free')) {
+        setLocalCategories(prev => prev.filter(c => c !== 'free'));
+      }
+      prevAppliedRef.current.freeOnly = currentFreeOnly;
+    }
+  }, [
+    appliedCategories,
+    appliedDifficulties,
+    appliedPriceMin,
+    appliedPriceMax,
+    appliedSort,
+    localCategories,
+  ]);
 
   // Check if there are pending changes
   const hasPendingChanges =
@@ -144,6 +163,16 @@ export function MarketplaceFilters({
     } else {
       params.delete('sort');
     }
+
+    // Free filter is now handled via categories, so just ensure categories are set correctly
+    if (localCategories.length > 0) {
+      params.set('categories', localCategories.join(','));
+    } else {
+      params.delete('categories');
+    }
+
+    // Remove old free parameter if it exists
+    params.delete('free');
 
     params.delete('page');
     router.push(`/marketplace?${params.toString()}`, { scroll: false });
@@ -225,7 +254,7 @@ export function MarketplaceFilters({
                 {appliedCategories.length +
                   appliedDifficulties.length +
                   (appliedPriceMin !== minPrice || appliedPriceMax !== maxPrice ? 1 : 0) +
-                  (appliedSort !== 'newest' ? 1 : 0)}
+                  (appliedSort !== 'popular' ? 1 : 0)}
                 {hasPendingChanges && '+'}
               </Badge>
             )}

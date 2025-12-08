@@ -36,8 +36,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Some products are no longer available' }, { status: 400 });
     }
 
-    // Get all unique seller IDs
-    const sellerIds = [...new Set(products.map((p: any) => p.user_id))];
+    // Filter out free products - they should be handled separately
+    const paidProducts = products.filter((p: any) => !p.is_free && p.price > 0);
+    const freeProducts = products.filter((p: any) => p.is_free || p.price === 0);
+
+    if (freeProducts.length > 0) {
+      return NextResponse.json(
+        {
+          error:
+            'Free products cannot be purchased through Stripe checkout. Please use the free checkout endpoint.',
+        },
+        { status: 400 }
+      );
+    }
+
+    if (paidProducts.length === 0) {
+      return NextResponse.json({ error: 'No paid products to checkout' }, { status: 400 });
+    }
+
+    // Get all unique seller IDs (from paid products only)
+    const sellerIds = [...new Set(paidProducts.map((p: any) => p.user_id))];
 
     // Get seller profiles with Stripe account IDs
     const { data: sellerProfiles, error: sellerError } = await supabase
@@ -53,7 +71,7 @@ export async function POST(request: NextRequest) {
     const sellerStripeMap = new Map(sellerProfiles.map((p: any) => [p.id, p.stripe_account_id]));
 
     // Check that all products have sellers with connected Stripe accounts
-    const productsWithoutStripe = products.filter((p: any) => !sellerStripeMap.get(p.user_id));
+    const productsWithoutStripe = paidProducts.filter((p: any) => !sellerStripeMap.get(p.user_id));
     if (productsWithoutStripe.length > 0) {
       return NextResponse.json(
         { error: 'Some sellers have not connected their Stripe accounts' },
@@ -101,32 +119,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Build line items for Stripe
-    const lineItems = items.map((item: { productId: string; quantity: number }) => {
-      const product = products.find((p: any) => p.id === item.productId);
-      if (!product) {
-        throw new Error(`Product ${item.productId} not found`);
-      }
+    // Build line items for Stripe (only paid products)
+    const lineItems = items
+      .filter((item: { productId: string; quantity: number }) => {
+        const product = paidProducts.find((p: any) => p.id === item.productId);
+        return product !== undefined;
+      })
+      .map((item: { productId: string; quantity: number }) => {
+        const product = paidProducts.find((p: any) => p.id === item.productId);
+        if (!product) {
+          throw new Error(`Product ${item.productId} not found`);
+        }
 
-      return {
-        price_data: {
-          currency: product.currency.toLowerCase(),
-          product_data: {
-            name: product.title,
-            description: product.description || undefined,
-            images: product.image_url ? [product.image_url] : [],
-            tax_code: 'txcd_10301000', // Digital products tax code (eBooks, digital files, etc.)
+        return {
+          price_data: {
+            currency: product.currency.toLowerCase(),
+            product_data: {
+              name: product.title,
+              description: product.description || undefined,
+              images: product.image_url ? [product.image_url] : [],
+              tax_code: 'txcd_10301000', // Digital products tax code (eBooks, digital files, etc.)
+            },
+            unit_amount: formatAmountForStripe(product.price, product.currency),
           },
-          unit_amount: formatAmountForStripe(product.price, product.currency),
-        },
-        quantity: item.quantity,
-      };
-    });
+          quantity: item.quantity,
+        };
+      });
 
-    // Calculate total amount for platform fee
+    // Calculate total amount for platform fee (only paid products)
     const totalAmount = items.reduce(
       (sum: number, item: { productId: string; quantity: number }) => {
-        const product = products.find((p: any) => p.id === item.productId);
+        const product = paidProducts.find((p: any) => p.id === item.productId);
         return sum + (product?.price || 0) * item.quantity;
       },
       0
@@ -147,14 +170,14 @@ export async function POST(request: NextRequest) {
     // Calculate Etsy-style fees
     const fees = calculateEtsyFees(totalInCents);
     const platformFeeAmount = fees.totalFee;
-    
+
     // Calculate seller payout: Total Sale Price - Platform Fee (tax excluded)
     // This ensures seller only gets their net from the sale, not the tax portion
     const sellerPayoutCents = totalInCents - platformFeeAmount;
 
     // Create Stripe checkout session with Connect transfer
     // Note: For multi-seller carts, consider splitting into separate sessions
-    // 
+    //
     // Tax handling (industry standard for marketplaces):
     // - Platform-level tax: Tax is calculated and collected by Stripe on the platform account
     // - Tax amount stays with platform for remittance to tax authorities

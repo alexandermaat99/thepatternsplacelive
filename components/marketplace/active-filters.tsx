@@ -23,7 +23,7 @@ export function ActiveFilters({ categories }: ActiveFiltersProps) {
 
   const removeFilter = (type: string, value?: string) => {
     const params = new URLSearchParams(searchParams.toString());
-    
+
     if (type === 'category' && value) {
       const newCategories = selectedCategories.filter(c => c !== value);
       if (newCategories.length > 0) {
@@ -45,7 +45,7 @@ export function ActiveFilters({ categories }: ActiveFiltersProps) {
     } else if (type === 'sort') {
       params.delete('sort');
     }
-    
+
     params.delete('page');
     router.push(`/marketplace?${params.toString()}`, { scroll: false });
   };
@@ -60,12 +60,12 @@ export function ActiveFilters({ categories }: ActiveFiltersProps) {
     router.push(`/marketplace?${params.toString()}`, { scroll: false });
   };
 
-  const activeFiltersCount = 
+  const activeFiltersCount =
     selectedCategories.length +
     selectedDifficulties.length +
     (priceMin ? 1 : 0) +
     (priceMax ? 1 : 0) +
-    (sortBy && sortBy !== 'newest' ? 1 : 0);
+    (sortBy && sortBy !== 'popular' ? 1 : 0);
 
   if (activeFiltersCount === 0) {
     return null;
@@ -74,9 +74,9 @@ export function ActiveFilters({ categories }: ActiveFiltersProps) {
   return (
     <div className="flex flex-wrap items-center gap-2 py-2">
       <span className="text-sm text-muted-foreground">Active filters:</span>
-      
+
       {/* Category filters */}
-      {selectedCategories.map((categorySlug) => {
+      {selectedCategories.map(categorySlug => {
         const category = categories.find(c => c.slug === categorySlug);
         return (
           <Badge
@@ -97,7 +97,7 @@ export function ActiveFilters({ categories }: ActiveFiltersProps) {
       })}
 
       {/* Difficulty filters */}
-      {selectedDifficulties.map((difficulty) => (
+      {selectedDifficulties.map(difficulty => (
         <Badge
           key={`difficulty-${difficulty}`}
           variant="secondary"
@@ -116,10 +116,7 @@ export function ActiveFilters({ categories }: ActiveFiltersProps) {
 
       {/* Price filters */}
       {priceMin && (
-        <Badge
-          variant="secondary"
-          className="flex items-center gap-1 pr-1"
-        >
+        <Badge variant="secondary" className="flex items-center gap-1 pr-1">
           Min: ${priceMin}
           <button
             onClick={() => removeFilter('minPrice')}
@@ -130,12 +127,9 @@ export function ActiveFilters({ categories }: ActiveFiltersProps) {
           </button>
         </Badge>
       )}
-      
+
       {priceMax && (
-        <Badge
-          variant="secondary"
-          className="flex items-center gap-1 pr-1"
-        >
+        <Badge variant="secondary" className="flex items-center gap-1 pr-1">
           Max: ${priceMax}
           <button
             onClick={() => removeFilter('maxPrice')}
@@ -148,17 +142,14 @@ export function ActiveFilters({ categories }: ActiveFiltersProps) {
       )}
 
       {/* Sort filter */}
-      {sortBy && sortBy !== 'newest' && (
-        <Badge
-          variant="secondary"
-          className="flex items-center gap-1 pr-1"
-        >
-          Sort: {
-            sortBy === 'oldest' && 'Oldest first'}
-            {sortBy === 'price-low' && 'Price: Low to High'}
-            {sortBy === 'price-high' && 'Price: High to Low'}
-            {sortBy === 'title-asc' && 'Title: A to Z'}
-            {sortBy === 'title-desc' && 'Title: Z to A'}
+      {sortBy && sortBy !== 'popular' && (
+        <Badge variant="secondary" className="flex items-center gap-1 pr-1">
+          Sort: {sortBy === 'oldest' && 'Oldest first'}
+          {sortBy === 'newest' && 'Newest first'}
+          {sortBy === 'price-low' && 'Price: Low to High'}
+          {sortBy === 'price-high' && 'Price: High to Low'}
+          {sortBy === 'title-asc' && 'Title: A to Z'}
+          {sortBy === 'title-desc' && 'Title: Z to A'}
           <button
             onClick={() => removeFilter('sort')}
             className="ml-1 hover:bg-muted-foreground/20 rounded-full p-0.5"
@@ -180,4 +171,3 @@ export function ActiveFilters({ categories }: ActiveFiltersProps) {
     </div>
   );
 }
-

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatAmountForDisplay } from '@/lib/utils-client';
-import { ShoppingCart, Trash2, ArrowLeft, Lock, Award } from 'lucide-react';
+import { ShoppingCart, Trash2, ArrowLeft, Lock, Award, Download } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -31,33 +31,69 @@ export default function CartPage() {
     setIsProcessing(true);
 
     try {
-      // Prepare cart items for checkout (digital products, quantity always 1)
-      const cartItems = state.items.map(item => ({
-        productId: item.id,
-        quantity: 1,
-      }));
+      // Separate free and paid products
+      const freeProducts = state.items.filter(item => item.is_free || item.price === 0);
+      const paidProducts = state.items.filter(item => !item.is_free && item.price > 0);
 
-      // Create Stripe checkout session
-      const response = await fetch('/api/checkout/cart', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ items: cartItems }),
-      });
+      // Process free products first (if any)
+      if (freeProducts.length > 0 && user) {
+        for (const product of freeProducts) {
+          try {
+            const response = await fetch('/api/checkout/free', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ productId: product.id }),
+            });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to create checkout session');
+            if (response.ok) {
+              // Remove from cart after successful download
+              removeItem(product.id);
+            } else {
+              const error = await response.json();
+              console.error(`Failed to download free product ${product.title}:`, error);
+            }
+          } catch (error) {
+            console.error(`Error downloading free product ${product.title}:`, error);
+          }
+        }
       }
 
-      const { url } = await response.json();
+      // If there are paid products, proceed to Stripe checkout
+      if (paidProducts.length > 0) {
+        const cartItems = paidProducts.map(item => ({
+          productId: item.id,
+          quantity: 1,
+        }));
 
-      if (url) {
-        // Redirect to Stripe Checkout
-        window.location.href = url;
+        // Create Stripe checkout session
+        const response = await fetch('/api/checkout/cart', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ items: cartItems }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to create checkout session');
+        }
+
+        const { url } = await response.json();
+
+        if (url) {
+          // Redirect to Stripe Checkout
+          window.location.href = url;
+        } else {
+          throw new Error('No checkout URL received');
+        }
       } else {
-        throw new Error('No checkout URL received');
+        // Only free products, show success message
+        alert('Free patterns downloaded! Check your email for the files.');
+        setIsProcessing(false);
+        router.push('/marketplace');
       }
     } catch (error) {
       console.error('Checkout error:', error);
@@ -72,13 +108,23 @@ export default function CartPage() {
     // Wait for auth to finish loading
     if (authLoading) return;
 
-    // If user is not authenticated, show auth modal
-    if (!user) {
+    // Check if there are free products
+    const hasFreeProducts = state.items.some(item => item.is_free || item.price === 0);
+    const hasPaidProducts = state.items.some(item => !item.is_free && item.price > 0);
+
+    // If there are free products and user is not authenticated, require login
+    if (hasFreeProducts && !user) {
       setShowCheckoutAuthModal(true);
       return;
     }
 
-    // User is authenticated, proceed directly to Stripe
+    // If there are paid products and user is not authenticated, show auth modal
+    if (hasPaidProducts && !user) {
+      setShowCheckoutAuthModal(true);
+      return;
+    }
+
+    // User is authenticated (or guest checkout for paid), proceed
     proceedToStripeCheckout();
   };
 
@@ -182,7 +228,11 @@ export default function CartPage() {
                       <h3 className="font-semibold text-lg truncate">{item.title}</h3>
                       <p className="text-muted-foreground text-sm mb-2">{item.category}</p>
                       <p className="text-lg font-bold text-primary">
-                        {formatAmountForDisplay(item.price, item.currency)}
+                        {item.is_free || item.price === 0 ? (
+                          <span className="text-green-600">Free</span>
+                        ) : (
+                          formatAmountForDisplay(item.price, item.currency)
+                        )}
                       </p>
                     </div>
                   </Link>
@@ -216,17 +266,53 @@ export default function CartPage() {
               <CardTitle>Order Summary</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex justify-between">
-                <span>
-                  Subtotal ({state.items.length} {state.items.length === 1 ? 'item' : 'items'})
-                </span>
-                <span className="font-medium">{formatAmountForDisplay(state.total, 'USD')}</span>
+              <div className="space-y-2">
+                {state.items.filter(item => !item.is_free && item.price > 0).length > 0 && (
+                  <div className="flex justify-between">
+                    <span>
+                      Subtotal ({state.items.filter(item => !item.is_free && item.price > 0).length}{' '}
+                      {state.items.filter(item => !item.is_free && item.price > 0).length === 1
+                        ? 'item'
+                        : 'items'}
+                      )
+                    </span>
+                    <span className="font-medium">
+                      {formatAmountForDisplay(
+                        state.items
+                          .filter(item => !item.is_free && item.price > 0)
+                          .reduce((sum, item) => sum + item.price, 0),
+                        'USD'
+                      )}
+                    </span>
+                  </div>
+                )}
+                {state.items.filter(item => item.is_free || item.price === 0).length > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>
+                      Free ({state.items.filter(item => item.is_free || item.price === 0).length}{' '}
+                      {state.items.filter(item => item.is_free || item.price === 0).length === 1
+                        ? 'item'
+                        : 'items'}
+                      )
+                    </span>
+                    <span className="font-medium">Free</span>
+                  </div>
+                )}
               </div>
 
               <div className="border-t pt-4">
                 <div className="flex justify-between text-lg font-bold">
                   <span>Total</span>
-                  <span>{formatAmountForDisplay(state.total, 'USD')}</span>
+                  <span>
+                    {state.items.filter(item => !item.is_free && item.price > 0).length > 0
+                      ? formatAmountForDisplay(
+                          state.items
+                            .filter(item => !item.is_free && item.price > 0)
+                            .reduce((sum, item) => sum + item.price, 0),
+                          'USD'
+                        )
+                      : 'Free'}
+                  </span>
                 </div>
               </div>
 
@@ -250,10 +336,15 @@ export default function CartPage() {
                     <LoadingSpinner size="sm" text="" />
                     Processing...
                   </>
-                ) : (
+                ) : state.items.filter(item => !item.is_free && item.price > 0).length > 0 ? (
                   <>
                     <Lock className="h-4 w-4 mr-2" />
                     Proceed to Checkout
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4 mr-2" />
+                    Download Free Patterns
                   </>
                 )}
               </Button>
