@@ -21,6 +21,7 @@ import { FeesInfoModal } from '@/components/marketplace/fees-info-modal';
 import { PATTERN_POINTS } from '@/lib/pattern-points';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { useToast } from '@/contexts/toast-context';
 
 interface SellFormProps {
   user: any;
@@ -31,8 +32,10 @@ interface SellFormProps {
 
 export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [showFeesModal, setShowFeesModal] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -48,16 +51,55 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError(null);
 
     try {
       if (!user) {
         throw new Error('You must be logged in to list a product');
       }
 
-      const price = formData.is_free ? 0 : parseFloat(formData.price);
-      if (!formData.is_free && (isNaN(price) || price < 1.0)) {
-        throw new Error('Price must be at least $1.00');
+      // Validate price BEFORE processing
+      if (!formData.is_free) {
+        const price = parseFloat(formData.price);
+        if (!formData.price || formData.price.trim() === '') {
+          const errorMsg = 'Please enter a price';
+          setError(errorMsg);
+          showToast(errorMsg, 'error');
+          setIsLoading(false);
+          return;
+        }
+        if (isNaN(price)) {
+          const errorMsg = 'Please enter a valid price';
+          setError(errorMsg);
+          showToast(errorMsg, 'error');
+          setIsLoading(false);
+          return;
+        }
+        if (price < 0) {
+          const errorMsg = 'Price cannot be negative';
+          setError(errorMsg);
+          showToast(errorMsg, 'error');
+          setIsLoading(false);
+          return;
+        }
+        if (price === 0) {
+          const errorMsg =
+            'Price cannot be $0.00. If you want to list a free pattern, please toggle the "Free Pattern" switch above.';
+          setError(errorMsg);
+          showToast(errorMsg, 'error');
+          setIsLoading(false);
+          return;
+        }
+        if (price < 1.0) {
+          const errorMsg = 'Price must be at least $1.00 for paid patterns';
+          setError(errorMsg);
+          showToast(errorMsg, 'error');
+          setIsLoading(false);
+          return;
+        }
       }
+
+      const price = formData.is_free ? 0 : parseFloat(formData.price);
 
       const isFree = formData.is_free;
 
@@ -145,7 +187,14 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
       router.push('/marketplace');
     } catch (error) {
       console.error('Error creating product:', error);
-      alert('Failed to create product. Please try again.');
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : error && typeof error === 'object' && 'message' in error
+            ? String(error.message)
+            : 'Failed to create product. Please try again.';
+      setError(errorMessage);
+      showToast(errorMessage, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -176,6 +225,11 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
             </p>
           </CardHeader>
           <CardContent>
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md">
+                <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+              </div>
+            )}
             {!canSell && !formData.is_free ? (
               <div className="space-y-4">
                 {!stripeStatus.isConnected ? (

@@ -26,6 +26,7 @@ import { FeesInfoModal } from '@/components/marketplace/fees-info-modal';
 import { DeleteProductDialog } from '@/components/delete-product-dialog';
 import { Trash2 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
+import { useToast } from '@/contexts/toast-context';
 
 interface Product {
   id: string;
@@ -49,9 +50,11 @@ interface EditProductModalProps {
 export function EditProductModal({ product, isOpen, onClose }: EditProductModalProps) {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [showFeesModal, setShowFeesModal] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -141,18 +144,58 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
       };
 
       loadCategories();
+      setError(null); // Clear error when product changes
     }
   }, [product]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError(null);
 
     try {
-      const price = formData.is_free ? 0 : parseFloat(formData.price);
-      if (!formData.is_free && (isNaN(price) || price < 1.0)) {
-        throw new Error('Price must be at least $1.00');
+      // Validate price BEFORE processing
+      if (!formData.is_free) {
+        const price = parseFloat(formData.price);
+        if (!formData.price || formData.price.trim() === '') {
+          const errorMsg = 'Please enter a price';
+          setError(errorMsg);
+          showToast(errorMsg, 'error');
+          setIsLoading(false);
+          return;
+        }
+        if (isNaN(price)) {
+          const errorMsg = 'Please enter a valid price';
+          setError(errorMsg);
+          showToast(errorMsg, 'error');
+          setIsLoading(false);
+          return;
+        }
+        if (price < 0) {
+          const errorMsg = 'Price cannot be negative';
+          setError(errorMsg);
+          showToast(errorMsg, 'error');
+          setIsLoading(false);
+          return;
+        }
+        if (price === 0) {
+          const errorMsg =
+            'Price cannot be $0.00. If you want to make this a free pattern, please toggle the "Free Pattern" switch above.';
+          setError(errorMsg);
+          showToast(errorMsg, 'error');
+          setIsLoading(false);
+          return;
+        }
+        if (price < 1.0) {
+          const errorMsg = 'Price must be at least $1.00 for paid patterns';
+          setError(errorMsg);
+          showToast(errorMsg, 'error');
+          setIsLoading(false);
+          return;
+        }
       }
+
+      const price = formData.is_free ? 0 : parseFloat(formData.price);
 
       const isFree = formData.is_free;
 
@@ -409,8 +452,14 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
       }, 500);
     } catch (error) {
       console.error('Error updating product:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      alert(`Failed to update product: ${errorMessage}\n\nCheck the browser console for details.`);
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : error && typeof error === 'object' && 'message' in error
+            ? String(error.message)
+            : 'Failed to update product. Please try again.';
+      setError(errorMessage);
+      showToast(errorMessage, 'error');
       setIsLoading(false); // Always stop loading on error
     }
   };
@@ -432,6 +481,11 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <div className="p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md">
+                <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+              </div>
+            )}
             <div>
               <Label htmlFor="title">Product Title</Label>
               <Input
