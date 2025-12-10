@@ -119,7 +119,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      {/* Google Tag Manager - loads in head via Next.js Script component */}
+      {/* Google Tag Manager - must load early in head */}
       <Script
         id="google-tag-manager"
         strategy="afterInteractive"
@@ -134,7 +134,7 @@ export default function RootLayout({
         }}
       />
       <body className={`${geistSans.className} antialiased flex flex-col min-h-screen`}>
-        {/* Google Tag Manager (noscript) */}
+        {/* Google Tag Manager (noscript) - must be immediately after opening <body> tag */}
         <noscript>
           <iframe
             src={`https://www.googletagmanager.com/ns.html?id=${gtmId}`}
