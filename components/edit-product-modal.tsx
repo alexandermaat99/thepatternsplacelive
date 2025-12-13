@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -47,6 +47,15 @@ interface EditProductModalProps {
   onClose: () => void;
 }
 
+interface FieldErrors {
+  title?: string;
+  description?: string;
+  price?: string;
+  difficulty?: string;
+  images?: string;
+  files?: string;
+}
+
 export function EditProductModal({ product, isOpen, onClose }: EditProductModalProps) {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
@@ -55,6 +64,8 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
   const [showFeesModal, setShowFeesModal] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const shouldScrollRef = useRef<string | null>(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -68,6 +79,22 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
     is_active: true,
     is_free: false,
   });
+
+  // Scroll to error field when fieldErrors change
+  useEffect(() => {
+    if (shouldScrollRef.current) {
+      const fieldId = shouldScrollRef.current;
+      shouldScrollRef.current = null;
+
+      // Wait for DOM to update
+      setTimeout(() => {
+        const element = document.getElementById(fieldId);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+    }
+  }, [fieldErrors]);
 
   // Update form data when product changes
   useEffect(() => {
@@ -145,51 +172,113 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
 
       loadCategories();
       setError(null); // Clear error when product changes
+      setFieldErrors({}); // Clear field errors when product changes
     }
   }, [product]);
 
+  const validateForm = (): boolean => {
+    const errors: FieldErrors = {};
+
+    // Validate title
+    if (!formData.title || formData.title.trim() === '') {
+      errors.title = 'Product title is required';
+    }
+
+    // Validate description
+    if (!formData.description || formData.description.trim() === '') {
+      errors.description = 'Description is required';
+    } else if (formData.description.trim().length < 10) {
+      errors.description = 'Description must be at least 10 characters';
+    }
+
+    // Validate price (if not free)
+    if (!formData.is_free) {
+      if (!formData.price || formData.price.trim() === '') {
+        errors.price = 'Please enter a price';
+      } else {
+        const price = parseFloat(formData.price);
+        if (isNaN(price)) {
+          errors.price = 'Please enter a valid price';
+        } else if (price < 0) {
+          errors.price = 'Price cannot be negative';
+        } else if (price === 0) {
+          errors.price =
+            'Price cannot be $0.00. If you want to make this a free pattern, please toggle the "Free Pattern" switch above.';
+        } else if (price < 1.0) {
+          errors.price = 'Price must be at least $1.00 for paid patterns';
+        }
+      }
+    }
+
+    // Validate difficulty
+    if (!formData.difficulty || formData.difficulty.trim() === '') {
+      errors.difficulty = 'Please select a difficulty level';
+    }
+
+    // Validate images
+    if (!formData.images || formData.images.length === 0) {
+      errors.images = 'Please upload at least one image';
+    }
+
+    // Validate files
+    if (!formData.files || formData.files.length === 0) {
+      errors.files = 'Please upload at least one PDF file';
+    }
+
+    // Set errors immediately
+    if (Object.keys(errors).length > 0) {
+      const firstErrorField = Object.keys(errors)[0];
+      shouldScrollRef.current = firstErrorField;
+      setFieldErrors(errors);
+      return false;
+    }
+
+    return true;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setError(null);
+    // Don't clear fieldErrors here - let validateForm set them
 
     try {
-      // Validate price BEFORE processing
+      // Validate all fields
+      if (!validateForm()) {
+        setIsLoading(false);
+        showToast('Please fix the errors in the form', 'error');
+        return;
+      }
+
+      setIsLoading(true);
+
+      // Validate price (additional check for consistency)
       if (!formData.is_free) {
         const price = parseFloat(formData.price);
         if (!formData.price || formData.price.trim() === '') {
-          const errorMsg = 'Please enter a price';
-          setError(errorMsg);
-          showToast(errorMsg, 'error');
+          setFieldErrors({ price: 'Please enter a price' });
           setIsLoading(false);
           return;
         }
         if (isNaN(price)) {
-          const errorMsg = 'Please enter a valid price';
-          setError(errorMsg);
-          showToast(errorMsg, 'error');
+          setFieldErrors({ price: 'Please enter a valid price' });
           setIsLoading(false);
           return;
         }
         if (price < 0) {
-          const errorMsg = 'Price cannot be negative';
-          setError(errorMsg);
-          showToast(errorMsg, 'error');
+          setFieldErrors({ price: 'Price cannot be negative' });
           setIsLoading(false);
           return;
         }
         if (price === 0) {
-          const errorMsg =
-            'Price cannot be $0.00. If you want to make this a free pattern, please toggle the "Free Pattern" switch above.';
-          setError(errorMsg);
-          showToast(errorMsg, 'error');
+          setFieldErrors({
+            price:
+              'Price cannot be $0.00. If you want to make this a free pattern, please toggle the "Free Pattern" switch above.',
+          });
           setIsLoading(false);
           return;
         }
         if (price < 1.0) {
-          const errorMsg = 'Price must be at least $1.00 for paid patterns';
-          setError(errorMsg);
-          showToast(errorMsg, 'error');
+          setFieldErrors({ price: 'Price must be at least $1.00 for paid patterns' });
           setIsLoading(false);
           return;
         }
@@ -199,9 +288,11 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
 
       const isFree = formData.is_free;
 
-      // Require at least one PDF file
+      // Additional validation (should already be caught by validateForm, but double-check)
       if (!formData.files || formData.files.length === 0) {
-        throw new Error('Please upload at least one PDF file for your product');
+        setFieldErrors({ files: 'Please upload at least one PDF file for your product' });
+        setIsLoading(false);
+        return;
       }
 
       const supabase = createClient();
@@ -488,13 +579,30 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
             )}
             <div>
               <Label htmlFor="title">Product Title</Label>
-              <Input
-                id="title"
-                value={formData.title}
-                onChange={e => setFormData({ ...formData, title: e.target.value })}
-                required
-                placeholder="Enter product title"
-              />
+              <div
+                className={
+                  fieldErrors.title
+                    ? 'rounded-md border border-red-500 focus-within:ring-1 focus-within:ring-red-500'
+                    : ''
+                }
+              >
+                <Input
+                  id="title"
+                  value={formData.title}
+                  onChange={e => {
+                    setFormData({ ...formData, title: e.target.value });
+                    if (fieldErrors.title) {
+                      setFieldErrors({ ...fieldErrors, title: undefined });
+                    }
+                  }}
+                  required
+                  placeholder="Enter product title"
+                  className={fieldErrors.title ? 'border-0 focus-visible:ring-0' : ''}
+                />
+              </div>
+              {fieldErrors.title && (
+                <p className="text-sm text-red-600 dark:text-red-400 mt-1">{fieldErrors.title}</p>
+              )}
             </div>
 
             <div>
@@ -504,47 +612,68 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
                   ({formData.description.length}/500 characters)
                 </span>
               </Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={e => {
-                  // Clean pasted content immediately
-                  let cleaned = e.target.value;
-                  // Remove any non-printable characters except newlines and tabs
-                  cleaned = cleaned.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
-                  // Limit to 500 characters
-                  if (cleaned.length > 500) {
-                    cleaned = cleaned.substring(0, 500);
-                  }
-                  setFormData({ ...formData, description: cleaned });
-                }}
-                onPaste={e => {
-                  // Handle paste event to clean content while preserving URLs
-                  e.preventDefault();
-                  const pastedText = e.clipboardData.getData('text/plain');
-                  // Remove non-printable characters but preserve URLs and links
-                  // URLs contain :, /, ?, &, =, etc. which are all printable ASCII
-                  let cleaned = pastedText.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
-                  // Get current cursor position or append to end
-                  const textarea = e.currentTarget;
-                  const start = textarea.selectionStart;
-                  const end = textarea.selectionEnd;
-                  const currentText = formData.description;
-                  let newText =
-                    currentText.substring(0, start) + cleaned + currentText.substring(end);
-                  // Limit to 500 characters
-                  if (newText.length > 500) {
-                    newText = newText.substring(0, 500);
-                  }
-                  setFormData({ ...formData, description: newText });
-                }}
-                required
-                placeholder="Describe your product"
-                rows={6}
-                maxLength={500}
-                className="resize-y min-h-[120px] max-h-[300px] overflow-y-auto"
-              />
-              {formData.description.length > 450 && (
+              <div
+                className={
+                  fieldErrors.description
+                    ? 'rounded-md border border-red-500 focus-within:ring-2 focus-within:ring-red-500'
+                    : ''
+                }
+              >
+                <Textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={e => {
+                    // Clean pasted content immediately
+                    let cleaned = e.target.value;
+                    // Remove any non-printable characters except newlines and tabs
+                    cleaned = cleaned.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
+                    // Limit to 500 characters
+                    if (cleaned.length > 500) {
+                      cleaned = cleaned.substring(0, 500);
+                    }
+                    setFormData({ ...formData, description: cleaned });
+                    if (fieldErrors.description) {
+                      setFieldErrors({ ...fieldErrors, description: undefined });
+                    }
+                  }}
+                  onPaste={e => {
+                    // Handle paste event to clean content while preserving URLs
+                    e.preventDefault();
+                    const pastedText = e.clipboardData.getData('text/plain');
+                    // Remove non-printable characters but preserve URLs and links
+                    // URLs contain :, /, ?, &, =, etc. which are all printable ASCII
+                    let cleaned = pastedText.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
+                    // Get current cursor position or append to end
+                    const textarea = e.currentTarget;
+                    const start = textarea.selectionStart;
+                    const end = textarea.selectionEnd;
+                    const currentText = formData.description;
+                    let newText =
+                      currentText.substring(0, start) + cleaned + currentText.substring(end);
+                    // Limit to 500 characters
+                    if (newText.length > 500) {
+                      newText = newText.substring(0, 500);
+                    }
+                    setFormData({ ...formData, description: newText });
+                    if (fieldErrors.description) {
+                      setFieldErrors({ ...fieldErrors, description: undefined });
+                    }
+                  }}
+                  required
+                  placeholder="Describe your product"
+                  rows={6}
+                  maxLength={500}
+                  className={`resize-y min-h-[120px] max-h-[300px] overflow-y-auto ${
+                    fieldErrors.description ? 'border-0 focus-visible:ring-0' : ''
+                  }`}
+                />
+              </div>
+              {fieldErrors.description && (
+                <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                  {fieldErrors.description}
+                </p>
+              )}
+              {!fieldErrors.description && formData.description.length > 450 && (
                 <p className="text-sm text-orange-600 mt-1">
                   Warning: Description is getting long ({formData.description.length} characters).
                 </p>
@@ -632,22 +761,37 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
                     />
                   </div>
                 </div>
-                <Input
-                  id="price"
-                  type={formData.is_free ? 'text' : 'number'}
-                  step="0.01"
-                  min={formData.is_free ? undefined : '1.00'}
-                  value={formData.is_free ? 'Free' : formData.price}
-                  onChange={e => {
-                    if (!formData.is_free) {
-                      setFormData({ ...formData, price: e.target.value });
-                    }
-                  }}
-                  required={!formData.is_free}
-                  disabled={formData.is_free}
-                  placeholder={formData.is_free ? 'Free' : '1.00'}
-                  readOnly={formData.is_free}
-                />
+                <div
+                  className={
+                    fieldErrors.price && !formData.is_free
+                      ? 'rounded-md border border-red-500 focus-within:ring-1 focus-within:ring-red-500'
+                      : ''
+                  }
+                >
+                  <Input
+                    id="price"
+                    type={formData.is_free ? 'text' : 'number'}
+                    step="0.01"
+                    min={formData.is_free ? undefined : '1.00'}
+                    value={formData.is_free ? 'Free' : formData.price}
+                    onChange={e => {
+                      if (!formData.is_free) {
+                        setFormData({ ...formData, price: e.target.value });
+                        if (fieldErrors.price) {
+                          setFieldErrors({ ...fieldErrors, price: undefined });
+                        }
+                      }
+                    }}
+                    required={!formData.is_free}
+                    disabled={formData.is_free}
+                    placeholder={formData.is_free ? 'Free' : '1.00'}
+                    readOnly={formData.is_free}
+                    className={fieldErrors.price ? 'border-0 focus-visible:ring-0' : ''}
+                  />
+                </div>
+                {fieldErrors.price && (
+                  <p className="text-sm text-red-600 dark:text-red-400 mt-1">{fieldErrors.price}</p>
+                )}
                 {formData.is_free ? (
                   <div className="mt-2 text-xs text-muted-foreground">
                     <p className="text-green-600 font-medium">
@@ -723,41 +867,83 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
                     <Info className="h-4 w-4" />
                   </Link>
                 </div>
-                <select
-                  id="difficulty"
-                  value={formData.difficulty}
-                  onChange={e => setFormData({ ...formData, difficulty: e.target.value })}
-                  required
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+                <div
+                  className={
+                    fieldErrors.difficulty
+                      ? 'rounded-md border border-red-500 focus-within:ring-1 focus-within:ring-red-500'
+                      : ''
+                  }
                 >
-                  <option value="" disabled>
-                    Select difficulty level
-                  </option>
-                  {DIFFICULTY_LEVELS.map(level => (
-                    <option key={level.value} value={level.value}>
-                      {level.label}
+                  <select
+                    id="difficulty"
+                    value={formData.difficulty}
+                    onChange={e => {
+                      setFormData({ ...formData, difficulty: e.target.value });
+                      if (fieldErrors.difficulty) {
+                        setFieldErrors({ ...fieldErrors, difficulty: undefined });
+                      }
+                    }}
+                    required
+                    className="flex h-9 w-full rounded-md border-0 bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+                  >
+                    <option value="" disabled>
+                      Select difficulty level
                     </option>
-                  ))}
-                </select>
+                    {DIFFICULTY_LEVELS.map(level => (
+                      <option key={level.value} value={level.value}>
+                        {level.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {fieldErrors.difficulty && (
+                  <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                    {fieldErrors.difficulty}
+                  </p>
+                )}
               </div>
             </div>
 
             {!authLoading && user && (
               <>
-                <MultiImageUpload
-                  value={formData.images}
-                  onChange={urls => setFormData({ ...formData, images: urls })}
-                  userId={user.id}
-                  maxImages={10}
-                />
+                <div>
+                  <MultiImageUpload
+                    value={formData.images}
+                    onChange={urls => {
+                      setFormData({ ...formData, images: urls });
+                      if (fieldErrors.images) {
+                        setFieldErrors({ ...fieldErrors, images: undefined });
+                      }
+                    }}
+                    userId={user.id}
+                    maxImages={10}
+                  />
+                  {fieldErrors.images && (
+                    <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                      {fieldErrors.images}
+                    </p>
+                  )}
+                </div>
 
-                <DigitalFileUpload
-                  value={formData.files}
-                  onChange={paths => setFormData({ ...formData, files: paths })}
-                  userId={user.id}
-                  maxFiles={10}
-                  maxFileSizeMB={100}
-                />
+                <div>
+                  <DigitalFileUpload
+                    value={formData.files}
+                    onChange={paths => {
+                      setFormData({ ...formData, files: paths });
+                      if (fieldErrors.files) {
+                        setFieldErrors({ ...fieldErrors, files: undefined });
+                      }
+                    }}
+                    userId={user.id}
+                    maxFiles={10}
+                    maxFileSizeMB={100}
+                  />
+                  {fieldErrors.files && (
+                    <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                      {fieldErrors.files}
+                    </p>
+                  )}
+                </div>
               </>
             )}
             {authLoading && (

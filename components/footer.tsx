@@ -65,7 +65,7 @@ export function Footer() {
           {/* Connect */}
           <div>
             <h3 className="font-semibold mb-4">Connect</h3>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 mb-4">
               {COMPANY_INFO.social.instagram && (
                 <a
                   href={COMPANY_INFO.social.instagram}
@@ -78,15 +78,41 @@ export function Footer() {
                 </a>
               )}
             </div>
-          </div>
-
-          {/* Settings */}
-          <div>
-            <h3 className="font-semibold mb-4">Settings</h3>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span>Theme:</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Theme:</span>
               <ThemeSwitcher />
             </div>
+          </div>
+
+          {/* About */}
+          <div>
+            <h3 className="font-semibold mb-4">About</h3>
+            <ul className="space-y-2 text-sm">
+              <li>
+                <Link
+                  href="/about"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  About Us
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href={COMPANY_INFO.urls.privacy}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Privacy Policy
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href={COMPANY_INFO.urls.terms}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Terms of Service
+                </Link>
+              </li>
+            </ul>
           </div>
         </div>
 
@@ -94,20 +120,6 @@ export function Footer() {
         <div className="mt-8 pt-8 border-t border-border">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
             <p>{getCopyrightText()}</p>
-            <div className="flex gap-6">
-              <Link
-                href={COMPANY_INFO.urls.privacy}
-                className="hover:text-foreground transition-colors"
-              >
-                Privacy Policy
-              </Link>
-              <Link
-                href={COMPANY_INFO.urls.terms}
-                className="hover:text-foreground transition-colors"
-              >
-                Terms of Service
-              </Link>
-            </div>
           </div>
         </div>
       </div>

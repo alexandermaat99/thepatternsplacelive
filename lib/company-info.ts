@@ -11,10 +11,10 @@ export const COMPANY_INFO = {
 
   // Contact Information
   email: {
-    general: 'hello@thepatternsplace.com',
+    general: 'thepatternsplacemarketplace@gmail.com',
     support: 'thepatternsplacemarketplace@gmail.com',
-    privacy: 'thepatternsplace@gmail.com',
-    legal: 'legal@thepatternsplace.com',
+    privacy: 'thepatternsplacemarketplace@gmail.com',
+    legal: 'thepatternsplacemarketplace@gmail.com',
   },
 
   phone: {

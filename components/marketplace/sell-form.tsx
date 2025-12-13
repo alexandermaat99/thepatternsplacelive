@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,12 +30,23 @@ interface SellFormProps {
   canSell: boolean;
 }
 
+interface FieldErrors {
+  title?: string;
+  description?: string;
+  price?: string;
+  difficulty?: string;
+  images?: string;
+  files?: string;
+}
+
 export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps) {
   const router = useRouter();
   const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [showFeesModal, setShowFeesModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const shouldScrollRef = useRef<string | null>(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -48,52 +59,131 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
     is_free: false,
   });
 
+  // Scroll to error field when fieldErrors change
+  useEffect(() => {
+    if (shouldScrollRef.current) {
+      const fieldId = shouldScrollRef.current;
+      shouldScrollRef.current = null;
+
+      // Wait for DOM to update
+      setTimeout(() => {
+        const element = document.getElementById(fieldId);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+    }
+  }, [fieldErrors]);
+
+  const validateForm = (): boolean => {
+    const errors: FieldErrors = {};
+
+    // Validate title
+    if (!formData.title || formData.title.trim() === '') {
+      errors.title = 'Product title is required';
+    }
+
+    // Validate description
+    if (!formData.description || formData.description.trim() === '') {
+      errors.description = 'Description is required';
+    } else if (formData.description.trim().length < 10) {
+      errors.description = 'Description must be at least 10 characters';
+    }
+
+    // Validate price (if not free)
+    if (!formData.is_free) {
+      if (!formData.price || formData.price.trim() === '') {
+        errors.price = 'Please enter a price';
+      } else {
+        const price = parseFloat(formData.price);
+        if (isNaN(price)) {
+          errors.price = 'Please enter a valid price';
+        } else if (price < 0) {
+          errors.price = 'Price cannot be negative';
+        } else if (price === 0) {
+          errors.price =
+            'Price cannot be $0.00. If you want to list a free pattern, please toggle the "Free Pattern" switch above.';
+        } else if (price < 1.0) {
+          errors.price = 'Price must be at least $1.00 for paid patterns';
+        }
+      }
+    }
+
+    // Validate difficulty
+    if (!formData.difficulty || formData.difficulty.trim() === '') {
+      errors.difficulty = 'Please select a difficulty level';
+    }
+
+    // Validate images
+    if (!formData.images || formData.images.length === 0) {
+      errors.images = 'Please upload at least one image';
+    }
+
+    // Validate files
+    if (!formData.files || formData.files.length === 0) {
+      errors.files = 'Please upload at least one PDF file';
+    }
+
+    // Set errors immediately
+    if (Object.keys(errors).length > 0) {
+      const firstErrorField = Object.keys(errors)[0];
+      shouldScrollRef.current = firstErrorField;
+      setFieldErrors(errors);
+      return false;
+    }
+
+    // Clear errors if validation passes
+    setFieldErrors({});
+    return true;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setError(null);
+    // Don't clear fieldErrors here - let validateForm set them
 
     try {
       if (!user) {
         throw new Error('You must be logged in to list a product');
       }
 
-      // Validate price BEFORE processing
+      // Validate all fields
+      if (!validateForm()) {
+        setIsLoading(false);
+        showToast('Please fix the errors in the form', 'error');
+        return;
+      }
+
+      setIsLoading(true);
+
+      // Validate price (additional check for consistency)
       if (!formData.is_free) {
         const price = parseFloat(formData.price);
         if (!formData.price || formData.price.trim() === '') {
-          const errorMsg = 'Please enter a price';
-          setError(errorMsg);
-          showToast(errorMsg, 'error');
+          setFieldErrors({ price: 'Please enter a price' });
           setIsLoading(false);
           return;
         }
         if (isNaN(price)) {
-          const errorMsg = 'Please enter a valid price';
-          setError(errorMsg);
-          showToast(errorMsg, 'error');
+          setFieldErrors({ price: 'Please enter a valid price' });
           setIsLoading(false);
           return;
         }
         if (price < 0) {
-          const errorMsg = 'Price cannot be negative';
-          setError(errorMsg);
-          showToast(errorMsg, 'error');
+          setFieldErrors({ price: 'Price cannot be negative' });
           setIsLoading(false);
           return;
         }
         if (price === 0) {
-          const errorMsg =
-            'Price cannot be $0.00. If you want to list a free pattern, please toggle the "Free Pattern" switch above.';
-          setError(errorMsg);
-          showToast(errorMsg, 'error');
+          setFieldErrors({
+            price:
+              'Price cannot be $0.00. If you want to list a free pattern, please toggle the "Free Pattern" switch above.',
+          });
           setIsLoading(false);
           return;
         }
         if (price < 1.0) {
-          const errorMsg = 'Price must be at least $1.00 for paid patterns';
-          setError(errorMsg);
-          showToast(errorMsg, 'error');
+          setFieldErrors({ price: 'Price must be at least $1.00 for paid patterns' });
           setIsLoading(false);
           return;
         }
@@ -103,9 +193,11 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
 
       const isFree = formData.is_free;
 
-      // Require at least one PDF file
+      // Additional validation (should already be caught by validateForm, but double-check)
       if (!formData.files || formData.files.length === 0) {
-        throw new Error('Please upload at least one PDF file for your product');
+        setFieldErrors({ files: 'Please upload at least one PDF file for your product' });
+        setIsLoading(false);
+        return;
       }
 
       const supabase = createClient();
@@ -203,7 +295,7 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
   return (
     <>
       <FeesInfoModal isOpen={showFeesModal} onClose={() => setShowFeesModal(false)} />
-      <div className="container mx-auto px-4 py-8 max-w-2xl">
+      <div className="container  mx-auto px-4 py-8 max-w-2xl">
         <div className="mb-6">
           <Button variant="ghost" onClick={() => router.back()} className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
@@ -262,13 +354,32 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
                   <Label htmlFor="title">Product Title</Label>
-                  <Input
-                    id="title"
-                    value={formData.title}
-                    onChange={e => setFormData({ ...formData, title: e.target.value })}
-                    required
-                    placeholder="Enter product title"
-                  />
+                  <div
+                    className={
+                      fieldErrors.title
+                        ? 'rounded-md border border-red-500 focus-within:ring-1 focus-within:ring-red-500'
+                        : ''
+                    }
+                  >
+                    <Input
+                      id="title"
+                      value={formData.title}
+                      onChange={e => {
+                        setFormData({ ...formData, title: e.target.value });
+                        if (fieldErrors.title) {
+                          setFieldErrors({ ...fieldErrors, title: undefined });
+                        }
+                      }}
+                      required
+                      placeholder="Enter product title"
+                      className={fieldErrors.title ? 'border-0 focus-visible:ring-0' : ''}
+                    />
+                  </div>
+                  {fieldErrors.title && (
+                    <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                      {fieldErrors.title}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -278,21 +389,38 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                       ({formData.description.length}/500 characters)
                     </span>
                   </Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
-                      const value = e.target.value;
-                      if (value.length <= 500) {
-                        setFormData({ ...formData, description: value });
-                      }
-                    }}
-                    required
-                    placeholder="Describe your product"
-                    rows={4}
-                    maxLength={500}
-                  />
-                  {formData.description.length > 450 && (
+                  <div
+                    className={
+                      fieldErrors.description
+                        ? 'rounded-md border border-red-500 focus-within:ring-2 focus-within:ring-red-500'
+                        : ''
+                    }
+                  >
+                    <Textarea
+                      id="description"
+                      value={formData.description}
+                      onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                        const value = e.target.value;
+                        if (value.length <= 500) {
+                          setFormData({ ...formData, description: value });
+                          if (fieldErrors.description) {
+                            setFieldErrors({ ...fieldErrors, description: undefined });
+                          }
+                        }
+                      }}
+                      required
+                      placeholder="Describe your product"
+                      rows={4}
+                      maxLength={500}
+                      className={fieldErrors.description ? 'border-0 focus-visible:ring-0' : ''}
+                    />
+                  </div>
+                  {fieldErrors.description && (
+                    <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                      {fieldErrors.description}
+                    </p>
+                  )}
+                  {!fieldErrors.description && formData.description.length > 450 && (
                     <p className="text-sm text-orange-600 mt-1">
                       Warning: Description is getting long ({formData.description.length}{' '}
                       characters).
@@ -357,22 +485,39 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                       />
                     </div>
                   </div>
-                  <Input
-                    id="price"
-                    type={formData.is_free ? 'text' : 'number'}
-                    step="0.01"
-                    min={formData.is_free ? undefined : '1.00'}
-                    value={formData.is_free ? 'Free' : formData.price}
-                    onChange={e => {
-                      if (!formData.is_free) {
-                        setFormData({ ...formData, price: e.target.value });
-                      }
-                    }}
-                    required={!formData.is_free}
-                    disabled={formData.is_free}
-                    placeholder={formData.is_free ? 'Free' : '1.00'}
-                    readOnly={formData.is_free}
-                  />
+                  <div
+                    className={
+                      fieldErrors.price && !formData.is_free
+                        ? 'rounded-md border border-red-500 focus-within:ring-1 focus-within:ring-red-500'
+                        : ''
+                    }
+                  >
+                    <Input
+                      id="price"
+                      type={formData.is_free ? 'text' : 'number'}
+                      step="0.01"
+                      min={formData.is_free ? undefined : '1.00'}
+                      value={formData.is_free ? 'Free' : formData.price}
+                      onChange={e => {
+                        if (!formData.is_free) {
+                          setFormData({ ...formData, price: e.target.value });
+                          if (fieldErrors.price) {
+                            setFieldErrors({ ...fieldErrors, price: undefined });
+                          }
+                        }
+                      }}
+                      required={!formData.is_free}
+                      disabled={formData.is_free}
+                      placeholder={formData.is_free ? 'Free' : '1.00'}
+                      readOnly={formData.is_free}
+                      className={fieldErrors.price ? 'border-0 focus-visible:ring-0' : ''}
+                    />
+                  </div>
+                  {fieldErrors.price && (
+                    <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                      {fieldErrors.price}
+                    </p>
+                  )}
                   {formData.is_free ? (
                     <div className="mt-2 text-xs text-muted-foreground">
                       <p className="text-green-600 font-medium">
@@ -448,40 +593,82 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                       <Info className="h-4 w-4" />
                     </Link>
                   </div>
-                  <select
-                    id="difficulty"
-                    value={formData.difficulty}
-                    onChange={e => setFormData({ ...formData, difficulty: e.target.value })}
-                    required
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+                  <div
+                    className={
+                      fieldErrors.difficulty
+                        ? 'rounded-md border border-red-500 focus-within:ring-1 focus-within:ring-red-500'
+                        : ''
+                    }
                   >
-                    <option value="" disabled>
-                      Select difficulty level
-                    </option>
-                    {DIFFICULTY_LEVELS.map(level => (
-                      <option key={level.value} value={level.value}>
-                        {level.label}
+                    <select
+                      id="difficulty"
+                      value={formData.difficulty}
+                      onChange={e => {
+                        setFormData({ ...formData, difficulty: e.target.value });
+                        if (fieldErrors.difficulty) {
+                          setFieldErrors({ ...fieldErrors, difficulty: undefined });
+                        }
+                      }}
+                      required
+                      className="flex h-9 w-full rounded-md border-0 bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+                    >
+                      <option value="" disabled>
+                        Select difficulty level
                       </option>
-                    ))}
-                  </select>
+                      {DIFFICULTY_LEVELS.map(level => (
+                        <option key={level.value} value={level.value}>
+                          {level.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {fieldErrors.difficulty && (
+                    <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                      {fieldErrors.difficulty}
+                    </p>
+                  )}
                 </div>
 
                 {user && (
                   <>
-                    <MultiImageUpload
-                      value={formData.images}
-                      onChange={urls => setFormData({ ...formData, images: urls })}
-                      userId={user.id}
-                      maxImages={10}
-                    />
+                    <div>
+                      <MultiImageUpload
+                        value={formData.images}
+                        onChange={urls => {
+                          setFormData({ ...formData, images: urls });
+                          if (fieldErrors.images) {
+                            setFieldErrors({ ...fieldErrors, images: undefined });
+                          }
+                        }}
+                        userId={user.id}
+                        maxImages={10}
+                      />
+                      {fieldErrors.images && (
+                        <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                          {fieldErrors.images}
+                        </p>
+                      )}
+                    </div>
 
-                    <DigitalFileUpload
-                      value={formData.files}
-                      onChange={paths => setFormData({ ...formData, files: paths })}
-                      userId={user.id}
-                      maxFiles={10}
-                      maxFileSizeMB={100}
-                    />
+                    <div>
+                      <DigitalFileUpload
+                        value={formData.files}
+                        onChange={paths => {
+                          setFormData({ ...formData, files: paths });
+                          if (fieldErrors.files) {
+                            setFieldErrors({ ...fieldErrors, files: undefined });
+                          }
+                        }}
+                        userId={user.id}
+                        maxFiles={10}
+                        maxFileSizeMB={100}
+                      />
+                      {fieldErrors.files && (
+                        <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                          {fieldErrors.files}
+                        </p>
+                      )}
+                    </div>
                   </>
                 )}
 
