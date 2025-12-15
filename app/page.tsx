@@ -40,8 +40,10 @@ export default function Home(props: any) {
                   </span>
                 </h1>
                 <p className="max-w-xl text-base text-muted-foreground sm:text-lg">
-                  Browse curated digital patterns from independent designers around the world.
-                  Download instantly, print at home, and start sewing within minutes.
+                  Browse curated digital patterns from independent designers.
+                  <span className="text-rose-400 font-semibold"> Download</span> instantly,{' '}
+                  <span className="text-rose-400 font-semibold"> print</span> at home, and start{' '}
+                  <span className="text-rose-400 font-semibold"> sew</span>ing within minutes.
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
@@ -82,24 +84,23 @@ export default function Home(props: any) {
                   </span> */}
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div className="space-y-2 rounded-2xl bg-muted/60 p-3">
+                  <div className="space-y-2 rounded-2xl bg-muted p-3">
                     <p className="font-semibold">Community rated</p>
                     <p className="text-muted-foreground">
                       See what other makers think about a pattern before you buy.
                     </p>
                   </div>
-                  <div className="space-y-2 rounded-2xl bg-muted/60 p-3">
+                  <div className="space-y-2 rounded-2xl bg-muted p-3">
                     <p className="font-semibold">Community focused</p>
                     <p className="text-muted-foreground">
-                      We're dedicated to cultivating the best community for you! Always open to
-                      feedback and suggestions.
+                      We're dedicated to cultivating the best community for you!
                     </p>
                   </div>
-                  <div className="space-y-2 rounded-2xl bg-muted/60 p-3">
+                  <div className="space-y-2 rounded-2xl bg-muted p-3">
                     <p className="font-semibold">PDF Patterns</p>
                     <p className="text-muted-foreground">Print at home or send to a copy shop.</p>
                   </div>
-                  <div className="space-y-2 rounded-2xl bg-muted/60 p-3">
+                  <div className="space-y-2 rounded-2xl bg-muted p-3">
                     <p className="font-semibold">Pattern points</p>
                     <p className="text-muted-foreground">
                       Collect pattern points to earn free patterns and other rewards.
