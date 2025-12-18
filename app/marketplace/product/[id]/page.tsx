@@ -37,17 +37,22 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
     };
   }
 
-  const categories = (product.product_categories as any[])?.map(
-    (pc: any) => pc?.category?.name
-  ).filter(Boolean).join(', ') || 'Pattern';
-  const sellerName = (product.profiles as any)?.full_name || (product.profiles as any)?.username || 'Creator';
+  const categories =
+    (product.product_categories as any[])
+      ?.map((pc: any) => pc?.category?.name)
+      .filter(Boolean)
+      .join(', ') || 'Pattern';
+  const sellerName =
+    (product.profiles as any)?.full_name || (product.profiles as any)?.username || 'Creator';
   const price = `$${Number(product.price).toFixed(2)}`;
-  const description = product.description 
+  const description = product.description
     ? `${product.description.substring(0, 155)}...`
     : `Buy ${product.title} - ${categories} pattern by ${sellerName} for ${price}. Digital download available instantly.`;
 
-  const imageUrl = product.image_url 
-    ? (product.image_url.startsWith('http') ? product.image_url : `${COMPANY_INFO.urls.website}${product.image_url}`)
+  const imageUrl = product.image_url
+    ? product.image_url.startsWith('http')
+      ? product.image_url
+      : `${COMPANY_INFO.urls.website}${product.image_url}`
     : `${COMPANY_INFO.urls.website}/opengraph-image.png`;
 
   return {
@@ -62,6 +67,17 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
       'crafting pattern',
       sellerName,
     ],
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        'max-image-preview': 'large',
+        'max-snippet': -1,
+        'max-video-preview': -1,
+      },
+    },
     openGraph: {
       title: `${product.title} | ${COMPANY_INFO.name}`,
       description,

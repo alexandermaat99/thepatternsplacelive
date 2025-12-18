@@ -10,21 +10,57 @@ import type { Category } from '@/lib/types/categories';
 import { Metadata } from 'next';
 import { COMPANY_INFO } from '@/lib/company-info';
 
-export const metadata: Metadata = {
-  title: 'Marketplace',
-  description:
-    'Browse and discover unique sewing and crafting patterns from independent creators. Find digital patterns for your next project.',
-  openGraph: {
-    title: `Marketplace | ${COMPANY_INFO.name}`,
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    q?: string;
+    categories?: string;
+    difficulty?: string;
+    minPrice?: string;
+    maxPrice?: string;
+    sort?: string;
+    page?: string;
+    free?: string;
+  }>;
+}): Promise<Metadata> {
+  const params = await searchParams;
+  const hasSearchParams = Boolean(
+    params.q ||
+      params.categories ||
+      params.difficulty ||
+      params.minPrice ||
+      params.maxPrice ||
+      params.sort ||
+      params.page ||
+      params.free
+  );
+
+  return {
+    title: 'Marketplace',
     description:
-      'Browse and discover unique sewing and crafting patterns from independent creators.',
-    url: `${COMPANY_INFO.urls.website}${COMPANY_INFO.urls.marketplace}`,
-    type: 'website',
-  },
-  alternates: {
-    canonical: `${COMPANY_INFO.urls.website}${COMPANY_INFO.urls.marketplace}`,
-  },
-};
+      'Browse and discover unique sewing and crafting patterns from independent creators. Find digital patterns for your next project.',
+    robots: hasSearchParams
+      ? {
+          index: false,
+          follow: true,
+        }
+      : {
+          index: true,
+          follow: true,
+        },
+    openGraph: {
+      title: `Marketplace | ${COMPANY_INFO.name}`,
+      description:
+        'Browse and discover unique sewing and crafting patterns from independent creators.',
+      url: `${COMPANY_INFO.urls.website}${COMPANY_INFO.urls.marketplace}`,
+      type: 'website',
+    },
+    alternates: {
+      canonical: `${COMPANY_INFO.urls.website}${COMPANY_INFO.urls.marketplace}`,
+    },
+  };
+}
 
 interface MarketplacePageProps {
   searchParams: Promise<{

@@ -53,15 +53,15 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: '/favicon.ico', sizes: 'any' },
-      { url: '/icons/favicon.ico', sizes: 'any' },
-      { url: '/icons/favicon.svg', type: 'image/svg+xml' },
-      { url: '/icons/favicon-96x96.png', sizes: '96x96', type: 'image/png' },
+      { url: `${siteUrl}/favicon.ico`, sizes: 'any' },
+      { url: `${siteUrl}/icons/favicon.ico`, sizes: 'any' },
+      { url: `${siteUrl}/icons/favicon.svg`, type: 'image/svg+xml' },
+      { url: `${siteUrl}/icons/favicon-96x96.png`, sizes: '96x96', type: 'image/png' },
     ],
-    apple: '/icons/apple-touch-icon.png',
-    shortcut: '/favicon.ico',
+    apple: `${siteUrl}/icons/apple-touch-icon.png`,
+    shortcut: `${siteUrl}/favicon.ico`,
   },
-  manifest: '/icons/site.webmanifest',
+  manifest: `${siteUrl}/icons/site.webmanifest`,
   openGraph: {
     type: 'website',
     locale: 'en_US',
@@ -119,6 +119,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Explicit favicon links for better Google indexing */}
+        <link rel="icon" href={`${siteUrl}/favicon.ico`} sizes="any" />
+        <link rel="icon" href={`${siteUrl}/icons/favicon.svg`} type="image/svg+xml" />
+        <link rel="apple-touch-icon" href={`${siteUrl}/icons/apple-touch-icon.png`} />
+        <link rel="manifest" href={`${siteUrl}/icons/site.webmanifest`} />
+      </head>
       {/* Google Tag Manager - must load early in head */}
       <Script
         id="google-tag-manager"
