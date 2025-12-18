@@ -2,26 +2,8 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
 
 export async function middleware(request: NextRequest) {
-  const url = request.nextUrl.clone();
-  const hostname = request.headers.get('host') || '';
-
-  // Handle HTTP to HTTPS redirect
-  if (request.nextUrl.protocol === 'http:') {
-    url.protocol = 'https:';
-    return NextResponse.redirect(url, 301);
-  }
-
-  // Handle www redirect - redirect non-www to www
-  // Only in production to avoid breaking localhost
-  if (process.env.NODE_ENV === 'production') {
-    const isWww = hostname.startsWith('www.');
-    const isThePatternsPlace = hostname.includes('thepatternsplace.com');
-
-    if (isThePatternsPlace && !isWww) {
-      url.hostname = `www.${hostname}`;
-      return NextResponse.redirect(url, 301);
-    }
-  }
+  // Note: HTTP to HTTPS and www redirects are handled by Vercel automatically
+  // Adding them here would cause redirect loops
 
   // Update Supabase session (this handles auth)
   const sessionResponse = await updateSession(request);
