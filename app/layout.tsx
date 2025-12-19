@@ -120,11 +120,12 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Explicit favicon links for better Google indexing */}
-        <link rel="icon" href={`${siteUrl}/favicon.ico`} sizes="any" />
-        <link rel="icon" href={`${siteUrl}/icons/favicon.svg`} type="image/svg+xml" />
-        <link rel="apple-touch-icon" href={`${siteUrl}/icons/apple-touch-icon.png`} />
-        <link rel="manifest" href={`${siteUrl}/icons/site.webmanifest`} />
+        {/* Explicit favicon links for Google - Next.js metadata API also adds these, but explicit ensures they're present */}
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml" />
+        <link rel="icon" href="/icons/favicon-96x96.png" type="image/png" sizes="96x96" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+        <link rel="manifest" href="/icons/site.webmanifest" />
       </head>
       {/* Google Tag Manager - must load early in head */}
       <Script
