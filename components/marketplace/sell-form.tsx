@@ -129,6 +129,7 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
       const firstErrorField = Object.keys(errors)[0];
       shouldScrollRef.current = firstErrorField;
       setFieldErrors(errors);
+      console.log('Validation errors set:', errors);
       return false;
     }
 
@@ -306,7 +307,7 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="text-2xl">List Your Product</CardTitle>
-              <Badge className="bg-rose-300 text-white border-0">
+              <Badge className="bg-rose-300 text-white border-0 hover:bg-rose-400">
                 <Award className="h-3 w-3 mr-1" />
                 Earn {PATTERN_POINTS.LIST_PRODUCT} Pattern Points
               </Badge>
@@ -318,14 +319,14 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
           </CardHeader>
           <CardContent>
             {error && (
-              <div className="mb-4 p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md">
-                <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+              <div className="mb-4 p-3 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 rounded-md">
+                <p className="text-sm text-rose-400 dark:text-rose-400">{error}</p>
               </div>
             )}
             {!canSell && !formData.is_free ? (
               <div className="space-y-4">
                 {!stripeStatus.isConnected ? (
-                  <p className="text-red-500 font-medium">
+                  <p className="text-rose-300 font-medium">
                     You must connect your Stripe account before listing a paid product. Free
                     patterns don't require Stripe.
                   </p>
@@ -351,13 +352,13 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                 )}
               </div>
             ) : (
-              <form onSubmit={handleSubmit} className="space-y-6">
+              <form onSubmit={handleSubmit} className="space-y-6" noValidate>
                 <div>
                   <Label htmlFor="title">Product Title</Label>
                   <div
                     className={
                       fieldErrors.title
-                        ? 'rounded-md border border-red-500 focus-within:ring-1 focus-within:ring-red-500'
+                        ? 'rounded-md border-2 border-rose-300 focus-within:ring-2 focus-within:ring-rose-300 focus-within:ring-offset-0'
                         : ''
                     }
                   >
@@ -372,11 +373,15 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                       }}
                       required
                       placeholder="Enter product title"
-                      className={fieldErrors.title ? 'border-0 focus-visible:ring-0' : ''}
+                      className={
+                        fieldErrors.title
+                          ? 'border-0 focus-visible:ring-0 focus-visible:ring-offset-0'
+                          : ''
+                      }
                     />
                   </div>
                   {fieldErrors.title && (
-                    <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                    <p className="text-sm text-rose-400 dark:text-rose-400 mt-1">
                       {fieldErrors.title}
                     </p>
                   )}
@@ -392,7 +397,7 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                   <div
                     className={
                       fieldErrors.description
-                        ? 'rounded-md border border-red-500 focus-within:ring-2 focus-within:ring-red-500'
+                        ? 'rounded-md border-2 border-rose-300 focus-within:ring-2 focus-within:ring-rose-300 focus-within:ring-offset-0'
                         : ''
                     }
                   >
@@ -412,11 +417,15 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                       placeholder="Describe your product"
                       rows={4}
                       maxLength={500}
-                      className={fieldErrors.description ? 'border-0 focus-visible:ring-0' : ''}
+                      className={
+                        fieldErrors.description
+                          ? 'border-0 focus-visible:ring-0 focus-visible:ring-offset-0'
+                          : ''
+                      }
                     />
                   </div>
                   {fieldErrors.description && (
-                    <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                    <p className="text-sm text-rose-400 dark:text-rose-400 mt-1">
                       {fieldErrors.description}
                     </p>
                   )}
@@ -488,7 +497,7 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                   <div
                     className={
                       fieldErrors.price && !formData.is_free
-                        ? 'rounded-md border border-red-500 focus-within:ring-1 focus-within:ring-red-500'
+                        ? 'rounded-md border-2 border-rose-300 focus-within:ring-2 focus-within:ring-rose-300 focus-within:ring-offset-0'
                         : ''
                     }
                   >
@@ -510,11 +519,15 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                       disabled={formData.is_free}
                       placeholder={formData.is_free ? 'Free' : '1.00'}
                       readOnly={formData.is_free}
-                      className={fieldErrors.price ? 'border-0 focus-visible:ring-0' : ''}
+                      className={
+                        fieldErrors.price && !formData.is_free
+                          ? 'border-0 focus-visible:ring-0 focus-visible:ring-offset-0'
+                          : ''
+                      }
                     />
                   </div>
                   {fieldErrors.price && (
-                    <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                    <p className="text-sm text-rose-400 dark:text-rose-400 mt-1">
                       {fieldErrors.price}
                     </p>
                   )}
@@ -593,37 +606,33 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                       <Info className="h-4 w-4" />
                     </Link>
                   </div>
-                  <div
-                    className={
+                  <select
+                    id="difficulty"
+                    value={formData.difficulty}
+                    onChange={e => {
+                      setFormData({ ...formData, difficulty: e.target.value });
+                      if (fieldErrors.difficulty) {
+                        setFieldErrors({ ...fieldErrors, difficulty: undefined });
+                      }
+                    }}
+                    required
+                    className={`flex h-9 w-full rounded-md bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm ${
                       fieldErrors.difficulty
-                        ? 'rounded-md border border-red-500 focus-within:ring-1 focus-within:ring-red-500'
-                        : ''
-                    }
+                        ? '!border-rose-300 focus-visible:!ring-rose-300 focus-visible:ring-2'
+                        : 'border border-input focus-visible:ring-1 focus-visible:ring-ring'
+                    }`}
                   >
-                    <select
-                      id="difficulty"
-                      value={formData.difficulty}
-                      onChange={e => {
-                        setFormData({ ...formData, difficulty: e.target.value });
-                        if (fieldErrors.difficulty) {
-                          setFieldErrors({ ...fieldErrors, difficulty: undefined });
-                        }
-                      }}
-                      required
-                      className="flex h-9 w-full rounded-md border-0 bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
-                    >
-                      <option value="" disabled>
-                        Select difficulty level
+                    <option value="" disabled>
+                      Select difficulty level
+                    </option>
+                    {DIFFICULTY_LEVELS.map(level => (
+                      <option key={level.value} value={level.value}>
+                        {level.label}
                       </option>
-                      {DIFFICULTY_LEVELS.map(level => (
-                        <option key={level.value} value={level.value}>
-                          {level.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                    ))}
+                  </select>
                   {fieldErrors.difficulty && (
-                    <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                    <p className="text-sm text-rose-400 dark:text-rose-400 mt-1">
                       {fieldErrors.difficulty}
                     </p>
                   )}
@@ -644,7 +653,7 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                         maxImages={10}
                       />
                       {fieldErrors.images && (
-                        <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                        <p className="text-sm text-rose-400 dark:text-rose-400 mt-1">
                           {fieldErrors.images}
                         </p>
                       )}
@@ -664,7 +673,7 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                         maxFileSizeMB={100}
                       />
                       {fieldErrors.files && (
-                        <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                        <p className="text-sm text-rose-400 dark:text-rose-400 mt-1">
                           {fieldErrors.files}
                         </p>
                       )}
