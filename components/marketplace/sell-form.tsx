@@ -551,7 +551,14 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="flex items-center gap-1">
-                            Fees (processing + platform fees):
+                            {(() => {
+                              const waivePlatformFees = profile 
+                                ? (profile.completed_sales_count || 0) < 5
+                                : false;
+                              return waivePlatformFees 
+                                ? 'Payment Processing Fee (platform fee waived)'
+                                : 'Fees (processing + platform fees)';
+                            })()}
                             <button
                               type="button"
                               onClick={() => setShowFeesModal(true)}
@@ -563,10 +570,17 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                           <span className="font-medium text-orange-600">
                             -$
                             {formData.price && !isNaN(parseFloat(formData.price))
-                              ? (
-                                  calculateEtsyFees(Math.round(parseFloat(formData.price) * 100))
-                                    .totalFee / 100
-                                ).toFixed(2)
+                              ? (() => {
+                                  const waivePlatformFees = profile 
+                                    ? (profile.completed_sales_count || 0) < 5
+                                    : false;
+                                  return (
+                                    calculateEtsyFees(
+                                      Math.round(parseFloat(formData.price) * 100),
+                                      waivePlatformFees
+                                    ).totalFee / 100
+                                  ).toFixed(2);
+                                })()
                               : '0.00'}
                           </span>
                         </div>
@@ -575,12 +589,19 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                           <span className="font-bold text-green-600">
                             $
                             {formData.price && !isNaN(parseFloat(formData.price))
-                              ? (
-                                  parseFloat(formData.price) -
-                                  calculateEtsyFees(Math.round(parseFloat(formData.price) * 100))
-                                    .totalFee /
-                                    100
-                                ).toFixed(2)
+                              ? (() => {
+                                  const waivePlatformFees = profile 
+                                    ? (profile.completed_sales_count || 0) < 5
+                                    : false;
+                                  return (
+                                    parseFloat(formData.price) -
+                                    calculateEtsyFees(
+                                      Math.round(parseFloat(formData.price) * 100),
+                                      waivePlatformFees
+                                    ).totalFee /
+                                      100
+                                  ).toFixed(2);
+                                })()
                               : '0.00'}
                           </span>
                         </div>

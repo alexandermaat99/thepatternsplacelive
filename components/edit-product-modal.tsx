@@ -65,6 +65,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [completedSalesCount, setCompletedSalesCount] = useState<number | null>(null);
   const shouldScrollRef = useRef<string | null>(null);
   const [formData, setFormData] = useState({
     title: '',
@@ -175,6 +176,32 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
       setFieldErrors({}); // Clear field errors when product changes
     }
   }, [product]);
+
+  // Fetch seller's completed sales count for fee calculation
+  useEffect(() => {
+    const fetchSalesCount = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const supabase = createClient();
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('completed_sales_count')
+          .eq('id', user.id)
+          .single();
+        
+        if (!error && profile) {
+          setCompletedSalesCount(profile.completed_sales_count || 0);
+        }
+      } catch (error) {
+        console.error('Error fetching sales count:', error);
+      }
+    };
+
+    if (isOpen && user) {
+      fetchSalesCount();
+    }
+  }, [isOpen, user]);
 
   const validateForm = (): boolean => {
     const errors: FieldErrors = {};
@@ -812,7 +839,12 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="flex items-center gap-1">
-                          Fees (processing + platform fees):
+                          {(() => {
+                            const waivePlatformFees = completedSalesCount !== null && completedSalesCount < 5;
+                            return waivePlatformFees 
+                              ? 'Payment Processing Fee (platform fee waived)'
+                              : 'Fees (processing + platform fees)';
+                          })()}
                           <button
                             type="button"
                             onClick={() => setShowFeesModal(true)}
@@ -824,10 +856,15 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
                         <span className="font-medium text-orange-600">
                           -$
                           {formData.price && !isNaN(parseFloat(formData.price))
-                            ? (
-                                calculateEtsyFees(Math.round(parseFloat(formData.price) * 100))
-                                  .totalFee / 100
-                              ).toFixed(2)
+                            ? (() => {
+                                const waivePlatformFees = completedSalesCount !== null && completedSalesCount < 5;
+                                return (
+                                  calculateEtsyFees(
+                                    Math.round(parseFloat(formData.price) * 100),
+                                    waivePlatformFees
+                                  ).totalFee / 100
+                                ).toFixed(2);
+                              })()
                             : '0.00'}
                         </span>
                       </div>
@@ -836,12 +873,17 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
                         <span className="font-bold text-green-600">
                           $
                           {formData.price && !isNaN(parseFloat(formData.price))
-                            ? (
-                                parseFloat(formData.price) -
-                                calculateEtsyFees(Math.round(parseFloat(formData.price) * 100))
-                                  .totalFee /
-                                  100
-                              ).toFixed(2)
+                            ? (() => {
+                                const waivePlatformFees = completedSalesCount !== null && completedSalesCount < 5;
+                                return (
+                                  parseFloat(formData.price) -
+                                  calculateEtsyFees(
+                                    Math.round(parseFloat(formData.price) * 100),
+                                    waivePlatformFees
+                                  ).totalFee /
+                                    100
+                                ).toFixed(2);
+                              })()
                             : '0.00'}
                         </span>
                       </div>

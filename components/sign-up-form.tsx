@@ -123,12 +123,12 @@ export function SignUpForm({ className, ...props }: React.ComponentPropsWithoutR
       });
       if (error) throw error;
 
-      // Redirect to login with redirect parameter if available
-      if (redirectUrl) {
-        router.push(`/auth/login?redirect=${encodeURIComponent(redirectUrl)}`);
-      } else {
-        router.push('/auth/sign-up-success');
-      }
+      // Always redirect to success page for conversion tracking
+      // Include redirect URL as query param so we can redirect after success message
+      const successUrl = redirectUrl
+        ? `/auth/sign-up-success?redirect=${encodeURIComponent(redirectUrl)}`
+        : '/auth/sign-up-success';
+      router.push(successUrl);
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : 'An error occurred');
     } finally {

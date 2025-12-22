@@ -57,10 +57,10 @@ export async function POST(request: NextRequest) {
     // Get all unique seller IDs (from paid products only)
     const sellerIds = [...new Set(paidProducts.map((p: any) => p.user_id))];
 
-    // Get seller profiles with Stripe account IDs
+    // Get seller profiles with Stripe account IDs and sales counts
     const { data: sellerProfiles, error: sellerError } = await supabase
       .from('profiles')
-      .select('id, stripe_account_id')
+      .select('id, stripe_account_id, completed_sales_count')
       .in('id', sellerIds);
 
     if (sellerError || !sellerProfiles) {
@@ -167,8 +167,16 @@ export async function POST(request: NextRequest) {
     // Total: $0.20 + (sale_price * 0.065) + (sale_price * 0.03) + $0.25
     const totalInCents = Math.round(totalAmount * 100);
 
-    // Calculate Etsy-style fees
-    const fees = calculateEtsyFees(totalInCents);
+    // Check if primary seller qualifies for first 5 sales fee waiver
+    // Note: For multi-seller carts, we use the primary seller's count
+    // In the future, you may want to split fees per seller
+    const primarySellerProfile = sellerProfiles.find((p: any) => p.id === paidProducts[0]?.user_id);
+    const waivePlatformFees = primarySellerProfile 
+      ? (primarySellerProfile.completed_sales_count || 0) < 5
+      : false;
+
+    // Calculate Etsy-style fees (waive platform fees for first 5 sales)
+    const fees = calculateEtsyFees(totalInCents, waivePlatformFees);
     const platformFeeAmount = fees.totalFee;
 
     // Calculate seller payout: Total Sale Price - Platform Fee (tax excluded)

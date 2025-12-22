@@ -101,18 +101,22 @@ export function getCopyrightText() {
 /**
  * Calculate Etsy-style platform fees for a sale
  * @param salePriceInCents - The sale price in cents
+ * @param waivePlatformFees - If true, waive platform fees (listing + transaction) but keep payment processing fees. Used for first 5 sales.
  * @returns Object with fee breakdown in cents
  */
-export function calculateEtsyFees(salePriceInCents: number) {
-  const listingFee = COMPANY_INFO.fees.listingFeeCents; // $0.20
-  const transactionFee = Math.round(salePriceInCents * COMPANY_INFO.fees.transactionFeePercent); // 6.5%
+export function calculateEtsyFees(salePriceInCents: number, waivePlatformFees: boolean = false) {
+  const listingFee = waivePlatformFees ? 0 : COMPANY_INFO.fees.listingFeeCents; // $0.20
+  const transactionFee = waivePlatformFees ? 0 : Math.round(salePriceInCents * COMPANY_INFO.fees.transactionFeePercent); // 6.5%
   const paymentProcessingPercent = Math.round(
     salePriceInCents * COMPANY_INFO.fees.paymentProcessingPercent
   ); // 3%
   const paymentProcessingFlat = COMPANY_INFO.fees.paymentProcessingFlatCents; // $0.25
 
   const totalFee = listingFee + transactionFee + paymentProcessingPercent + paymentProcessingFlat;
-  const finalFee = Math.max(totalFee, COMPANY_INFO.fees.minimumFeeCents);
+  // Only apply minimum fee if platform fees are not waived
+  const finalFee = waivePlatformFees 
+    ? totalFee 
+    : Math.max(totalFee, COMPANY_INFO.fees.minimumFeeCents);
 
   return {
     listingFee,
@@ -122,6 +126,7 @@ export function calculateEtsyFees(salePriceInCents: number) {
     // For backward compatibility
     platformFee: finalFee,
     stripeFee: 0, // Payment processing is included in total fee
+    waivePlatformFees, // Include flag in return for transparency
   };
 }
 

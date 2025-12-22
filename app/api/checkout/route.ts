@@ -35,10 +35,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get seller's profile with Stripe account ID
+    // Get seller's profile with Stripe account ID and sales count
     const { data: sellerProfile, error: sellerError } = await supabase
       .from('profiles')
-      .select('stripe_account_id')
+      .select('stripe_account_id, completed_sales_count')
       .eq('id', product.user_id)
       .single();
 
@@ -88,8 +88,11 @@ export async function POST(request: NextRequest) {
     // - Seller receives: $10.00 - $1.40 = $8.60
     const priceInCents = Math.round(product.price * 100);
 
-    // Calculate Etsy-style fees
-    const fees = calculateEtsyFees(priceInCents);
+    // Check if seller qualifies for first 5 sales fee waiver
+    const waivePlatformFees = (sellerProfile.completed_sales_count || 0) < 5;
+
+    // Calculate Etsy-style fees (waive platform fees for first 5 sales)
+    const fees = calculateEtsyFees(priceInCents, waivePlatformFees);
     const platformFeeAmount = fees.totalFee;
 
     // Calculate seller payout: Sale Price - Platform Fee (tax excluded)

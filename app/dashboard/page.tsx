@@ -18,6 +18,7 @@ import {
   ArrowUpCircle,
   TrendingUp,
   ShoppingBag,
+  Gift,
 } from 'lucide-react';
 import { StripeDashboardButton } from '@/components/stripe-dashboard-button';
 import {
@@ -129,6 +130,26 @@ export default async function DashboardPage() {
         </div>
         <SignOutButton />
       </div>
+
+      {/* First 5 Sales Fee Waiver Banner - Only show for sellers with Stripe connected and < 5 sales */}
+      {hasSellerIntent && profile && (profile.completed_sales_count || 0) < 5 && (
+        <Card className="mb-6 border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <Gift className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <h3 className="font-semibold text-green-900 dark:text-green-100 mb-1">
+                  Platform Fee Waiver Active
+                </h3>
+                <p className="text-sm text-green-800 dark:text-green-200">
+                  Your next {5 - (profile.completed_sales_count || 0)} sale{5 - (profile.completed_sales_count || 0) !== 1 ? 's' : ''} have platform fees waived! 
+                  Only the Stripe processing fees (3% + $0.25) will apply on these sales.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className={`grid grid-cols-1 ${hasSellerIntent ? 'md:grid-cols-2' : ''} gap-6`}>
         {/* Stripe Connect Status - Only show if user has started seller onboarding */}
