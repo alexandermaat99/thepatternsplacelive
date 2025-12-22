@@ -8,6 +8,7 @@ export interface UserProfile {
   username: string | null;
   pattern_points: number | null;
   bio: string | null;
+  completed_sales_count?: number | null;
   created_at: string;
   updated_at: string;
 }

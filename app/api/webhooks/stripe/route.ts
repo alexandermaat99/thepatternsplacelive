@@ -9,16 +9,40 @@ import { awardPointsForPurchase, awardPointsForSale } from '@/lib/pattern-points
 
 // Calculate fees for an order using Etsy-style structure
 // When tax is included, we maintain the seller's net amount by scaling the fee proportionally
-function calculateFees(amount: number, originalSubtotal?: number) {
+// sellerSalesCount: number of completed sales for the seller (used for first 5 sales waiver)
+async function calculateFees(
+  amount: number,
+  originalSubtotal?: number,
+  sellerId?: string,
+  supabase?: any
+) {
   // Convert to cents for calculation
   const amountInCents = Math.round(amount * 100);
+
+  // Check if seller qualifies for first 5 sales fee waiver
+  let waivePlatformFees = false;
+  if (sellerId && supabase) {
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('completed_sales_count')
+        .eq('id', sellerId)
+        .single();
+      
+      if (profile) {
+        waivePlatformFees = (profile.completed_sales_count || 0) < 5;
+      }
+    } catch (error) {
+      console.error('Error fetching seller sales count:', error);
+    }
+  }
 
   // If we have the original subtotal, maintain seller's net amount
   // This ensures that when tax is added, the seller gets the same net as before
   if (originalSubtotal && originalSubtotal !== amount) {
     // Calculate what the fee was on the original subtotal using Etsy structure
     const originalSubtotalCents = Math.round(originalSubtotal * 100);
-    const originalFees = calculateEtsyFees(originalSubtotalCents);
+    const originalFees = calculateEtsyFees(originalSubtotalCents, waivePlatformFees);
     const originalFeeCents = originalFees.totalFee;
 
     // Calculate original seller net
@@ -41,7 +65,7 @@ function calculateFees(amount: number, originalSubtotal?: number) {
   }
 
   // No original subtotal or amounts are the same - calculate normally using Etsy structure
-  const fees = calculateEtsyFees(amountInCents);
+  const fees = calculateEtsyFees(amountInCents, waivePlatformFees);
   const platformFee = fees.totalFee / 100;
   const stripeFee = 0; // Payment processing is included in total fee
   const netAmount = (amountInCents - fees.totalFee) / 100;
@@ -130,8 +154,8 @@ export async function POST(request: NextRequest) {
               );
 
               // Create an order for each product in the cart
-              const orders = items
-                .map((item: { productId: string; quantity: number }) => {
+              const orders = await Promise.all(
+                items.map(async (item: { productId: string; quantity: number }) => {
                   const product = products.find(p => p.id === item.productId);
                   if (!product) return null;
 
@@ -140,7 +164,8 @@ export async function POST(request: NextRequest) {
                   const orderTotalAmount =
                     totalSubtotal > 0 ? orderAmount * (1 + taxRate) : orderAmount; // Fallback if no subtotal
                   // Calculate fees on total amount, passing original subtotal to maintain seller net
-                  const fees = calculateFees(orderTotalAmount, orderAmount);
+                  // Pass seller_id to check for first 5 sales waiver
+                  const fees = await calculateFees(orderTotalAmount, orderAmount, product.user_id, supabase);
                   // Net amount should be total_amount (with tax) minus fees
                   const netAmount = orderTotalAmount - fees.platformFee - fees.stripeFee;
 
@@ -159,12 +184,15 @@ export async function POST(request: NextRequest) {
                     net_amount: netAmount,
                   };
                 })
-                .filter(Boolean);
+              );
+              
+              // Filter out null values
+              const validOrders = orders.filter((order): order is NonNullable<typeof order> => order !== null);
 
-              if (orders.length > 0) {
+              if (validOrders.length > 0) {
                 const { error: orderError, data: insertedOrders } = await supabase
                   .from('orders')
-                  .insert(orders)
+                  .insert(validOrders)
                   .select();
 
                 if (orderError) {
@@ -431,7 +459,8 @@ export async function POST(request: NextRequest) {
             const orderSubtotal = session.amount_subtotal ? session.amount_subtotal / 100 : 0;
             const orderTotal = session.amount_total ? session.amount_total / 100 : 0;
             // Calculate fees on total amount, passing original subtotal to maintain seller net
-            const fees = calculateFees(orderTotal, orderSubtotal || orderTotal);
+            // Pass seller_id to check for first 5 sales waiver
+            const fees = await calculateFees(orderTotal, orderSubtotal || orderTotal, product.user_id, supabase);
             // Net amount should be total_amount (with tax) minus fees
             const netAmount = orderTotal - fees.platformFee - fees.stripeFee;
 
