@@ -47,7 +47,8 @@ export function ActiveFilters({ categories }: ActiveFiltersProps) {
     }
 
     params.delete('page');
-    router.push(`/marketplace?${params.toString()}`, { scroll: false });
+    const queryString = params.toString();
+    router.push(queryString ? `/marketplace?${queryString}` : '/marketplace', { scroll: false });
   };
 
   const clearAll = () => {
@@ -57,7 +58,8 @@ export function ActiveFilters({ categories }: ActiveFiltersProps) {
     if (searchQuery) {
       params.set('q', searchQuery);
     }
-    router.push(`/marketplace?${params.toString()}`, { scroll: false });
+    const queryString = params.toString();
+    router.push(queryString ? `/marketplace?${queryString}` : '/marketplace', { scroll: false });
   };
 
   const activeFiltersCount =

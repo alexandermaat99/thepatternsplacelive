@@ -175,7 +175,8 @@ export function MarketplaceFilters({
     params.delete('free');
 
     params.delete('page');
-    router.push(`/marketplace?${params.toString()}`, { scroll: false });
+    const queryString = params.toString();
+    router.push(queryString ? `/marketplace?${queryString}` : '/marketplace', { scroll: false });
   };
 
   const handleCategoryToggle = (categorySlug: string) => {

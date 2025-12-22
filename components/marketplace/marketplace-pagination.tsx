@@ -38,7 +38,8 @@ export function MarketplacePagination({
       params.set('page', page.toString());
     }
     
-    return `/marketplace?${params.toString()}`;
+    const queryString = params.toString();
+    return queryString ? `/marketplace?${queryString}` : '/marketplace';
   };
 
   const handlePageChange = (page: number) => {

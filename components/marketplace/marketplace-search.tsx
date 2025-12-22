@@ -37,7 +37,8 @@ export function MarketplaceSearch() {
     const params = new URLSearchParams(searchParams.toString());
     params.delete('q');
     params.delete('page');
-    router.push(`/marketplace?${params.toString()}`, { scroll: false });
+    const queryString = params.toString();
+    router.push(queryString ? `/marketplace?${queryString}` : '/marketplace', { scroll: false });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
