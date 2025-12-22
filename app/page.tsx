@@ -17,6 +17,17 @@ export const metadata: Metadata = {
   alternates: {
     canonical: COMPANY_INFO.urls.website,
   },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
 };
 
 export default function Home(props: any) {
@@ -114,8 +125,9 @@ export default function Home(props: any) {
       </section>
 
       {/* Embedded Marketplace Section */}
-      <section aria-label="Marketplace">
+      <section aria-label="Marketplace" data-embedded="true">
         {/* Reuse existing marketplace page/component so filters, pagination, and SEO logic stay consistent */}
+        {/* Note: This is embedded content. The canonical marketplace page is at /marketplace */}
         <MarketplacePage {...props} />
       </section>
     </div>

@@ -36,6 +36,8 @@ export async function generateMetadata({
       params.free
   );
 
+  const baseUrl = `${COMPANY_INFO.urls.website}${COMPANY_INFO.urls.marketplace}`;
+  
   return {
     title: 'Marketplace',
     description:
@@ -44,20 +46,34 @@ export async function generateMetadata({
       ? {
           index: false,
           follow: true,
+          googleBot: {
+            index: false,
+            follow: true,
+            'max-video-preview': -1,
+            'max-image-preview': 'large',
+            'max-snippet': -1,
+          },
         }
       : {
           index: true,
           follow: true,
+          googleBot: {
+            index: true,
+            follow: true,
+            'max-video-preview': -1,
+            'max-image-preview': 'large',
+            'max-snippet': -1,
+          },
         },
     openGraph: {
       title: `Marketplace | ${COMPANY_INFO.name}`,
       description:
         'Browse and discover unique sewing and crafting patterns from independent creators.',
-      url: `${COMPANY_INFO.urls.website}${COMPANY_INFO.urls.marketplace}`,
+      url: baseUrl,
       type: 'website',
     },
     alternates: {
-      canonical: `${COMPANY_INFO.urls.website}${COMPANY_INFO.urls.marketplace}`,
+      canonical: baseUrl,
     },
   };
 }
