@@ -71,12 +71,17 @@ export default function Home(props: any) {
                   Sell your patterns
                 </a>
               </div>
-              <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-xs text-muted-foreground sm:text-sm">
-                <span>Instant digital downloads</span>
-                <span className="h-1 w-1 rounded-full bg-muted-foreground/60" />
-                <span>Secure payments</span>
-                <span className="h-1 w-1 rounded-full bg-muted-foreground/60" />
-                <span>Community rated patterns</span>
+              <div className="space-y-2">
+                <div className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 border border-emerald-100">
+                  No platform fees on your first 5 sales (Stripe processing fees still apply)
+                </div>
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-xs text-muted-foreground sm:text-sm">
+                  <span>Instant digital downloads</span>
+                  <span className="h-1 w-1 rounded-full bg-muted-foreground/60" />
+                  <span>Secure payments</span>
+                  <span className="h-1 w-1 rounded-full bg-muted-foreground/60" />
+                  <span>Community rated patterns</span>
+                </div>
               </div>
             </div>
 
@@ -90,9 +95,9 @@ export default function Home(props: any) {
                     </p>
                     <p className="text-sm text-foreground">Dresses, tops, accessories & more</p>
                   </div>
-                  {/* <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-600">
-                    idk
-                  </span> */}
+                  <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-600">
+                    Platform fees waived for first 5 sales
+                  </span>
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div className="space-y-2 rounded-2xl bg-muted p-3">
