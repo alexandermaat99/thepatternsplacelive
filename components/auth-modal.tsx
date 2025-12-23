@@ -120,19 +120,51 @@ export function AuthModal({
     }
 
     try {
-      const { error } = await supabase.auth.signUp({
-        email,
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/protected`,
         },
       });
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
+
+      // Supabase quirk: if the user already exists, `error` can be null but
+      // `data.user.identities` is an empty array. Treat that as "already registered".
+      if (data?.user && Array.isArray((data.user as any).identities)) {
+        const identities = (data.user as any).identities as unknown[];
+        if (identities.length === 0) {
+          setError(
+            "There's already an account with this email address. Try signing in instead or reset your password."
+          );
+          setIsLoading(false);
+          return;
+        }
+      }
 
       // Show success view
       setView('signup-success');
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : 'An error occurred');
+      // Provide a clearer message when the email is already in use
+      if (error instanceof Error) {
+        const message = error.message.toLowerCase();
+
+        if (
+          message.includes('already registered') ||
+          message.includes('already exists') ||
+          message.includes('user already')
+        ) {
+          setError(
+            "There's already an account with this email address. Try signing in instead or reset your password."
+          );
+        } else {
+          setError(error.message || 'An error occurred');
+        }
+      } else {
+        setError('An error occurred');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -376,7 +408,7 @@ export function AuthModal({
           setRepeatPassword('');
           setView('login');
         }}
-        className="mt-4"
+        className="mt-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-rose-300"
       >
         Back to Sign In
       </Button>
@@ -404,7 +436,7 @@ export function AuthModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px] p-0 gap-0 overflow-hidden">
+      <DialogContent className="sm:max-w-[425px] p-0 gap-0 overflow-hidden focus-visible:outline-none focus-visible:ring-0">
         {/* Header with logo */}
         <div className="relative p-6 pb-4 border-b bg-muted/30">
           {showBackButton && (

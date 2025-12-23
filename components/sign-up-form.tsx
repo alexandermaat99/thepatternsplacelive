@@ -114,23 +114,56 @@ export function SignUpForm({ className, ...props }: React.ComponentPropsWithoutR
     }
 
     try {
-      const { error } = await supabase.auth.signUp({
-        email,
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/protected`,
         },
       });
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
+
+      // Supabase quirk: if the user already exists, `error` can be null but
+      // `data.user.identities` is an empty array. Treat that as "already registered".
+      if (data?.user && Array.isArray((data.user as any).identities)) {
+        const identities = (data.user as any).identities as unknown[];
+        if (identities.length === 0) {
+          setError(
+            "There's already an account with this email address. Try logging in instead or reset your password."
+          );
+          setIsLoading(false);
+          return;
+        }
+      }
 
       // Always redirect to success page for conversion tracking
       // Include redirect URL as query param so we can redirect after success message
-      const successUrl = redirectUrl
-        ? `/auth/sign-up-success?redirect=${encodeURIComponent(redirectUrl)}`
-        : '/auth/sign-up-success';
+      const successUrl =
+        redirectUrl != null
+          ? `/auth/sign-up-success?redirect=${encodeURIComponent(redirectUrl)}`
+          : '/auth/sign-up-success';
       router.push(successUrl);
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : 'An error occurred');
+      // Provide a clearer message when the email is already in use
+      if (error instanceof Error) {
+        const message = error.message.toLowerCase();
+
+        if (
+          message.includes('already registered') ||
+          message.includes('already exists') ||
+          message.includes('user already')
+        ) {
+          setError(
+            "There's already an account with this email address. Try logging in instead or reset your password."
+          );
+        } else {
+          setError(error.message || 'An error occurred');
+        }
+      } else {
+        setError('An error occurred');
+      }
     } finally {
       setIsLoading(false);
     }
