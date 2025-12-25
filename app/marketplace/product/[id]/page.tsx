@@ -34,6 +34,10 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
   if (!product) {
     return {
       title: 'Product Not Found',
+      robots: {
+        index: false,
+        follow: false,
+      },
     };
   }
 
