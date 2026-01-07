@@ -2,8 +2,19 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
 
 export async function proxy(request: NextRequest) {
-  // Note: HTTP to HTTPS and www redirects are handled by Vercel automatically
-  // Adding them here would cause redirect loops
+  // Handle www redirect FIRST (before other processing)
+  // Note: Vercel handles HTTPS automatically, but we need to handle www redirect
+  const url = request.nextUrl;
+  const hostname = request.headers.get('host') || '';
+
+  // Only redirect in production to avoid localhost issues
+  if (process.env.NODE_ENV === 'production' && hostname === 'thepatternsplace.com') {
+    // Redirect non-www to www (301 permanent redirect for SEO)
+    const wwwUrl = url.clone();
+    wwwUrl.hostname = 'www.thepatternsplace.com';
+    // Preserve protocol (Vercel handles HTTPS)
+    return NextResponse.redirect(wwwUrl, 301);
+  }
 
   // Update Supabase session (this handles auth)
   const sessionResponse = await updateSession(request);

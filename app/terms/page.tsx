@@ -8,6 +8,9 @@ import { COMPANY_INFO } from '@/lib/company-info';
 export const metadata: Metadata = {
   title: `Terms of Service - ${COMPANY_INFO.name}`,
   description: `Terms of Service for ${COMPANY_INFO.name} marketplace.`,
+  alternates: {
+    canonical: `${COMPANY_INFO.urls.website}/terms`,
+  },
 };
 
 export default function TermsOfServicePage() {

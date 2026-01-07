@@ -3,11 +3,48 @@ import { ProductCard } from '@/components/marketplace/product-card';
 import { notFound } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { BackButton } from '@/components/back-button';
+import { Metadata } from 'next';
+import { COMPANY_INFO } from '@/lib/company-info';
 
 interface SellerPageProps {
   params: Promise<{
     username: string;
   }>;
+}
+
+export async function generateMetadata({ params }: SellerPageProps): Promise<Metadata> {
+  const { username } = await params;
+  const supabase = await createClient();
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name, username')
+    .ilike('username', username)
+    .single();
+
+  if (!profile) {
+    return {
+      title: 'Seller Not Found',
+      robots: {
+        index: false,
+        follow: false,
+      },
+    };
+  }
+
+  const sellerName = profile.full_name || `@${profile.username}`;
+
+  return {
+    title: `${sellerName} - Seller Profile | ${COMPANY_INFO.name}`,
+    description: `Browse patterns by ${sellerName} on ${COMPANY_INFO.name}. Discover unique sewing and crafting patterns from this independent creator.`,
+    alternates: {
+      canonical: `${COMPANY_INFO.urls.website}/marketplace/seller/${username}`,
+    },
+    robots: {
+      index: true,
+      follow: true,
+    },
+  };
 }
 
 export default async function SellerPage({ params }: SellerPageProps) {
