@@ -18,9 +18,7 @@ interface UserCardProps {
 
 export function UserCard({ user }: UserCardProps) {
   const displayName = user.username ? `@${user.username}` : user.full_name || 'User';
-  const initials = (user.full_name || user.username || 'U')
-    .charAt(0)
-    .toUpperCase();
+  const initials = (user.full_name || user.username || 'U').charAt(0).toUpperCase();
 
   return (
     <Link href={`/marketplace/seller/${user.username || user.id}`}>
