@@ -11,11 +11,11 @@ export const metadata: Metadata = {
   openGraph: {
     title: COMPANY_INFO.name,
     description: 'Discover modern sewing and crafting patterns from independent designers.',
-    url: COMPANY_INFO.urls.website,
+    url: `${COMPANY_INFO.urls.website}/`,
     type: 'website',
   },
   alternates: {
-    canonical: COMPANY_INFO.urls.website,
+    canonical: `${COMPANY_INFO.urls.website}/`,
   },
   robots: {
     index: true,

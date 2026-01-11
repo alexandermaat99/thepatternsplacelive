@@ -84,7 +84,7 @@ export function OrganizationStructuredData() {
     '@type': 'Organization',
     name: COMPANY_INFO.name,
     url: baseUrl,
-    logo: `${baseUrl}/opengraph-image.png`,
+    logo: `${baseUrl}/icons/web-app-manifest-512x512.png`,
     description: COMPANY_INFO.tagline,
     contactPoint: {
       '@type': 'ContactPoint',
