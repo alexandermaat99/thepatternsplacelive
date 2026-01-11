@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     canonical: `${COMPANY_INFO.urls.website}/marketplace/sell`,
   },
   robots: {
-    index: true,
+    index: false, // Requires authentication - can't be indexed
     follow: true,
   },
 };

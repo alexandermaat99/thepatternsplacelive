@@ -51,12 +51,34 @@ export default async function SellerPage({ params }: SellerPageProps) {
   const { username } = await params;
   const supabase = await createClient();
 
-  // First, find the user by username
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('id, full_name, username, avatar_url, bio')
-    .ilike('username', username)
-    .single();
+  // First, try to find the user by username
+  let profile = null;
+  let profileError = null;
+
+  // Check if the param is a UUID (for users without username)
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    username
+  );
+
+  if (isUUID) {
+    // Look up by ID
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, full_name, username, avatar_url, bio')
+      .eq('id', username)
+      .single();
+    profile = data;
+    profileError = error;
+  } else {
+    // Look up by username
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, full_name, username, avatar_url, bio')
+      .ilike('username', username)
+      .single();
+    profile = data;
+    profileError = error;
+  }
 
   if (profileError || !profile) {
     notFound();
