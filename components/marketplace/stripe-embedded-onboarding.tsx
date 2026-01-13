@@ -23,6 +23,8 @@ export function StripeEmbeddedOnboarding({ onComplete, onExit }: StripeEmbeddedO
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState<OnboardingStep>("account");
+  const [onboardingError, setOnboardingError] = useState<string | null>(null);
+  const [accountId, setAccountId] = useState<string | null>(null);
 
   // Fetch the client secret from our API
   const fetchClientSecret = useCallback(async () => {
@@ -36,14 +38,18 @@ export function StripeEmbeddedOnboarding({ onComplete, onExit }: StripeEmbeddedO
       throw new Error(data.error || "Failed to create account session");
     }
 
-    const { clientSecret } = await response.json();
-    return clientSecret;
+    const data = await response.json();
+    if (data.accountId) {
+      setAccountId(data.accountId);
+    }
+    return data.clientSecret;
   }, []);
 
   // Scroll to top on mount
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
+
 
   // Initialize Stripe Connect on mount
   useEffect(() => {
@@ -91,6 +97,32 @@ export function StripeEmbeddedOnboarding({ onComplete, onExit }: StripeEmbeddedO
     console.log("Account onboarding complete, moving to tax setup");
     setCurrentStep("tax");
     window.scrollTo(0, 0);
+  };
+
+
+  const handleUseAccountLink = async () => {
+    if (!accountId) {
+      setError("Account ID not available. Please refresh the page.");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/connect/continue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountId }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to create account link");
+      }
+
+      const { url } = await response.json();
+      window.location.href = url;
+    } catch (err: any) {
+      setOnboardingError(err.message || "Failed to open Stripe setup");
+    }
   };
 
   const handleSkipTax = () => {
@@ -198,15 +230,43 @@ export function StripeEmbeddedOnboarding({ onComplete, onExit }: StripeEmbeddedO
               </p>
             </div>
             
-            <ConnectComponentsProvider connectInstance={stripeConnectInstance}>
-              <ConnectAccountOnboarding
-                onExit={handleAccountOnboardingExit}
-                collectionOptions={{
-                  fields: "eventually_due",
-                  futureRequirements: "include",
-                }}
-              />
-            </ConnectComponentsProvider>
+            {onboardingError && (
+              <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-4">
+                <p className="text-sm text-red-800 dark:text-red-200 mb-3">
+                  {onboardingError}
+                </p>
+                <Button onClick={handleUseAccountLink} className="w-full">
+                  Continue Setup in New Window
+                </Button>
+              </div>
+            )}
+            
+            <div id="stripe-onboarding-container" className="min-h-[400px]">
+              <ConnectComponentsProvider connectInstance={stripeConnectInstance}>
+                <ConnectAccountOnboarding
+                  onExit={handleAccountOnboardingExit}
+                  collectionOptions={{
+                    fields: "eventually_due",
+                    futureRequirements: "include",
+                  }}
+                />
+              </ConnectComponentsProvider>
+            </div>
+
+            {/* Always show fallback option in case embedded form doesn't render */}
+            <div className="mt-4 pt-4 border-t">
+              <p className="text-xs text-muted-foreground mb-3 text-center">
+                Having trouble with the form above? You can also continue setup in a new window:
+              </p>
+              <Button 
+                onClick={handleUseAccountLink} 
+                variant="outline" 
+                className="w-full"
+                disabled={!accountId}
+              >
+                Continue Setup in New Window
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
