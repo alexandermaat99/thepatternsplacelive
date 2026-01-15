@@ -11,14 +11,16 @@ export function securityHeaders(request: NextRequest) {
 
   // Content Security Policy
   // Allow self, Supabase, Stripe, Google Analytics, and common CDNs
+  // Note: CSP wildcards (*.stripe.com) may not work in all browsers
+  // Using explicit domains for better compatibility
   const cspDirectives = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com https://js.stripe.com https://connect.stripe.com https://connect-js.stripe.com https://*.stripe.com",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com https://js.stripe.com https://connect.stripe.com https://connect-js.stripe.com https://b.stripecdn.com https://hooks.stripe.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com data:",
     "img-src 'self' data: https: blob:",
-    "connect-src 'self' https://*.supabase.co https://*.supabase.in https://api.stripe.com https://connect-js.stripe.com https://*.stripe.com https://www.google-analytics.com https://www.googletagmanager.com",
-    "frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://connect.stripe.com https://connect-js.stripe.com https://*.stripe.com",
+    "connect-src 'self' https://*.supabase.co https://*.supabase.in https://api.stripe.com https://connect-js.stripe.com https://connect.stripe.com https://js.stripe.com https://hooks.stripe.com https://b.stripecdn.com https://www.google-analytics.com https://www.googletagmanager.com https://www.google.com",
+    "frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://connect.stripe.com https://connect-js.stripe.com",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
