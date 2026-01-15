@@ -19,12 +19,29 @@ export async function middleware(request: NextRequest) {
   // Update Supabase session (this handles auth)
   const sessionResponse = await updateSession(request);
 
+  // CRITICAL: Create a new response to ensure headers are properly set
+  // updateSession may create new response objects when cookies are set
+  const response = NextResponse.next({
+    request,
+  });
+
+  // Copy cookies from sessionResponse to our new response
+  sessionResponse.cookies.getAll().forEach((cookie) => {
+    response.cookies.set(cookie.name, cookie.value, {
+      path: cookie.path,
+      domain: cookie.domain,
+      sameSite: cookie.sameSite as any,
+      secure: cookie.secure,
+      httpOnly: cookie.httpOnly,
+      expires: cookie.expires,
+      maxAge: cookie.maxAge,
+    });
+  });
+
   // Apply security headers
   const isProduction = process.env.NODE_ENV === 'production';
 
-  // Content Security Policy
-  // Note: CSP wildcards (*.stripe.com) may not work in all browsers
-  // Using explicit domains for better compatibility
+  // Content Security Policy - MUST include connect-js.stripe.com for Stripe Connect
   const cspDirectives = [
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com https://js.stripe.com https://connect.stripe.com https://connect-js.stripe.com https://b.stripecdn.com https://hooks.stripe.com",
@@ -40,24 +57,24 @@ export async function middleware(request: NextRequest) {
     'upgrade-insecure-requests',
   ].join('; ');
 
-  // Set security headers on the session response
-  sessionResponse.headers.set('X-DNS-Prefetch-Control', 'on');
-  sessionResponse.headers.set(
+  // Set security headers
+  response.headers.set('X-DNS-Prefetch-Control', 'on');
+  response.headers.set(
     'Strict-Transport-Security',
     isProduction ? 'max-age=31536000; includeSubDomains; preload' : 'max-age=0'
   );
-  sessionResponse.headers.set('X-Frame-Options', 'SAMEORIGIN');
-  sessionResponse.headers.set('X-Content-Type-Options', 'nosniff');
-  sessionResponse.headers.set('X-XSS-Protection', '1; mode=block');
-  sessionResponse.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-  sessionResponse.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-  sessionResponse.headers.set('Content-Security-Policy', cspDirectives);
+  response.headers.set('X-Frame-Options', 'SAMEORIGIN');
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('X-XSS-Protection', '1; mode=block');
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  response.headers.set('Content-Security-Policy', cspDirectives);
 
   // Remove server information
-  sessionResponse.headers.delete('X-Powered-By');
-  sessionResponse.headers.delete('Server');
+  response.headers.delete('X-Powered-By');
+  response.headers.delete('Server');
 
-  return sessionResponse;
+  return response;
 }
 
 export const config = {
