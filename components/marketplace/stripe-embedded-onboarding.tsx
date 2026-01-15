@@ -50,6 +50,35 @@ export function StripeEmbeddedOnboarding({ onComplete, onExit }: StripeEmbeddedO
     window.scrollTo(0, 0);
   }, []);
 
+  // Listen for script loading errors (especially Connect.js)
+  useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      if (event.message?.includes('Connect.js') || 
+          event.message?.includes('connect-js.stripe.com') ||
+          event.filename?.includes('connect-js.stripe.com')) {
+        console.error('Detected Connect.js loading error:', event);
+        setOnboardingError("The Stripe setup form failed to load. Please use the button below to continue setup in a new window.");
+        setLoading(false);
+      }
+    };
+
+    const handleRejection = (event: PromiseRejectionEvent) => {
+      const reason = event.reason?.message || event.reason?.toString() || '';
+      if (reason.includes('Connect.js') || reason.includes('Failed to load')) {
+        console.error('Detected Connect.js promise rejection:', event.reason);
+        setOnboardingError("The Stripe setup form failed to load. Please use the button below to continue setup in a new window.");
+        setLoading(false);
+      }
+    };
+
+    window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', handleRejection);
+    return () => {
+      window.removeEventListener('error', handleError);
+      window.removeEventListener('unhandledrejection', handleRejection);
+    };
+  }, []);
+
 
   // Initialize Stripe Connect on mount
   useEffect(() => {
@@ -86,12 +115,24 @@ export function StripeEmbeddedOnboarding({ onComplete, onExit }: StripeEmbeddedO
       } catch (err: any) {
         console.error("Error initializing Stripe Connect:", err);
         setError(err.message || "Failed to initialize onboarding");
+        setOnboardingError("The embedded form failed to load. Please use the button below to continue setup.");
         setLoading(false);
       }
     };
 
+    // Set a timeout to detect if Connect.js fails to load
+    const timeout = setTimeout(() => {
+      if (loading && !stripeConnectInstance) {
+        console.warn("Stripe Connect.js taking too long to load, showing fallback");
+        setOnboardingError("The embedded form is taking too long to load. Please use the button below to continue setup.");
+        setLoading(false);
+      }
+    }, 8000); // 8 second timeout
+
     initStripeConnect();
-  }, [fetchClientSecret]);
+
+    return () => clearTimeout(timeout);
+  }, [fetchClientSecret, loading, stripeConnectInstance]);
 
   const handleAccountOnboardingExit = () => {
     console.log("Account onboarding complete, moving to tax setup");
@@ -231,41 +272,66 @@ export function StripeEmbeddedOnboarding({ onComplete, onExit }: StripeEmbeddedO
             </div>
             
             {onboardingError && (
-              <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-4">
-                <p className="text-sm text-red-800 dark:text-red-200 mb-3">
+              <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-4">
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-3">
                   {onboardingError}
                 </p>
-                <Button onClick={handleUseAccountLink} className="w-full">
+                <Button onClick={handleUseAccountLink} className="w-full" size="lg">
                   Continue Setup in New Window
                 </Button>
               </div>
             )}
             
-            <div id="stripe-onboarding-container" className="min-h-[400px]">
-              <ConnectComponentsProvider connectInstance={stripeConnectInstance}>
-                <ConnectAccountOnboarding
-                  onExit={handleAccountOnboardingExit}
-                  collectionOptions={{
-                    fields: "eventually_due",
-                    futureRequirements: "include",
-                  }}
-                />
-              </ConnectComponentsProvider>
-            </div>
+            {!onboardingError && (
+              <div id="stripe-onboarding-container" className="min-h-[400px]">
+                {stripeConnectInstance ? (
+                  <ConnectComponentsProvider connectInstance={stripeConnectInstance}>
+                    <ConnectAccountOnboarding
+                      onExit={handleAccountOnboardingExit}
+                      collectionOptions={{
+                        fields: "eventually_due",
+                        futureRequirements: "include",
+                      }}
+                    />
+                  </ConnectComponentsProvider>
+                ) : (
+                  <div className="text-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-4" />
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Loading setup form...
+                    </p>
+                    <Button 
+                      onClick={handleUseAccountLink} 
+                      variant="outline" 
+                      className="w-full"
+                      disabled={!accountId}
+                    >
+                      Continue Setup in New Window Instead
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
 
-            {/* Always show fallback option in case embedded form doesn't render */}
-            <div className="mt-4 pt-4 border-t">
-              <p className="text-xs text-muted-foreground mb-3 text-center">
-                Having trouble with the form above? You can also continue setup in a new window:
-              </p>
-              <Button 
-                onClick={handleUseAccountLink} 
-                variant="outline" 
-                className="w-full"
-                disabled={!accountId}
-              >
-                Continue Setup in New Window
-              </Button>
+            {/* Always show fallback option prominently */}
+            <div className="mt-6 pt-6 border-t">
+              <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
+                  Alternative: Continue Setup in New Window
+                </p>
+                <p className="text-xs text-blue-700 dark:text-blue-300 mb-4">
+                  If the embedded form above doesn&apos;t work, click the button below to complete your setup in a new window.
+                </p>
+                <Button 
+                  onClick={handleUseAccountLink} 
+                  variant="default" 
+                  className="w-full"
+                  disabled={!accountId}
+                  size="lg"
+                >
+                  Continue Setup in New Window
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
