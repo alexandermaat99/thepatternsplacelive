@@ -7,10 +7,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const supabase = await createClient();
 
   // Get all active products
-  const { data: products } = await supabase
+  const { data: products, error } = await supabase
     .from('products')
     .select('id, updated_at')
     .eq('is_active', true);
+
+  // If there's an error fetching products, log it but continue with static pages
+  if (error) {
+    console.error('Error fetching products for sitemap:', error);
+  }
 
   // Static pages
   const staticPages: MetadataRoute.Sitemap = [

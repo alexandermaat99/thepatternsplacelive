@@ -16,7 +16,10 @@ const defaultUrl =
   process.env.NEXT_PUBLIC_SITE_URL ||
   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
 
-const siteUrl = typeof defaultUrl === 'string' ? defaultUrl : 'https://www.thepatternsplace.com';
+// Always use www version for consistency
+const siteUrl = typeof defaultUrl === 'string' 
+  ? (defaultUrl.includes('localhost') ? defaultUrl : COMPANY_INFO.urls.website)
+  : COMPANY_INFO.urls.website;
 
 // Google Analytics Measurement ID
 const gaId = process.env.NEXT_PUBLIC_GA_ID || 'G-41YY2ZJVNN';

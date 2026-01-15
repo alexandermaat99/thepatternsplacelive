@@ -8,6 +8,20 @@ import { COMPANY_INFO } from '@/lib/company-info';
 export const metadata: Metadata = {
   title: `Privacy Policy - ${COMPANY_INFO.name}`,
   description: `Privacy Policy for ${COMPANY_INFO.name} marketplace.`,
+  alternates: {
+    canonical: `${COMPANY_INFO.urls.website}/privacy`,
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+      'max-video-preview': -1,
+    },
+  },
 };
 
 export default function PrivacyPolicyPage() {
