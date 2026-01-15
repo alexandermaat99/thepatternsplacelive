@@ -43,6 +43,7 @@ export async function proxy(request: NextRequest) {
 
   // Content Security Policy - MUST include connect-js.stripe.com for Stripe Connect
   // Updated: 2025-01-14 - Added all required Stripe domains
+  // CRITICAL: This CSP must include connect-js.stripe.com for Stripe Connect.js to load
   const cspDirectives = [
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com https://js.stripe.com https://connect.stripe.com https://connect-js.stripe.com https://b.stripecdn.com https://hooks.stripe.com",
@@ -70,6 +71,11 @@ export async function proxy(request: NextRequest) {
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   response.headers.set('Content-Security-Policy', cspDirectives);
+  
+  // Debug: Verify CSP is being set (remove after confirming it works)
+  if (process.env.NODE_ENV === 'production') {
+    console.log('[PROXY] Setting CSP with connect-js.stripe.com');
+  }
 
   // Remove server information
   response.headers.delete('X-Powered-By');
