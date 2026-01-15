@@ -28,21 +28,43 @@ export function StripeEmbeddedOnboarding({ onComplete, onExit }: StripeEmbeddedO
 
   // Fetch the client secret from our API
   const fetchClientSecret = useCallback(async () => {
-    const response = await fetch("/api/connect/account-session", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-    });
+    try {
+      const response = await fetch("/api/connect/account-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include", // Include cookies for authentication
+      });
 
-    if (!response.ok) {
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        const errorMessage = data.error || "Failed to create account session";
+        
+        // Don't retry on 401 - it's an authentication issue, not a transient error
+        if (response.status === 401) {
+          const authError = new Error(errorMessage);
+          // Mark as auth error so we can handle it differently
+          (authError as any).isAuthError = true;
+          setError("You must be logged in to set up your Stripe account. Please log in and try again.");
+          setLoading(false);
+          throw authError;
+        }
+        
+        throw new Error(errorMessage);
+      }
+
       const data = await response.json();
-      throw new Error(data.error || "Failed to create account session");
+      if (data.accountId) {
+        setAccountId(data.accountId);
+      }
+      return data.clientSecret;
+    } catch (err: any) {
+      // Re-throw auth errors to stop retry loop
+      if (err.isAuthError) {
+        throw err;
+      }
+      // For other errors, throw to allow retry logic
+      throw err;
     }
-
-    const data = await response.json();
-    if (data.accountId) {
-      setAccountId(data.accountId);
-    }
-    return data.clientSecret;
   }, []);
 
   // Scroll to top on mount
@@ -152,6 +174,7 @@ export function StripeEmbeddedOnboarding({ onComplete, onExit }: StripeEmbeddedO
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ accountId }),
+        credentials: "include", // Include cookies for authentication
       });
 
       if (!response.ok) {
