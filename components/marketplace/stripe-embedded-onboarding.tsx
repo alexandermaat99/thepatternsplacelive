@@ -72,6 +72,34 @@ export function StripeEmbeddedOnboarding({ onComplete, onExit }: StripeEmbeddedO
     window.scrollTo(0, 0);
   }, []);
 
+  // Fetch account ID immediately so fallback button is always enabled
+  useEffect(() => {
+    const fetchAccountId = async () => {
+      try {
+        const response = await fetch("/api/connect/account-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.accountId) {
+            setAccountId(data.accountId);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch account ID:", err);
+        // Don't set error state - let the component continue trying to load
+      }
+    };
+
+    // Only fetch if we don't have accountId yet
+    if (!accountId) {
+      fetchAccountId();
+    }
+  }, [accountId]);
+
   // Listen for script loading errors (especially Connect.js)
   useEffect(() => {
     const handleError = (event: ErrorEvent) => {
@@ -104,6 +132,9 @@ export function StripeEmbeddedOnboarding({ onComplete, onExit }: StripeEmbeddedO
 
   // Initialize Stripe Connect on mount
   useEffect(() => {
+    let mounted = true;
+    let timeoutId: NodeJS.Timeout;
+    
     const initStripeConnect = async () => {
       try {
         const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
@@ -111,6 +142,15 @@ export function StripeEmbeddedOnboarding({ onComplete, onExit }: StripeEmbeddedO
         if (!publishableKey) {
           throw new Error("Missing NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY environment variable");
         }
+
+        // Set timeout to detect if Connect.js fails to load
+        timeoutId = setTimeout(() => {
+          if (mounted && loading && !stripeConnectInstance) {
+            console.warn("Stripe Connect.js taking too long to load, showing fallback");
+            setOnboardingError("The embedded form is taking too long to load. This may be due to browser security settings. Please use the button below to continue setup in a new window.");
+            setLoading(false);
+          }
+        }, 5000); // 5 second timeout - faster detection
 
         const instance = loadConnectAndInitialize({
           publishableKey,
@@ -129,32 +169,33 @@ export function StripeEmbeddedOnboarding({ onComplete, onExit }: StripeEmbeddedO
           },
         });
 
-        setStripeConnectInstance(instance);
-        setLoading(false);
-        
-        // Scroll to top after Stripe loads
-        setTimeout(() => window.scrollTo(0, 0), 100);
+        if (mounted) {
+          clearTimeout(timeoutId);
+          setStripeConnectInstance(instance);
+          setLoading(false);
+          
+          // Scroll to top after Stripe loads
+          setTimeout(() => window.scrollTo(0, 0), 100);
+        }
       } catch (err: any) {
         console.error("Error initializing Stripe Connect:", err);
-        setError(err.message || "Failed to initialize onboarding");
-        setOnboardingError("The embedded form failed to load. Please use the button below to continue setup.");
-        setLoading(false);
+        if (mounted) {
+          clearTimeout(timeoutId);
+          const errorMsg = err.message || "Failed to initialize onboarding";
+          setError(errorMsg);
+          setOnboardingError("The embedded form failed to load. Please use the button below to continue setup in a new window.");
+          setLoading(false);
+        }
       }
     };
 
-    // Set a timeout to detect if Connect.js fails to load
-    const timeout = setTimeout(() => {
-      if (loading && !stripeConnectInstance) {
-        console.warn("Stripe Connect.js taking too long to load, showing fallback");
-        setOnboardingError("The embedded form is taking too long to load. Please use the button below to continue setup.");
-        setLoading(false);
-      }
-    }, 8000); // 8 second timeout
-
     initStripeConnect();
 
-    return () => clearTimeout(timeout);
-  }, [fetchClientSecret, loading, stripeConnectInstance]);
+    return () => {
+      mounted = false;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [fetchClientSecret]);
 
   const handleAccountOnboardingExit = () => {
     console.log("Account onboarding complete, moving to tax setup");
@@ -294,68 +335,89 @@ export function StripeEmbeddedOnboarding({ onComplete, onExit }: StripeEmbeddedO
               </p>
             </div>
             
-            {onboardingError && (
-              <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-4">
-                <p className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-3">
-                  {onboardingError}
-                </p>
-                <Button onClick={handleUseAccountLink} className="w-full" size="lg">
-                  Continue Setup in New Window
-                </Button>
-              </div>
-            )}
-            
-            {!onboardingError && (
-              <div id="stripe-onboarding-container" className="min-h-[400px]">
-                {stripeConnectInstance ? (
-                  <ConnectComponentsProvider connectInstance={stripeConnectInstance}>
-                    <ConnectAccountOnboarding
-                      onExit={handleAccountOnboardingExit}
-                      collectionOptions={{
-                        fields: "eventually_due",
-                        futureRequirements: "include",
-                      }}
-                    />
-                  </ConnectComponentsProvider>
-                ) : (
-                  <div className="text-center py-8">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-4" />
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Loading setup form...
-                    </p>
-                    <Button 
-                      onClick={handleUseAccountLink} 
-                      variant="outline" 
-                      className="w-full"
-                      disabled={!accountId}
-                    >
-                      Continue Setup in New Window Instead
-                    </Button>
+            {/* Always show the form container, but show fallback if error or timeout */}
+            <div id="stripe-onboarding-container" className="min-h-[400px]">
+              {onboardingError ? (
+                <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg p-6 mb-4">
+                  <div className="flex items-start gap-3 mb-4">
+                    <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-red-800 dark:text-red-200 mb-2">
+                        Embedded Form Failed to Load
+                      </p>
+                      <p className="text-sm text-red-700 dark:text-red-300 mb-4">
+                        {onboardingError}
+                      </p>
+                      <Button onClick={handleUseAccountLink} className="w-full" size="lg" disabled={!accountId}>
+                        Continue Setup in New Window
+                      </Button>
+                      {!accountId && (
+                        <p className="text-xs text-red-600 dark:text-red-400 mt-3">
+                          Creating your account... This may take a moment. If the button stays disabled, please refresh the page.
+                        </p>
+                      )}
+                    </div>
                   </div>
-                )}
+                </div>
+              ) : stripeConnectInstance ? (
+                <ConnectComponentsProvider connectInstance={stripeConnectInstance}>
+                  <ConnectAccountOnboarding
+                    onExit={handleAccountOnboardingExit}
+                    collectionOptions={{
+                      fields: "eventually_due",
+                      futureRequirements: "include",
+                    }}
+                  />
+                </ConnectComponentsProvider>
+              ) : (
+                <div className="text-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-4" />
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Loading setup form...
+                  </p>
+                  <p className="text-xs text-muted-foreground mb-4">
+                    If this takes too long, use the button below to continue in a new window.
+                  </p>
+                  <Button 
+                    onClick={handleUseAccountLink} 
+                    variant="default" 
+                    className="w-full"
+                    disabled={!accountId}
+                    size="lg"
+                  >
+                    Continue Setup in New Window Instead
+                  </Button>
+                  {!accountId && (
+                    <p className="text-xs text-muted-foreground mt-3">
+                      Creating your account...
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Always show fallback option prominently - visible even when form is loading */}
+            {!onboardingError && (
+              <div className="mt-6 pt-6 border-t">
+                <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
+                    Alternative: Continue Setup in New Window
+                  </p>
+                  <p className="text-xs text-blue-700 dark:text-blue-300 mb-4">
+                    If the embedded form above doesn&apos;t work, click the button below to complete your setup in a new window.
+                  </p>
+                  <Button 
+                    onClick={handleUseAccountLink} 
+                    variant="default" 
+                    className="w-full"
+                    disabled={!accountId}
+                    size="lg"
+                  >
+                    Continue Setup in New Window
+                  </Button>
+                </div>
               </div>
             )}
-
-            {/* Always show fallback option prominently */}
-            <div className="mt-6 pt-6 border-t">
-              <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
-                  Alternative: Continue Setup in New Window
-                </p>
-                <p className="text-xs text-blue-700 dark:text-blue-300 mb-4">
-                  If the embedded form above doesn&apos;t work, click the button below to complete your setup in a new window.
-                </p>
-                <Button 
-                  onClick={handleUseAccountLink} 
-                  variant="default" 
-                  className="w-full"
-                  disabled={!accountId}
-                  size="lg"
-                >
-                  Continue Setup in New Window
-                </Button>
-              </div>
-            </div>
           </CardContent>
         </Card>
       </div>
