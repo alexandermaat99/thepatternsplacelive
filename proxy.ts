@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   // Handle www redirect FIRST (before other processing)
   // Note: Vercel handles HTTPS automatically, but we need to handle www redirect
   const url = request.nextUrl;
@@ -42,6 +42,7 @@ export async function middleware(request: NextRequest) {
   const isProduction = process.env.NODE_ENV === 'production';
 
   // Content Security Policy - MUST include connect-js.stripe.com for Stripe Connect
+  // Updated: 2025-01-14 - Added all required Stripe domains
   const cspDirectives = [
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com https://js.stripe.com https://connect.stripe.com https://connect-js.stripe.com https://b.stripecdn.com https://hooks.stripe.com",
