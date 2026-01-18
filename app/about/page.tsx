@@ -41,36 +41,11 @@ export const metadata: Metadata = {
     description: `Learn about ${COMPANY_INFO.name}, a community marketplace built specifically for the sewing and knitting community.`,
     images: ['/photos/GailAndAlex-optimized.webp'],
   },
-  alternates: {
-    canonical: `${COMPANY_INFO.urls.website}/about`,
-  },
 };
 
 export default function AboutPage() {
-  const baseUrl = COMPANY_INFO.urls.website;
-  const aboutPageStructuredData = {
-    '@context': 'https://schema.org',
-    '@type': 'AboutPage',
-    name: `About ${COMPANY_INFO.name}`,
-    description: `Learn about ${COMPANY_INFO.name}, a community marketplace built specifically for the sewing and knitting community.`,
-    url: `${baseUrl}/about`,
-    mainEntity: {
-      '@type': 'Organization',
-      name: COMPANY_INFO.name,
-      description: COMPANY_INFO.tagline,
-      foundingDate: '2024-10',
-      image: `${baseUrl}/photos/GailAndAlex-optimized.webp`,
-    },
-  };
-
-  const jsonString = JSON.stringify(aboutPageStructuredData)
-    .replace(/</g, '\\u003c')
-    .replace(/>/g, '\\u003e')
-    .replace(/&/g, '\\u0026');
-
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonString }} />
       <Navigation showMarketplaceLinks={true} />
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <article className="space-y-8">

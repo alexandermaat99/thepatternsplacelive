@@ -46,24 +46,10 @@ export async function generateMetadata({
       ? {
           index: false,
           follow: true,
-          googleBot: {
-            index: false,
-            follow: true,
-            'max-video-preview': -1,
-            'max-image-preview': 'large',
-            'max-snippet': -1,
-          },
         }
       : {
           index: true,
           follow: true,
-          googleBot: {
-            index: true,
-            follow: true,
-            'max-video-preview': -1,
-            'max-image-preview': 'large',
-            'max-snippet': -1,
-          },
         },
     openGraph: {
       title: `Marketplace | ${COMPANY_INFO.name}`,
@@ -71,9 +57,6 @@ export async function generateMetadata({
         'Browse and discover unique sewing and crafting patterns from independent creators.',
       url: baseUrl,
       type: 'website',
-    },
-    alternates: {
-      canonical: baseUrl,
     },
   };
 }

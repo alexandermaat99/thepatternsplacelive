@@ -3,7 +3,6 @@ import { ProductDetail } from '@/components/marketplace/product-detail';
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
 import { COMPANY_INFO } from '@/lib/company-info';
-import { ProductStructuredData, BreadcrumbStructuredData } from '@/components/structured-data';
 
 interface ProductPageProps {
   params: Promise<{
@@ -70,13 +69,6 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
     robots: {
       index: true,
       follow: true,
-      googleBot: {
-        index: true,
-        follow: true,
-        'max-image-preview': 'large',
-        'max-snippet': -1,
-        'max-video-preview': -1,
-      },
     },
     openGraph: {
       title: `${product.title} | ${COMPANY_INFO.name}`,
@@ -97,9 +89,6 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
       title: product.title,
       description,
       images: [imageUrl],
-    },
-    alternates: {
-      canonical: `${COMPANY_INFO.urls.website}/marketplace/product/${id}`,
     },
   };
 }
@@ -156,18 +145,8 @@ export default async function ProductPage({ params }: ProductPageProps) {
   }
 
   return (
-    <>
-      <ProductStructuredData product={product} />
-      <BreadcrumbStructuredData
-        items={[
-          { name: 'Home', url: '/' },
-          { name: 'Marketplace', url: '/marketplace' },
-          { name: product.title, url: `/marketplace/product/${id}` },
-        ]}
-      />
-      <div className="container mx-auto px-4 py-4 sm:py-8">
-        <ProductDetail product={product} />
-      </div>
-    </>
+    <div className="container mx-auto px-4 py-4 sm:py-8">
+      <ProductDetail product={product} />
+    </div>
   );
 }
