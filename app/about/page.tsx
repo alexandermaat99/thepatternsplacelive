@@ -41,6 +41,9 @@ export const metadata: Metadata = {
     description: `Learn about ${COMPANY_INFO.name}, a community marketplace built specifically for the sewing and knitting community.`,
     images: ['/photos/GailAndAlex-optimized.webp'],
   },
+  alternates: {
+    canonical: `${COMPANY_INFO.urls.website}/about`,
+  },
 };
 
 export default function AboutPage() {

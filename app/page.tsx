@@ -14,9 +14,19 @@ export const metadata: Metadata = {
     url: `${COMPANY_INFO.urls.website}/`,
     type: 'website',
   },
+  alternates: {
+    canonical: 'https://thepatternsplace.com/',
+  },
   robots: {
     index: true,
     follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
   },
 };
 

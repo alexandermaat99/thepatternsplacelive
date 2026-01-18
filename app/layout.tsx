@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Script from 'next/script';
 import { Geist } from 'next/font/google';
 import { ThemeProvider } from 'next-themes';
 import { Providers } from '@/components/providers';
@@ -8,6 +9,7 @@ import { FeedbackBubble } from '@/components/feedback-bubble';
 import './globals.css';
 
 import { COMPANY_INFO } from '@/lib/company-info';
+import { OrganizationStructuredData, WebsiteStructuredData } from '@/components/structured-data';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 
 const defaultUrl =
@@ -18,6 +20,12 @@ const defaultUrl =
 const siteUrl = typeof defaultUrl === 'string' 
   ? (defaultUrl.includes('localhost') ? defaultUrl : COMPANY_INFO.urls.website)
   : COMPANY_INFO.urls.website;
+
+// Google Analytics Measurement ID
+const gaId = process.env.NEXT_PUBLIC_GA_ID || 'G-41YY2ZJVNN';
+
+// Google Tag Manager Container ID
+const gtmId = process.env.NEXT_PUBLIC_GTM_ID || 'GTM-MVJ3TWSH';
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -85,6 +93,19 @@ export const metadata: Metadata = {
   robots: {
     index: true,
     follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+  verification: {
+    // Add these when you have them:
+    // google: 'your-google-verification-code',
+    // yandex: 'your-yandex-verification-code',
+    // yahoo: 'your-yahoo-verification-code',
   },
 };
 
@@ -108,7 +129,32 @@ export default function RootLayout({
         <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
         <link rel="manifest" href="/icons/site.webmanifest" />
       </head>
+      {/* Google Tag Manager - must load early in head */}
+      <Script
+        id="google-tag-manager"
+        strategy="afterInteractive"
+        dangerouslySetInnerHTML={{
+          __html: `
+            (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+            new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+            j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+            'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+            })(window,document,'script','dataLayer','${gtmId}');
+          `,
+        }}
+      />
       <body className={`${geistSans.className} antialiased flex flex-col min-h-screen`}>
+        {/* Google Tag Manager (noscript) - must be immediately after opening <body> tag */}
+        <noscript>
+          <iframe
+            src={`https://www.googletagmanager.com/ns.html?id=${gtmId}`}
+            height="0"
+            width="0"
+            style={{ display: 'none', visibility: 'hidden' }}
+          />
+        </noscript>
+        <OrganizationStructuredData />
+        <WebsiteStructuredData />
         <ThemeProvider
           attribute="class"
           defaultTheme="light"
@@ -123,6 +169,19 @@ export default function RootLayout({
           </Providers>
         </ThemeProvider>
         <SpeedInsights />
+        {/* Google Analytics */}
+        <Script
+          strategy="afterInteractive"
+          src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', '${gaId}');
+          `}
+        </Script>
       </body>
     </html>
   );
