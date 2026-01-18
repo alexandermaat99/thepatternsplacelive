@@ -33,6 +33,10 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
   if (!product) {
     return {
       title: 'Product Not Found',
+      robots: {
+        index: false,
+        follow: false,
+      },
     };
   }
 
@@ -128,6 +132,10 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const userId = userResult.data.user?.id || null;
 
   if (error || !product) {
+    // Product not found - return 404 with noindex metadata
+    // Note: Next.js page components can't return 410 directly
+    // The noindex metadata + 404 status is sufficient for search engines
+    // Google will eventually remove these from index
     notFound();
   }
 

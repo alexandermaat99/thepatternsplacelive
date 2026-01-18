@@ -3,12 +3,18 @@ import { getStripe } from '@/lib/stripe';
 import { createClient } from '@/lib/supabase/server';
 import { COMPANY_INFO } from '@/lib/company-info';
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
-    if (authError || !user) {
+    if (authError) {
+      console.error('Auth error in account-session:', authError);
+      return NextResponse.json({ error: 'Unauthorized', details: authError.message }, { status: 401 });
+    }
+    
+    if (!user) {
+      console.error('No user found in account-session request');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

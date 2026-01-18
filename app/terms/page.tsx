@@ -8,6 +8,20 @@ import { COMPANY_INFO } from '@/lib/company-info';
 export const metadata: Metadata = {
   title: `Terms of Service - ${COMPANY_INFO.name}`,
   description: `Terms of Service for ${COMPANY_INFO.name} marketplace.`,
+  alternates: {
+    canonical: `${COMPANY_INFO.urls.website}/terms`,
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+      'max-video-preview': -1,
+    },
+  },
 };
 
 export default function TermsOfServicePage() {

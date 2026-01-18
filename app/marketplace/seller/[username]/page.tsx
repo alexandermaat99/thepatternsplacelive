@@ -3,6 +3,8 @@ import { ProductCard } from '@/components/marketplace/product-card';
 import { notFound } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { BackButton } from '@/components/back-button';
+import { Metadata } from 'next';
+import { COMPANY_INFO } from '@/lib/company-info';
 
 interface SellerPageProps {
   params: Promise<{
@@ -10,16 +12,73 @@ interface SellerPageProps {
   }>;
 }
 
+export async function generateMetadata({ params }: SellerPageProps): Promise<Metadata> {
+  const { username } = await params;
+  const supabase = await createClient();
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name, username')
+    .ilike('username', username)
+    .single();
+
+  if (!profile) {
+    return {
+      title: 'Seller Not Found',
+      robots: {
+        index: false,
+        follow: false,
+      },
+    };
+  }
+
+  const sellerName = profile.full_name || `@${profile.username}`;
+
+  return {
+    title: `${sellerName} - Seller Profile | ${COMPANY_INFO.name}`,
+    description: `Browse patterns by ${sellerName} on ${COMPANY_INFO.name}. Discover unique sewing and crafting patterns from this independent creator.`,
+    alternates: {
+      canonical: `${COMPANY_INFO.urls.website}/marketplace/seller/${username}`,
+    },
+    robots: {
+      index: true,
+      follow: true,
+    },
+  };
+}
+
 export default async function SellerPage({ params }: SellerPageProps) {
   const { username } = await params;
   const supabase = await createClient();
 
-  // First, find the user by username
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('id, full_name, username, avatar_url, bio')
-    .ilike('username', username)
-    .single();
+  // First, try to find the user by username
+  let profile = null;
+  let profileError = null;
+
+  // Check if the param is a UUID (for users without username)
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    username
+  );
+
+  if (isUUID) {
+    // Look up by ID
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, full_name, username, avatar_url, bio')
+      .eq('id', username)
+      .single();
+    profile = data;
+    profileError = error;
+  } else {
+    // Look up by username
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, full_name, username, avatar_url, bio')
+      .ilike('username', username)
+      .single();
+    profile = data;
+    profileError = error;
+  }
 
   if (profileError || !profile) {
     notFound();

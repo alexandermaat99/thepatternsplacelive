@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { ProductCard } from '@/components/marketplace/product-card';
+import { UserCard } from '@/components/marketplace/user-card';
 import { MarketplaceFilters } from '@/components/marketplace/marketplace-filters';
 import { ActiveFilters } from '@/components/marketplace/active-filters';
 import { MarketplacePagination } from '@/components/marketplace/marketplace-pagination';
@@ -37,7 +38,7 @@ export async function generateMetadata({
   );
 
   const baseUrl = `${COMPANY_INFO.urls.website}${COMPANY_INFO.urls.marketplace}`;
-  
+
   return {
     title: 'Marketplace',
     description:
@@ -115,6 +116,7 @@ async function MarketplaceContent({ searchParams }: MarketplacePageProps) {
     categoryFilterData,
     usernameSearchData,
     categorySearchData,
+    userSearchResults,
   ] = await Promise.all([
     // Get categories that have products
     (async () => {
@@ -190,12 +192,49 @@ async function MarketplaceContent({ searchParams }: MarketplacePageProps) {
           .or(searchWords.map(word => `name.ilike.%${word}%`).join(','))
           .then(result => result.data?.map(c => c.id) || [])
       : Promise.resolve([]),
+
+    // Search for users/profiles (if search is active)
+    // This searches usernames and full names, regardless of whether they have products
+    // Only show users with usernames (required for profile page routing)
+    searchWords.length > 0
+      ? supabase
+          .from('profiles')
+          .select('id, username, full_name, avatar_url, bio')
+          .not('username', 'is', null)
+          .or(
+            searchWords
+              .map(word => `username.ilike.%${word}%,full_name.ilike.%${word}%`)
+              .join(',')
+          )
+          .then(result => {
+            // Filter results to match all search words and ensure username exists
+            if (result.data) {
+              let filtered = result.data.filter(profile => profile.username); // Only users with usernames
+              
+              if (searchWords.length > 1) {
+                filtered = filtered.filter(profile => {
+                  const searchableText = [
+                    profile.username?.toLowerCase() || '',
+                    profile.full_name?.toLowerCase() || '',
+                  ].join(' ');
+                  return searchWords.every(word =>
+                    searchableText.includes(word.toLowerCase())
+                  );
+                });
+              }
+              
+              return filtered;
+            }
+            return [];
+          })
+      : Promise.resolve([]),
   ]);
 
   const categories = categoriesWithProducts;
   const prices = priceRangeData.data?.map(p => Number(p.price)) || [0];
   const minPrice = prices.length > 0 ? Math.floor(Math.min(...prices, 0)) : 0;
   const maxPrice = prices.length > 0 ? Math.ceil(Math.max(...prices, 100)) : 100;
+  const users = userSearchResults || [];
 
   // Get product IDs from category search
   let categorySearchProductIds: string[] = [];
@@ -587,6 +626,18 @@ async function MarketplaceContent({ searchParams }: MarketplacePageProps) {
             <ActiveFilters categories={categories} />
           </Suspense>
 
+          {/* Users Section - Only show when searching */}
+          {users.length > 0 && searchWords.length > 0 && (
+            <div className="mb-8">
+              <h2 className="text-2xl font-semibold mb-4">Users</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {users.map(user => (
+                  <UserCard key={user.id} user={user} />
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Products Grid */}
           {paginatedProducts.length > 0 ? (
             <>
@@ -608,11 +659,17 @@ async function MarketplaceContent({ searchParams }: MarketplacePageProps) {
             <div className="text-center py-16">
               <div className="max-w-md mx-auto">
                 <h3 className="text-xl font-semibold mb-3">
-                  {hasFilters ? 'No patterns found' : 'Ready to explore patterns?'}
+                  {hasFilters
+                    ? users.length > 0
+                      ? 'No patterns found'
+                      : 'No patterns found'
+                    : 'Ready to explore patterns?'}
                 </h3>
                 <p className="text-muted-foreground mb-6">
                   {hasFilters
-                    ? "Try adjusting your search or filters to find what you're looking for."
+                    ? users.length > 0
+                      ? "We found some users above, but no patterns match your search. Try adjusting your filters."
+                      : "Try adjusting your search or filters to find what you're looking for."
                     : 'The marketplace is waiting for your first pattern! Be the one to share something amazing.'}
                 </p>
                 {!hasFilters && (
