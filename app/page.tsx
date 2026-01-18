@@ -13,6 +13,20 @@ export const metadata: Metadata = {
     description: 'Discover modern sewing and crafting patterns from independent designers.',
     url: `${COMPANY_INFO.urls.website}/`,
     type: 'website',
+    images: [
+      {
+        url: `${COMPANY_INFO.urls.website}/opengraph-image.png`,
+        width: 1200,
+        height: 630,
+        alt: COMPANY_INFO.name,
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: COMPANY_INFO.name,
+    description: 'Discover modern sewing and crafting patterns from independent designers.',
+    images: [`${COMPANY_INFO.urls.website}/twitter-image.png`],
   },
   alternates: {
     canonical: 'https://thepatternsplace.com/',

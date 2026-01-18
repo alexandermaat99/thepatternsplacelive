@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: SellerPageProps): Promise<Met
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('full_name, username')
+    .select('full_name, username, avatar_url')
     .ilike('username', username)
     .single();
 
@@ -33,12 +33,38 @@ export async function generateMetadata({ params }: SellerPageProps): Promise<Met
   }
 
   const sellerName = profile.full_name || `@${profile.username}`;
+  const profileUrl = `${COMPANY_INFO.urls.website}/marketplace/seller/${username}`;
+  
+  // Use seller's avatar if available, otherwise fall back to default OG image
+  const ogImage = profile.avatar_url 
+    ? profile.avatar_url 
+    : `${COMPANY_INFO.urls.website}/opengraph-image.png`;
 
   return {
     title: `${sellerName} - Seller Profile | ${COMPANY_INFO.name}`,
     description: `Browse patterns by ${sellerName} on ${COMPANY_INFO.name}. Discover unique sewing and crafting patterns from this independent creator.`,
     alternates: {
-      canonical: `${COMPANY_INFO.urls.website}/marketplace/seller/${username}`,
+      canonical: profileUrl,
+    },
+    openGraph: {
+      title: `${sellerName} - Seller Profile | ${COMPANY_INFO.name}`,
+      description: `Browse patterns by ${sellerName} on ${COMPANY_INFO.name}. Discover unique sewing and crafting patterns from this independent creator.`,
+      url: profileUrl,
+      type: 'profile',
+      images: [
+        {
+          url: ogImage,
+          width: 1200,
+          height: 630,
+          alt: `${sellerName} - ${COMPANY_INFO.name}`,
+        },
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${sellerName} - Seller Profile`,
+      description: `Browse patterns by ${sellerName} on ${COMPANY_INFO.name}.`,
+      images: [ogImage],
     },
     robots: {
       index: true,
