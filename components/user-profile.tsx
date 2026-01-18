@@ -6,12 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
 import { AvatarUpload } from '@/components/avatar-upload';
-import { ExternalLink, User, Award } from 'lucide-react';
+import { ExternalLink, User, Award, Share2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { UserProfile as UserProfileType, StripeAccountStatus } from '@/lib/auth-helpers';
 import { UsernameEditor } from '@/components/username-editor';
 import { BioEditor } from '@/components/bio-editor';
+import { useToast } from '@/contexts/toast-context';
 
 interface UserProfileProps {
   // Optional props from server component - if provided, use these instead of useAuth
@@ -27,6 +28,7 @@ export function UserProfile({
 }: UserProfileProps = {}) {
   const router = useRouter();
   const authHook = useAuth();
+  const { showToast } = useToast();
 
   // Use server props if available, otherwise fall back to useAuth hook
   const user = serverUser || authHook.user;
@@ -166,6 +168,36 @@ export function UserProfile({
     }
   };
 
+  const handleShareProfile = async () => {
+    const username = currentProfile?.username || profile?.username;
+    if (!username) {
+      showToast('Username not set. Please set a username first.', 'error');
+      return;
+    }
+
+    const profileUrl = `${window.location.origin}/marketplace/seller/${username}`;
+    
+    try {
+      await navigator.clipboard.writeText(profileUrl);
+      showToast('Profile URL copied to clipboard!', 'success');
+    } catch (err) {
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = profileUrl;
+      textArea.style.position = 'fixed';
+      textArea.style.opacity = '0';
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        showToast('Profile URL copied to clipboard!', 'success');
+      } catch (fallbackErr) {
+        showToast('Failed to copy URL. Please copy manually.', 'error');
+      }
+      document.body.removeChild(textArea);
+    }
+  };
+
   if (loading) {
     return (
       <Card>
@@ -201,9 +233,20 @@ export function UserProfile({
       {/* User Info */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="h-5 w-5" />
-            User Profile
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              User Profile
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleShareProfile}
+              className="h-8 w-8"
+              title="Share profile URL"
+            >
+              <Share2 className="h-4 w-4" />
+            </Button>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
