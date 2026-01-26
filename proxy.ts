@@ -53,8 +53,6 @@ export async function proxy(request: NextRequest) {
   });
 
   // Apply security headers
-  const isProduction = process.env.NODE_ENV === 'production';
-
   // Content Security Policy - MUST include connect-js.stripe.com for Stripe Connect
   // Updated: 2025-01-14 - Added all required Stripe domains
   // CRITICAL: This CSP must include connect-js.stripe.com for Stripe Connect.js to load
