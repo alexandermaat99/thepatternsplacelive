@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     images: [`${COMPANY_INFO.urls.website}/twitter-image.png`],
   },
   alternates: {
-    canonical: 'https://thepatternsplace.com/',
+    canonical: `${COMPANY_INFO.urls.website}/`,
   },
   robots: {
     index: true,
