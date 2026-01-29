@@ -3,33 +3,22 @@ import { updateSession } from '@/lib/supabase/middleware';
 
 export async function proxy(request: NextRequest) {
   const url = request.nextUrl.clone();
-  const hostname = request.headers.get('host') || '';
-  const protocol = request.headers.get('x-forwarded-proto') || (url.protocol === 'https:' ? 'https' : 'http');
-  
+  const protocol =
+    request.headers.get('x-forwarded-proto') || (url.protocol === 'https:' ? 'https' : 'http');
+
   // Only apply redirects in production
   const isProduction = process.env.NODE_ENV === 'production';
-  
+
   if (isProduction) {
-    // 1. Redirect HTTP to HTTPS
+    // 1. Redirect HTTP to HTTPS only. Do NOT redirect www <-> non-www here:
+    // that can cause "redirected you too many times" if the host (Vercel/Cloudflare)
+    // also does domain redirects. Set canonical www or non-www in Vercel Domains instead.
     if (protocol === 'http') {
       url.protocol = 'https:';
       return NextResponse.redirect(url, 301);
     }
-    
-    // 2. Redirect non-www to www (canonical is www.thepatternsplace.com)
-    const isLocalhost = hostname.includes('localhost') || hostname.includes('127.0.0.1');
-    const isVercelPreview = hostname.includes('vercel.app');
-    
-    if (!isLocalhost && !isVercelPreview) {
-      // Check if it's thepatternsplace.com (without www)
-      if (hostname === 'thepatternsplace.com') {
-        // Redirect to www version
-        url.hostname = 'www.thepatternsplace.com';
-        return NextResponse.redirect(url, 301);
-      }
-    }
   }
-  
+
   // Update Supabase session (this handles auth)
   const sessionResponse = await updateSession(request);
 
@@ -40,7 +29,7 @@ export async function proxy(request: NextRequest) {
   });
 
   // Copy cookies from sessionResponse to our new response
-  sessionResponse.cookies.getAll().forEach((cookie) => {
+  sessionResponse.cookies.getAll().forEach(cookie => {
     response.cookies.set(cookie.name, cookie.value, {
       path: cookie.path,
       domain: cookie.domain,
@@ -83,7 +72,7 @@ export async function proxy(request: NextRequest) {
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   response.headers.set('Content-Security-Policy', cspDirectives);
-  
+
   // Debug: Verify CSP is being set (remove after confirming it works)
   if (process.env.NODE_ENV === 'production') {
     console.log('[PROXY] Setting CSP with connect-js.stripe.com');
@@ -97,15 +86,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - images - .svg, .png, .jpg, .jpeg, .gif, .webp
-     * Feel free to modify this pattern to include more paths.
-     */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 };
