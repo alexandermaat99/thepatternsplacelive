@@ -3,6 +3,8 @@ import { updateSession } from '@/lib/supabase/middleware';
 
 export async function proxy(request: NextRequest) {
   const url = request.nextUrl.clone();
+  // Use x-forwarded-host if behind a proxy (Vercel/Cloudflare), otherwise use host header
+  const hostname = request.headers.get('x-forwarded-host') || request.headers.get('host') || '';
   const protocol =
     request.headers.get('x-forwarded-proto') || (url.protocol === 'https:' ? 'https' : 'http');
 
@@ -10,11 +12,20 @@ export async function proxy(request: NextRequest) {
   const isProduction = process.env.NODE_ENV === 'production';
 
   if (isProduction) {
-    // 1. Redirect HTTP to HTTPS only. Do NOT redirect www <-> non-www here:
-    // that can cause "redirected you too many times" if the host (Vercel/Cloudflare)
-    // also does domain redirects. Set canonical www or non-www in Vercel Domains instead.
+    // 1. Redirect HTTP to HTTPS
     if (protocol === 'http') {
       url.protocol = 'https:';
+      return NextResponse.redirect(url, 301);
+    }
+
+    // 2. Redirect non-www to www (canonical domain)
+    // This fixes "Duplicate without user-selected canonical" in Google Search Console
+    // Note: If you use Cloudflare, ensure SSL is set to "Full" (not "Flexible") to avoid redirect loops
+    const isLocalhost = hostname.includes('localhost') || hostname.includes('127.0.0.1');
+    const isVercelPreview = hostname.includes('vercel.app');
+
+    if (!isLocalhost && !isVercelPreview && hostname === 'thepatternsplace.com') {
+      url.hostname = 'www.thepatternsplace.com';
       return NextResponse.redirect(url, 301);
     }
   }
