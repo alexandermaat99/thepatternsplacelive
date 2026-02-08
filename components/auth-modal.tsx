@@ -98,10 +98,26 @@ export function AuthModal({
           window.location.href = decodedRedirect;
         }
       }
-    } catch (error: unknown) {
-      console.error('Login error:', error);
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'message' in err && typeof (err as Error).message === 'string'
+          ? (err as Error).message
+          : 'An error occurred during login. Please try again.';
+      const isInvalidCredentials =
+        message.toLowerCase().includes('invalid login credentials') ||
+        message.toLowerCase().includes('invalid_credentials');
+      if (isInvalidCredentials) {
+        // Expected case: wrong email/password — avoid noisy console stack trace
+        if (process.env.NODE_ENV === 'development') {
+          console.info('Login failed: invalid credentials');
+        }
+      } else {
+        console.error('Login error:', err);
+      }
       setError(
-        error instanceof Error ? error.message : 'An error occurred during login. Please try again.'
+        isInvalidCredentials
+          ? 'Invalid email or password. Please try again or use "Forgot password?" below.'
+          : message
       );
       setIsLoading(false);
     }
