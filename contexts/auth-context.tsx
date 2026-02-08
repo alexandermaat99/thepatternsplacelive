@@ -139,7 +139,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        if (!user) {
+        // If getUser() returned null but we have a session (e.g. cookies just set by middleware), use session.user
+        const userToUse = user ?? session?.user ?? null;
+        if (!userToUse) {
           setAuthState(prev => ({
             ...prev,
             user: null,
@@ -156,7 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const { data: profileData, error: profileError } = await supabase
             .from('profiles')
             .select('*')
-            .eq('id', user.id)
+            .eq('id', userToUse.id)
             .single();
 
           if (!profileError && profileData) {
@@ -169,7 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Set user immediately, even if profile is null
         if (mounted) {
           setAuthState({
-            user,
+            user: userToUse,
             profile,
             stripeStatus: {
               isConnected: false,

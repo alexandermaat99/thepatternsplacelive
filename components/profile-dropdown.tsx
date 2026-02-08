@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,19 +18,6 @@ import Link from 'next/link';
 export function ProfileDropdown() {
   const { user, profile, signOut, loading, openAuthModal, canSell } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
-
-  // Debug logging
-  useEffect(() => {
-    console.log('[ProfileDropdown] ===== STATE UPDATE =====');
-    console.log('[ProfileDropdown] hasUser:', !!user);
-    console.log('[ProfileDropdown] userId:', user?.id);
-    console.log('[ProfileDropdown] email:', user?.email);
-    console.log('[ProfileDropdown] hasProfile:', !!profile);
-    console.log('[ProfileDropdown] profileAvatar:', profile?.avatar_url);
-    console.log('[ProfileDropdown] loading:', loading);
-    console.log('[ProfileDropdown] Will render authenticated?', !!user && !loading);
-    console.log('[ProfileDropdown] =======================');
-  }, [user, profile, loading]);
 
   const getInitials = () => {
     if (profile?.full_name?.trim()) {
@@ -53,53 +40,31 @@ export function ProfileDropdown() {
   };
 
   const handleSignOut = async () => {
-    console.log('[ProfileDropdown] Sign out initiated');
     setIsOpen(false);
     try {
       await signOut();
-      console.log('[ProfileDropdown] Sign out successful');
     } catch (error) {
-      console.error('[ProfileDropdown] Sign out error:', error);
+      console.error('Sign out error:', error);
     }
   };
 
   // Loading state
   if (loading && !user) {
-    console.log('[ProfileDropdown] Rendering LOADING state');
     return <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />;
   }
 
   // Authenticated state
   if (user) {
-    console.log('[ProfileDropdown] Rendering AUTHENTICATED state');
     const avatarUrl = getAvatarUrl();
     const initials = getInitials();
-
-    console.log('[ProfileDropdown] Rendering authenticated state', {
-      userId: user.id,
-      avatarUrl,
-      initials,
-    });
 
     return (
       <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
         <DropdownMenuTrigger
           className="flex items-center gap-2 h-8 px-1 rounded-full hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer"
-          onClick={e => {
-            console.log('[ProfileDropdown] Trigger clicked!', e);
-            e.stopPropagation();
-          }}
-          onMouseDown={e => {
-            console.log('[ProfileDropdown] Trigger mouseDown!', e);
-          }}
+          onClick={e => e.stopPropagation()}
         >
-          <Avatar
-            className="h-8 w-8 pointer-events-none"
-            onClick={e => {
-              console.log('[ProfileDropdown] Avatar clicked!', e);
-              e.stopPropagation();
-            }}
-          >
+          <Avatar className="h-8 w-8 pointer-events-none">
             <AvatarImage src={avatarUrl} alt={profile?.full_name || user.email || 'User'} />
             <AvatarFallback className="text-xs bg-primary/10 text-primary">
               {initials}
@@ -164,7 +129,6 @@ export function ProfileDropdown() {
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onSelect={e => {
-              console.log('[ProfileDropdown] Sign out onSelect triggered');
               e.preventDefault();
               handleSignOut();
             }}
@@ -179,7 +143,6 @@ export function ProfileDropdown() {
   }
 
   // Unauthenticated state
-  console.log('[ProfileDropdown] Rendering UNAUTHENTICATED state');
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger className="h-8 w-8 rounded-full p-0 hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer flex items-center justify-center">

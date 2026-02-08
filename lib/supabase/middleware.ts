@@ -34,15 +34,13 @@ export async function updateSession(request: NextRequest) {
           });
           cookiesToSet.forEach(({ name, value, options }) => {
             // Ensure cookies have proper settings for localhost
+            // Do NOT force httpOnly: true - client createBrowserClient reads session from document.cookie.
+            // If we set httpOnly here, the client never sees the session and ProfileDropdown shows unauthenticated.
             supabaseResponse.cookies.set(name, value, {
               ...options,
-              // Don't set domain in localhost - let browser handle it
-              // SameSite: 'lax' helps with localhost cookie issues
               sameSite: options?.sameSite || 'lax',
-              // Secure should be false for localhost (http)
               secure: process.env.NODE_ENV === 'production',
-              // HttpOnly is set by Supabase automatically
-              httpOnly: options?.httpOnly ?? true,
+              httpOnly: options?.httpOnly ?? false,
             });
           });
         },
