@@ -41,17 +41,15 @@ export async function proxy(request: NextRequest) {
   });
 
   // Apply security headers
-  // Content Security Policy - MUST include connect-js.stripe.com for Stripe Connect
-  // Updated: 2025-01-14 - Added all required Stripe domains
-  // CRITICAL: This CSP must include connect-js.stripe.com for Stripe Connect.js to load
+  // Content Security Policy - Stripe Connect + Google Analytics/GTM/Ads
   const cspDirectives = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com https://js.stripe.com https://connect.stripe.com https://connect-js.stripe.com https://b.stripecdn.com https://hooks.stripe.com",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com https://googleads.g.doubleclick.net https://www.googleadservices.com https://js.stripe.com https://connect.stripe.com https://connect-js.stripe.com https://b.stripecdn.com https://hooks.stripe.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com data:",
     "img-src 'self' data: https: blob:",
     "connect-src 'self' https://*.supabase.co https://*.supabase.in https://api.stripe.com https://connect-js.stripe.com https://connect.stripe.com https://js.stripe.com https://hooks.stripe.com https://b.stripecdn.com https://www.google-analytics.com https://www.googletagmanager.com https://www.google.com",
-    "frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://connect.stripe.com https://connect-js.stripe.com",
+    "frame-src 'self' https://www.googletagmanager.com https://js.stripe.com https://hooks.stripe.com https://connect.stripe.com https://connect-js.stripe.com",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
