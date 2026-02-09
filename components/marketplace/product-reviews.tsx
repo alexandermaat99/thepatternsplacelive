@@ -153,7 +153,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
             .eq('buyer_id', user.id)
             .eq('status', 'completed')
             .limit(1)
-            .single();
+            .maybeSingle();
 
           setHasPurchased(!!order);
         } else {

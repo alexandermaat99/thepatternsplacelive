@@ -40,7 +40,7 @@ export function ProductFilesDownload({
           .eq('buyer_id', user.id)
           .eq('status', 'completed')
           .limit(1)
-          .single();
+          .maybeSingle();
 
         setHasPurchased(!!data && !error);
       } catch (error) {

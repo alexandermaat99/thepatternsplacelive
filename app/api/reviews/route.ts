@@ -200,7 +200,7 @@ export async function POST(request: NextRequest) {
       .eq('buyer_id', user.id)
       .eq('status', 'completed')
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (orderError || !order) {
       return NextResponse.json(
@@ -215,7 +215,7 @@ export async function POST(request: NextRequest) {
       .select('id, order_id')
       .eq('product_id', productId)
       .eq('buyer_id', user.id)
-      .single();
+      .maybeSingle();
 
     if (existingReview) {
       // Update existing review (use sanitized values)
