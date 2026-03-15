@@ -58,7 +58,7 @@ interface FieldErrors {
 
 export function EditProductModal({ product, isOpen, onClose }: EditProductModalProps) {
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
+  const { user, canSell, loading: authLoading } = useAuth();
   const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [showFeesModal, setShowFeesModal] = useState(false);
@@ -66,7 +66,30 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [completedSalesCount, setCompletedSalesCount] = useState<number | null>(null);
+  const [canSellInModal, setCanSellInModal] = useState<boolean | null>(null);
   const shouldScrollRef = useRef<string | null>(null);
+
+  // Fetch can-sell when modal opens so the Free/paid switch is correct immediately (auth context may not be ready yet)
+  useEffect(() => {
+    if (!isOpen) {
+      setCanSellInModal(null);
+      return;
+    }
+    let cancelled = false;
+    fetch('/api/can-sell')
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled) setCanSellInModal(!!data.canSell);
+      })
+      .catch(() => {
+        if (!cancelled) setCanSellInModal(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
+
+  const effectiveCanSell = canSellInModal ?? canSell;
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -314,6 +337,20 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
       const price = formData.is_free ? 0 : parseFloat(formData.price);
 
       const isFree = formData.is_free;
+
+      // If saving as paid, require an approved Stripe account (check on submit for accuracy)
+      if (!isFree) {
+        const res = await fetch('/api/can-sell');
+        const data = await res.json();
+        if (!data.canSell) {
+          setError(
+            'You need an approved Stripe account to list paid patterns. Connect or complete Stripe setup in your dashboard, or keep this as a free pattern.'
+          );
+          setIsLoading(false);
+          showToast('Stripe account required for paid patterns', 'error');
+          return;
+        }
+      }
 
       // Additional validation (should already be caught by validateForm, but double-check)
       if (!formData.files || formData.files.length === 0) {
@@ -771,7 +808,10 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
                     <Switch
                       id="is_free"
                       checked={formData.is_free}
+                      disabled={!effectiveCanSell}
                       onCheckedChange={checked => {
+                        // Users without approved Stripe can only have free patterns
+                        if (!effectiveCanSell && !checked) return;
                         // When switching from free to paid, ensure price is at least 1.00
                         // When switching from paid to free, set price to 0
                         const newPrice = checked
@@ -825,6 +865,15 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
                       This is a free pattern. Buyers will be able to download it without payment.
                       The "free" category will be added automatically.
                     </p>
+                    {!effectiveCanSell ? (
+                      <p className="mt-1 text-muted-foreground">
+                        Connect and complete Stripe in your dashboard to switch to a paid pattern.
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-muted-foreground">
+                        Your Stripe account is approved — you can switch this to a paid pattern anytime.
+                      </p>
+                    )}
                   </div>
                 ) : (
                   formData.price &&

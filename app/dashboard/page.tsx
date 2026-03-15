@@ -70,6 +70,14 @@ export default async function DashboardPage() {
   const canSell = stripeStatus.isOnboarded;
   const hasSellerIntent = !!profile?.stripe_account_id; // User has started seller onboarding
 
+  // Fetch product count so we can show "My Products" to free-only sellers who have listed items
+  const supabase = await createClient();
+  const { count: productCount } = await supabase
+    .from('products')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', user.id);
+  const hasListedProducts = (productCount ?? 0) >= 1;
+
   // Fetch earnings data if user can sell
   let earningsData = {
     thisMonthNet: 0,
@@ -79,7 +87,6 @@ export default async function DashboardPage() {
   };
 
   if (canSell) {
-    const supabase = await createClient();
     const { data: orders } = await supabase
       .from('orders')
       .select('amount, net_amount, created_at, product_id, products(title)')
@@ -341,6 +348,7 @@ export default async function DashboardPage() {
               </div>
             )}
 
+            {/* Full seller actions: Earnings, My Products, Stripe — only when Stripe is approved */}
             {canSell && (
               <>
                 <Link href="/dashboard/earnings" className="block">
@@ -359,12 +367,30 @@ export default async function DashboardPage() {
                 <StripeDashboardButton />
               </>
             )}
+
+            {/* Seller actions when they have listings but Stripe not approved yet: My Products + Earnings (zeros until they complete Stripe) */}
+            {!canSell && hasListedProducts && (
+              <div className="pt-3 border-t space-y-3">
+                <Link href="/dashboard/earnings" className="block">
+                  <Button variant="outline" className="w-full justify-start">
+                    <DollarSign className="h-4 w-4 mr-2" />
+                    View Earnings
+                  </Button>
+                </Link>
+                <Link href="/dashboard/my-products" className="block">
+                  <Button variant="outline" className="w-full justify-start">
+                    <Package className="h-4 w-4 mr-2" />
+                    View My Products
+                  </Button>
+                </Link>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Mini Earnings Section - Only shown for sellers */}
-      {canSell && (
+      {/* Mini Earnings Section - shown when Stripe approved or when they have listings (zeros until paid sales) */}
+      {(canSell || hasListedProducts) && (
         <Link href="/dashboard/earnings" className="block mt-6">
           <Card className="hover:border-primary hover:shadow-md transition-all duration-200 cursor-pointer">
             <CardContent className="py-6">

@@ -16,7 +16,7 @@ import { User, LogOut, ShoppingBag, Package, Plus, Ruler } from 'lucide-react';
 import Link from 'next/link';
 
 export function ProfileDropdown() {
-  const { user, profile, signOut, loading, openAuthModal, canSell, isAdmin } = useAuth();
+  const { user, profile, signOut, loading, openAuthModal, isAdmin } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
   const getInitials = () => {
@@ -104,18 +104,16 @@ export function ProfileDropdown() {
               <span>Marketplace</span>
             </Link>
           </DropdownMenuItem>
-          {canSell && (
-            <DropdownMenuItem asChild>
-              <Link
-                href="/dashboard/my-products"
-                className="flex items-center w-full"
-                onClick={() => setIsOpen(false)}
-              >
-                <Package className="mr-2 h-4 w-4" />
-                <span>My Products</span>
-              </Link>
-            </DropdownMenuItem>
-          )}
+          <DropdownMenuItem asChild>
+            <Link
+              href="/dashboard/my-products"
+              className="flex items-center w-full"
+              onClick={() => setIsOpen(false)}
+            >
+              <Package className="mr-2 h-4 w-4" />
+              <span>My Products</span>
+            </Link>
+          </DropdownMenuItem>
           {isAdmin && (
             <DropdownMenuItem asChild>
               <Link
