@@ -316,6 +316,7 @@ export function useAuth() {
     refreshProfile,
     signOut,
     isAuthenticated: !!authState.user,
-    canSell: authState.stripeStatus.isOnboarded
+    canSell: authState.stripeStatus.isOnboarded,
+    isAdmin: authState.profile?.admin === true
   };
 }

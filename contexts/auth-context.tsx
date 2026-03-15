@@ -33,6 +33,7 @@ interface AuthContextType extends AuthState {
   signOut: () => Promise<void>;
   isAuthenticated: boolean;
   canSell: boolean;
+  isAdmin: boolean;
   // Auth modal state and methods
   authModal: AuthModalState;
   openAuthModal: (view?: AuthModalView, options?: { action?: string; redirectUrl?: string }) => void;
@@ -399,6 +400,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signOut,
     isAuthenticated: !!authState.user,
     canSell: authState.stripeStatus.isOnboarded,
+    isAdmin: authState.profile?.admin === true,
     // Auth modal
     authModal,
     openAuthModal,
