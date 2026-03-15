@@ -329,6 +329,18 @@ export default async function DashboardPage() {
               </div>
             )}
 
+            {/* List a free pattern without Stripe — always show when user can't sell paid yet */}
+            {!canSell && (
+              <div className="pt-3 border-t">
+                <Link href="/marketplace/sell" className="block">
+                  <Button variant="outline" className="w-full justify-start text-green-700 dark:text-green-400 border-green-200 dark:border-green-800 hover:bg-green-50 dark:hover:bg-green-950/30">
+                    <Package className="h-4 w-4 mr-2" />
+                    List a free pattern (no Stripe needed)
+                  </Button>
+                </Link>
+              </div>
+            )}
+
             {canSell && (
               <>
                 <Link href="/dashboard/earnings" className="block">

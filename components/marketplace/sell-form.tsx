@@ -47,6 +47,7 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const shouldScrollRef = useRef<string | null>(null);
+  // When user hasn't connected Stripe, default to free pattern so they can list without Stripe
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -56,7 +57,7 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
     difficulty: '' as string,
     images: [] as string[],
     files: [] as string[],
-    is_free: false,
+    is_free: !canSell,
   });
 
   // Scroll to error field when fieldErrors change
@@ -353,6 +354,11 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+                {!canSell && formData.is_free && (
+                  <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 p-3 text-sm text-green-800 dark:text-green-200">
+                    <strong>List a free pattern</strong> — no Stripe account needed. Buyers can download without payment. To list paid patterns later, connect Stripe from your dashboard.
+                  </div>
+                )}
                 <div>
                   <Label htmlFor="title">Product Title</Label>
                   <div
@@ -477,7 +483,10 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                       <Switch
                         id="free-toggle"
                         checked={formData.is_free}
+                        disabled={!canSell}
                         onCheckedChange={checked => {
+                          // Users without Stripe can only list free patterns
+                          if (!canSell && !checked) return;
                           // When switching from free to paid, ensure price is at least 1.00
                           // When switching from paid to free, set price to 0
                           const newPrice = checked
