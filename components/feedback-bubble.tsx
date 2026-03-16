@@ -12,12 +12,14 @@ import {
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 
 const MAX_MESSAGE_LENGTH = 2000;
 
 export function FeedbackBubble() {
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState('');
+  const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -44,6 +46,7 @@ export function FeedbackBubble() {
         },
         body: JSON.stringify({
           message: message.trim(),
+          email: email.trim() || null,
           page_url: typeof window !== 'undefined' ? window.location.href : null,
           user_agent: typeof window !== 'undefined' ? window.navigator.userAgent : null,
         }),
@@ -82,6 +85,7 @@ export function FeedbackBubble() {
 
       setSubmitStatus('success');
       setMessage('');
+      setEmail('');
 
       // Close dialog after a short delay
       setTimeout(() => {
@@ -103,6 +107,7 @@ export function FeedbackBubble() {
     if (!open) {
       // Reset state when closing
       setMessage('');
+      setEmail('');
       setSubmitStatus('idle');
       setErrorMessage(null);
     }
@@ -135,6 +140,21 @@ export function FeedbackBubble() {
           </DialogHeader>
 
           <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="feedback-email">Email (optional)</Label>
+              <Input
+                id="feedback-email"
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                disabled={isSubmitting}
+              />
+              <p className="text-xs text-muted-foreground">
+                If you&apos;d like a response, please leave your email.
+              </p>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="feedback-message">Your message</Label>
               <Textarea

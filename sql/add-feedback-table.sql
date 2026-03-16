@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS public.feedback (
   user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   username TEXT, -- Username at the time of submission (snapshot)
   message TEXT NOT NULL,
+  email TEXT,
   page_url TEXT,
   user_agent TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

@@ -6,6 +6,9 @@ import { sanitizeString } from '@/lib/security/input-validation';
 const MAX_MESSAGE_LENGTH = 2000;
 const MAX_URL_LENGTH = 2048;
 const MAX_USER_AGENT_LENGTH = 500;
+const MAX_EMAIL_LENGTH = 254;
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(request: NextRequest) {
   try {
@@ -42,7 +45,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { message, page_url, user_agent } = body;
+    const { message, email, page_url, user_agent } = body;
 
     // Validate message
     if (!message || typeof message !== 'string') {
@@ -68,6 +71,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate and sanitize optional fields
+    let sanitizedEmail: string | null = null;
+    if (email && typeof email === 'string') {
+      const trimmedEmail = email.trim();
+      if (trimmedEmail.length > 0) {
+        if (trimmedEmail.length > MAX_EMAIL_LENGTH) {
+          return NextResponse.json({ error: 'Email is too long' }, { status: 400 });
+        }
+        if (!EMAIL_REGEX.test(trimmedEmail)) {
+          return NextResponse.json({ error: 'Email is invalid' }, { status: 400 });
+        }
+        sanitizedEmail = sanitizeString(trimmedEmail, MAX_EMAIL_LENGTH) || null;
+      }
+    }
+
     let sanitizedPageUrl: string | null = null;
     if (page_url && typeof page_url === 'string') {
       const trimmedUrl = page_url.trim();
@@ -117,6 +134,7 @@ export async function POST(request: NextRequest) {
         user_id: user?.id || null,
         username: username,
         message: sanitizedMessage,
+        email: sanitizedEmail,
         page_url: sanitizedPageUrl,
         user_agent: sanitizedUserAgent,
       })
