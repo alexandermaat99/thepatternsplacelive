@@ -18,7 +18,8 @@ import {
 } from '@/components/ui/dialog';
 import { FabricPhotoUpload } from '@/components/admin/fabric-photo-upload';
 import type { Fabric } from '@/types/fabric';
-import { Plus, Pencil, Ruler, Trash2, X } from 'lucide-react';
+import { formatBoltLabel, parseFabricSku } from '@/lib/fabric-sku';
+import { Plus, Pencil, Ruler, Trash2, X, CopyPlus } from 'lucide-react';
 import Image from 'next/image';
 
 interface FabricInventoryProps {
@@ -55,9 +56,28 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
+  const sortedFabric = [...fabric].sort((a, b) => {
+    const pa = parseFabricSku(a.sku);
+    const pb = parseFabricSku(b.sku);
+    const baseA = pa.ok ? pa.baseSku : a.sku;
+    const baseB = pb.ok ? pb.baseSku : b.sku;
+    if (baseA < baseB) return -1;
+    if (baseA > baseB) return 1;
+    const boltA = pa.ok ? pa.boltIndex : 0;
+    const boltB = pb.ok ? pb.boltIndex : 0;
+    return boltA - boltB;
+  });
+
   const openAdd = () => {
     setEditingSku(null);
     setForm(emptyForm);
+    setError(null);
+    setDialogOpen(true);
+  };
+
+  const openAddWithPreset = (preset: Partial<typeof emptyForm>) => {
+    setEditingSku(null);
+    setForm({ ...emptyForm, ...preset });
     setError(null);
     setDialogOpen(true);
   };
@@ -81,14 +101,61 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
     setDialogOpen(true);
   };
 
+  const getNextBoltSkuForBase = (baseSku: string) => {
+    const indices = fabric
+      .map(f => parseFabricSku(f.sku))
+      .filter((p): p is Extract<typeof p, { ok: true }> => p.ok && p.baseSku === baseSku)
+      .map(p => p.boltIndex);
+
+    const nextIndex = indices.length ? Math.max(...indices) + 1 : 0;
+    if (nextIndex === 0) return baseSku;
+    if (nextIndex > 9) return null; // optional 4th digit only supports 0-9
+    return `${baseSku}${nextIndex}`;
+  };
+
+  const addNextBoltFromRow = (row: Fabric) => {
+    const parsed = parseFabricSku(row.sku);
+    if (!parsed.ok) {
+      setError(parsed.error);
+      return;
+    }
+
+    const nextSku = getNextBoltSkuForBase(parsed.baseSku);
+    if (!nextSku) {
+      setError(`Too many bolts for ${parsed.baseSku}. Bolt suffix only supports 0–9.`);
+      return;
+    }
+
+    openAddWithPreset({
+      sku: nextSku,
+      name: row.name ?? '',
+      description: row.description ?? '',
+      weave: row.weave ?? '',
+      fiber: row.fiber ?? '',
+      width: row.width != null ? String(row.width) : '',
+      buy_price: row.buy_price != null ? String(row.buy_price) : '',
+      sell_price: row.sell_price != null ? String(row.sell_price) : '',
+      photo_url: row.photo_url,
+      current_quantity: '',
+      purchase_quantity: '',
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSaving(true);
     try {
       const supabase = createClient();
+      const parsed = parseFabricSku(form.sku);
+      if (!parsed.ok) {
+        setError(parsed.error);
+        setSaving(false);
+        return;
+      }
+
       const row = {
-        sku: form.sku.trim(),
+        sku: parsed.normalizedSku,
         name: form.name.trim() || null,
         description: form.description.trim() || null,
         weave: form.weave.trim() || null,
@@ -121,6 +188,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
         if (updateError) throw updateError;
         setFabric(prev => prev.map(f => (f.sku === editingSku ? { ...f, ...row, sku: f.sku } : f)));
       } else {
+        // Duplicate protection: prevent inserting an existing SKU
         const { data: existing } = await supabase
           .from('fabric')
           .select('sku')
@@ -203,6 +271,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
                   <tr className="border-b">
                     <th className="text-left py-2 px-2">Photo</th>
                     <th className="text-left py-2 px-2">SKU</th>
+                    <th className="text-left py-2 px-2">Bolt</th>
                     <th className="text-left py-2 px-2">Name</th>
                     <th className="text-left py-2 px-2">Weave</th>
                     <th className="text-left py-2 px-2">Fiber</th>
@@ -214,7 +283,10 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
                   </tr>
                 </thead>
                 <tbody>
-                  {fabric.map(row => (
+                  {sortedFabric.map(row => {
+                    const parsed = parseFabricSku(row.sku);
+                    const boltLabel = parsed.ok ? formatBoltLabel(parsed.boltIndex) : '—';
+                    return (
                     <tr key={row.sku} className="border-b hover:bg-muted/50">
                       <td className="py-2 px-2">
                         {row.photo_url ? (
@@ -236,6 +308,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
                         )}
                       </td>
                       <td className="py-2 px-2 font-mono">{row.sku}</td>
+                      <td className="py-2 px-2">{boltLabel}</td>
                       <td className="py-2 px-2">{row.name ?? '—'}</td>
                       <td className="py-2 px-2">{row.weave ?? '—'}</td>
                       <td className="py-2 px-2">{row.fiber ?? '—'}</td>
@@ -261,6 +334,15 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
                         <Button
                           variant="ghost"
                           size="sm"
+                          onClick={() => addNextBoltFromRow(row)}
+                          aria-label="Add next bolt"
+                          title="Add next bolt"
+                        >
+                          <CopyPlus className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => {
                             setDeleteConfirm({ sku: row.sku, name: row.name });
                             setDeleteError(null);
@@ -272,7 +354,8 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
                         </Button>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -299,6 +382,15 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
                 required
                 className="font-mono"
               />
+              {!editingSku && form.sku.trim() && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {(() => {
+                    const p = parseFabricSku(form.sku);
+                    if (!p.ok) return p.error;
+                    return `Base: ${p.baseSku} • ${formatBoltLabel(p.boltIndex)} (0-based index ${p.boltIndex})`;
+                  })()}
+                </p>
+              )}
             </div>
             <div>
               <Label htmlFor="name">Name</Label>
