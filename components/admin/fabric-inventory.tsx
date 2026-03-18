@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -19,7 +19,7 @@ import {
 import { FabricPhotoUpload } from '@/components/admin/fabric-photo-upload';
 import type { Fabric } from '@/types/fabric';
 import { formatBoltLabel, parseFabricSku } from '@/lib/fabric-sku';
-import { Plus, Pencil, Ruler, Trash2, X, CopyPlus } from 'lucide-react';
+import { Plus, Pencil, Ruler, Trash2, X, CopyPlus, ScanLine } from 'lucide-react';
 import Image from 'next/image';
 
 interface FabricInventoryProps {
@@ -56,6 +56,17 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
+  // Market scan flow (barcode scanners usually type SKU + Enter)
+  const [marketOpen, setMarketOpen] = useState(false);
+  const [scanValue, setScanValue] = useState('');
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [scannedFabric, setScannedFabric] = useState<Fabric | null>(null);
+  const [sellQuantity, setSellQuantity] = useState<string>('1');
+  const [receiptEmail, setReceiptEmail] = useState<string>('');
+  const [sellError, setSellError] = useState<string | null>(null);
+  const [selling, setSelling] = useState(false);
+  const scanInputRef = useRef<HTMLInputElement>(null);
+
   const sortedFabric = [...fabric].sort((a, b) => {
     const pa = parseFabricSku(a.sku);
     const pb = parseFabricSku(b.sku);
@@ -67,6 +78,19 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
     const boltB = pb.ok ? pb.boltIndex : 0;
     return boltA - boltB;
   });
+
+  const sellTotal = useMemo(() => {
+    if (!scannedFabric?.sell_price) return null;
+    const q = Number(sellQuantity);
+    if (!Number.isFinite(q) || q <= 0) return null;
+    return Number(scannedFabric.sell_price) * q;
+  }, [scannedFabric?.sell_price, sellQuantity]);
+
+  useEffect(() => {
+    if (!marketOpen) return;
+    const t = setTimeout(() => scanInputRef.current?.focus(), 50);
+    return () => clearTimeout(t);
+  }, [marketOpen]);
 
   const openAdd = () => {
     setEditingSku(null);
@@ -139,6 +163,123 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
       current_quantity: '',
       purchase_quantity: '',
     });
+  };
+
+  const openMarket = () => {
+    setMarketOpen(true);
+    setScanValue('');
+    setScanError(null);
+    setScannedFabric(null);
+    setSellQuantity('1');
+    setReceiptEmail('');
+    setSellError(null);
+  };
+
+  const lookupSku = async (skuRaw: string) => {
+    const sku = skuRaw.trim();
+    if (!sku) return;
+    setScanError(null);
+    setSellError(null);
+    setScannedFabric(null);
+    setSellQuantity('1');
+    // keep receiptEmail
+
+    const parsed = parseFabricSku(sku);
+    if (!parsed.ok) {
+      setScanError(parsed.error);
+      return;
+    }
+
+    try {
+      const supabase = createClient();
+      const { data, error: fetchError } = await supabase
+        .from('fabric')
+        .select('*')
+        .eq('sku', parsed.normalizedSku)
+        .maybeSingle();
+
+      if (fetchError) throw fetchError;
+      if (!data) {
+        setScanError(`No fabric found for SKU ${parsed.normalizedSku}`);
+        return;
+      }
+      setScannedFabric(data as Fabric);
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'message' in err
+          ? String((err as { message: unknown }).message)
+          : err instanceof Error
+            ? err.message
+            : 'Failed to look up SKU';
+      setScanError(message);
+    }
+  };
+
+  const confirmSale = async () => {
+    if (!scannedFabric) return;
+    const q = Number(sellQuantity);
+    if (!Number.isFinite(q) || q <= 0) {
+      setSellError('Enter a quantity greater than 0.');
+      return;
+    }
+    if (scannedFabric.current_quantity == null) {
+      setSellError('This fabric has no current quantity set.');
+      return;
+    }
+    if (q > Number(scannedFabric.current_quantity)) {
+      setSellError('Not enough inventory for that quantity.');
+      return;
+    }
+    const email = receiptEmail.trim();
+    // quick client-side check; server validates too
+    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      setSellError('Enter a valid email for the receipt.');
+      return;
+    }
+
+    setSelling(true);
+    setSellError(null);
+    try {
+      const res = await fetch('/api/fabric/sale', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sku: scannedFabric.sku, quantity: q, receiptEmail: email }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        setSellError(data?.error || 'Failed to complete sale');
+        return;
+      }
+
+      const newQty = Number(data.newQuantity);
+      setFabric(prev =>
+        prev.map(f => (f.sku === scannedFabric.sku ? { ...f, current_quantity: newQty } : f))
+      );
+      setScannedFabric(prev => (prev ? { ...prev, current_quantity: newQty } : prev));
+
+      if (data.emailSent === false && data.emailError) {
+        setSellError(`Sale completed but receipt email failed: ${data.emailError}`);
+        return;
+      }
+
+      // Ready for next scan quickly
+      setScanValue('');
+      setScannedFabric(null);
+      setSellQuantity('1');
+      setReceiptEmail('');
+      setTimeout(() => scanInputRef.current?.focus(), 0);
+      router.refresh();
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'message' in err
+          ? String((err as { message: unknown }).message)
+          : err instanceof Error
+            ? err.message
+            : 'Failed to complete sale';
+      setSellError(message);
+    } finally {
+      setSelling(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -249,10 +390,16 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
           <Ruler className="h-7 w-7" />
           Fabric Inventory
         </h1>
-        <Button onClick={openAdd} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Add fabric
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={openMarket} className="gap-2">
+            <ScanLine className="h-4 w-4" />
+            Scan barcode
+          </Button>
+          <Button onClick={openAdd} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Add fabric
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -519,6 +666,138 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
               />
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={marketOpen} onOpenChange={setMarketOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Farmers market scan</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="scanSku">Scan barcode / enter SKU</Label>
+              <Input
+                id="scanSku"
+                ref={scanInputRef}
+                value={scanValue}
+                onChange={e => setScanValue(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    lookupSku(scanValue);
+                  }
+                }}
+                placeholder="e.g. PDP0011"
+                className="font-mono"
+              />
+              {scanError && (
+                <p className="text-sm text-destructive bg-destructive/10 p-2 rounded">{scanError}</p>
+              )}
+            </div>
+
+            {scannedFabric && (
+              <div className="border rounded-lg p-3 space-y-2">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold">{scannedFabric.name || scannedFabric.sku}</p>
+                    <p className="text-sm text-muted-foreground">
+                      SKU: <span className="font-mono">{scannedFabric.sku}</span>
+                      {(() => {
+                        const p = parseFabricSku(scannedFabric.sku);
+                        return p.ok ? ` • ${formatBoltLabel(p.boltIndex)}` : '';
+                      })()}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      In stock: {scannedFabric.current_quantity ?? '—'}
+                    </p>
+                  </div>
+                  {scannedFabric.photo_url && (
+                    <button
+                      type="button"
+                      onClick={() => setLightboxUrl(scannedFabric.photo_url)}
+                      className="relative w-16 h-16 rounded overflow-hidden bg-muted block cursor-zoom-in"
+                      aria-label="View photo larger"
+                    >
+                      <Image
+                        src={scannedFabric.photo_url}
+                        alt={scannedFabric.name || scannedFabric.sku}
+                        fill
+                        className="object-cover"
+                      />
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 items-end">
+                  <div>
+                    <Label htmlFor="sellQty">Quantity</Label>
+                    <Input
+                      id="sellQty"
+                      type="number"
+                      step="1"
+                      min="1"
+                      value={sellQuantity}
+                      onChange={e => setSellQuantity(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label>Price</Label>
+                    <div className="h-10 flex items-center rounded-md border px-3 text-sm">
+                      {scannedFabric.sell_price != null
+                        ? `$${Number(scannedFabric.sell_price).toFixed(2)}`
+                        : '—'}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="receiptEmail">Receipt email</Label>
+                  <Input
+                    id="receiptEmail"
+                    type="email"
+                    placeholder="customer@email.com"
+                    value={receiptEmail}
+                    onChange={e => setReceiptEmail(e.target.value)}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Total</span>
+                  <span className="font-semibold">
+                    {sellTotal != null ? `$${sellTotal.toFixed(2)}` : '—'}
+                  </span>
+                </div>
+
+                {sellError && (
+                  <p className="text-sm text-destructive bg-destructive/10 p-2 rounded">{sellError}</p>
+                )}
+
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setScannedFabric(null);
+                      setScanValue('');
+                      setSellQuantity('1');
+                      setReceiptEmail('');
+                      setScanError(null);
+                      setSellError(null);
+                      setTimeout(() => scanInputRef.current?.focus(), 0);
+                    }}
+                    disabled={selling}
+                  >
+                    Clear
+                  </Button>
+                  <Button type="button" onClick={confirmSale} disabled={selling}>
+                    {selling ? 'Updating...' : 'Confirm sale'}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 
