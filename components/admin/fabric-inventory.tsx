@@ -70,10 +70,10 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
   const [selectedPayment, setSelectedPayment] = useState<'venmo' | 'stripe' | 'cash' | null>(null);
   const scanInputRef = useRef<HTMLInputElement>(null);
 
-  // Camera barcode scanner (mobile)
+  // Camera barcode scanning (mobile) – no dependencies, uses BarcodeDetector when available
   const [cameraOpen, setCameraOpen] = useState(false);
-  const [cameraError, setCameraError] = useState<string | null>(null);
   const [cameraRunning, setCameraRunning] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const cameraRafRef = useRef<number | null>(null);
@@ -102,6 +102,113 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
     const t = setTimeout(() => scanInputRef.current?.focus(), 50);
     return () => clearTimeout(t);
   }, [marketOpen]);
+
+  const isProbablyMobile = () => {
+    if (typeof window === 'undefined') return false;
+    return (
+      window.matchMedia?.('(pointer:coarse)')?.matches ||
+      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+    );
+  };
+
+  const stopCamera = () => {
+    if (cameraRafRef.current != null) {
+      cancelAnimationFrame(cameraRafRef.current);
+      cameraRafRef.current = null;
+    }
+    if (cameraStreamRef.current) {
+      cameraStreamRef.current.getTracks().forEach(t => t.stop());
+      cameraStreamRef.current = null;
+    }
+    setCameraRunning(false);
+  };
+
+  const startCameraScan = async () => {
+    // Must be triggered by a user gesture to reliably show permission prompt on mobile.
+    try {
+      setCameraError(null);
+      setCameraRunning(true);
+
+      if (typeof window !== 'undefined' && !window.isSecureContext) {
+        setCameraError('Camera scanning requires HTTPS (or localhost).');
+        setCameraRunning(false);
+        return;
+      }
+
+      if (!navigator?.mediaDevices?.getUserMedia) {
+        setCameraError('Camera not available in this browser.');
+        setCameraRunning(false);
+        return;
+      }
+
+      const Detector = (globalThis as any).BarcodeDetector as
+        | (new (opts?: { formats?: string[] }) => { detect: (src: any) => Promise<any[]> })
+        | undefined;
+
+      if (!Detector) {
+        setCameraError('Barcode scanning is not supported in this browser. Use manual entry.');
+        setCameraRunning(false);
+        return;
+      }
+
+      const detector = new Detector({
+        formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'qr_code'],
+      });
+
+      const video = videoRef.current;
+      if (!video) {
+        setCameraError('Camera element not ready.');
+        setCameraRunning(false);
+        return;
+      }
+
+      // Prefer back camera on phones
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false,
+      });
+
+      cameraStreamRef.current = stream;
+      video.srcObject = stream;
+      // iOS Safari sometimes needs the attribute set explicitly
+      video.setAttribute('playsinline', 'true');
+      await video.play();
+
+      let lastScanAt = 0;
+      const scan = async (now: number) => {
+        cameraRafRef.current = requestAnimationFrame(scan);
+        if (now - lastScanAt < 250) return;
+        lastScanAt = now;
+
+        try {
+          const results = await detector.detect(video);
+          const raw = results?.[0]?.rawValue;
+          const text = typeof raw === 'string' ? raw.trim() : '';
+          if (!text) return;
+
+          stopCamera();
+          setCameraOpen(false);
+          setMarketOpen(true);
+          setScanValue(text);
+          await lookupSku(text);
+        } catch {
+          // ignore intermittent detect errors
+        }
+      };
+
+      cameraRafRef.current = requestAnimationFrame(scan);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to start camera scanner.';
+      setCameraError(msg);
+      stopCamera();
+    }
+  };
+
+  useEffect(() => {
+    // cleanup on unmount
+    return () => stopCamera();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const openAdd = () => {
     setEditingSku(null);
@@ -187,127 +294,6 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
     setPaymentOpen(false);
     setSelectedPayment(null);
   };
-
-  const isProbablyMobile = () => {
-    if (typeof window === 'undefined') return false;
-    return (
-      window.matchMedia?.('(pointer:coarse)')?.matches ||
-      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-    );
-  };
-
-  const openCameraScanner = () => {
-    setCameraError(null);
-    setCameraRunning(false);
-    if (typeof window !== 'undefined' && !window.isSecureContext) {
-      setCameraError('Camera scanning requires HTTPS (or localhost).');
-      setCameraOpen(true);
-      return;
-    }
-    setCameraOpen(true);
-  };
-
-  const stopCamera = () => {
-    if (cameraRafRef.current != null) {
-      cancelAnimationFrame(cameraRafRef.current);
-      cameraRafRef.current = null;
-    }
-    if (cameraStreamRef.current) {
-      cameraStreamRef.current.getTracks().forEach(t => t.stop());
-      cameraStreamRef.current = null;
-    }
-    setCameraRunning(false);
-  };
-
-  const startCameraScan = async () => {
-    try {
-      setCameraError(null);
-      setCameraRunning(true);
-
-      // Many mobile browsers require getUserMedia to be called from a user gesture
-      // (button tap), otherwise no permission prompt is shown.
-      if (!navigator?.mediaDevices?.getUserMedia) {
-        setCameraError('Camera not available in this browser.');
-        setCameraRunning(false);
-        return;
-      }
-
-      const video = videoRef.current;
-      if (!video) return;
-
-      const Detector = (globalThis as any).BarcodeDetector as
-        | (new (opts?: { formats?: string[] }) => { detect: (src: any) => Promise<any[]> })
-        | undefined;
-
-      if (!Detector) {
-        setCameraError('Barcode scanning is not supported in this browser. Use manual entry.');
-        setCameraRunning(false);
-        return;
-      }
-
-      const detector = new Detector({
-        formats: [
-          'ean_13',
-          'ean_8',
-          'upc_a',
-          'upc_e',
-          'code_128',
-          'code_39',
-          'qr_code',
-        ],
-      });
-
-      // Prefer the back camera on phones
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' } },
-        audio: false,
-      });
-      cameraStreamRef.current = stream;
-      video.srcObject = stream;
-      await video.play();
-
-      let lastScanAt = 0;
-      const scan = async (now: number) => {
-        cameraRafRef.current = requestAnimationFrame(scan);
-        if (now - lastScanAt < 250) return;
-        lastScanAt = now;
-
-        try {
-          const results = await detector.detect(video);
-          const value =
-            results?.[0]?.rawValue ||
-            results?.[0]?.data ||
-            results?.[0]?.value ||
-            '';
-          const text = typeof value === 'string' ? value.trim() : '';
-          if (!text) return;
-
-          stopCamera();
-          setCameraOpen(false);
-          setMarketOpen(true);
-          setScanValue(text);
-          await lookupSku(text);
-        } catch {
-          // ignore intermittent detect errors
-        }
-      };
-
-      cameraRafRef.current = requestAnimationFrame(scan);
-    } catch (e) {
-      const msg =
-        e instanceof Error ? e.message : 'Failed to start camera scanner. Check permissions.';
-      setCameraError(msg);
-      stopCamera();
-    }
-  };
-
-  useEffect(() => {
-    if (!cameraOpen) {
-      stopCamera();
-    }
-    return () => stopCamera();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cameraOpen]);
 
   const lookupSku = async (skuRaw: string) => {
     const sku = skuRaw.trim();
@@ -559,7 +545,15 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
           <Button
             variant="outline"
-            onClick={() => (isProbablyMobile() ? openCameraScanner() : openMarket())}
+            onClick={() => {
+              if (isProbablyMobile()) {
+                setCameraError(null);
+                setCameraRunning(false);
+                setCameraOpen(true);
+              } else {
+                openMarket();
+              }
+            }}
             className="gap-2 w-full sm:w-auto"
           >
             <ScanLine className="h-4 w-4" />
@@ -1086,22 +1080,14 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
         </DialogContent>
       </Dialog>
 
-      {/* Camera barcode scanner (mobile) */}
+      {/* Camera scanner dialog (mobile) */}
       <Dialog
         open={cameraOpen}
         onOpenChange={open => {
           if (!open) {
             setCameraOpen(false);
             setCameraError(null);
-            setCameraRunning(false);
-            if (cameraRafRef.current != null) {
-              cancelAnimationFrame(cameraRafRef.current);
-              cameraRafRef.current = null;
-            }
-            if (cameraStreamRef.current) {
-              cameraStreamRef.current.getTracks().forEach(t => t.stop());
-              cameraStreamRef.current = null;
-            }
+            stopCamera();
           } else {
             setCameraOpen(true);
           }
@@ -1135,13 +1121,20 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
             <Button
               type="button"
               onClick={startCameraScan}
-              disabled={cameraRunning || !!cameraError}
+              disabled={cameraRunning}
               className="bg-rose-400 text-white border-rose-400 hover:bg-rose-500 hover:text-white"
               variant="outline"
             >
               {cameraRunning ? 'Starting…' : 'Start camera'}
             </Button>
-            <Button type="button" variant="outline" onClick={openMarket}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setCameraOpen(false);
+                openMarket();
+              }}
+            >
               Enter SKU manually
             </Button>
           </DialogFooter>
