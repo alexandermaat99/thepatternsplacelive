@@ -155,7 +155,7 @@ export async function POST(req: NextRequest) {
 </html>`;
 
         const text =
-          `${COMPANY_INFO.name} - Farmers market receipt\n\n` +
+          `${COMPANY_INFO.name} - Fabric sale receipt\n\n` +
           `Item: ${title}\n` +
           `SKU: ${fabric.sku}\n` +
           `Quantity: ${quantity}\n` +

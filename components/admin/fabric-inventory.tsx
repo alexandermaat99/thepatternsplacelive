@@ -181,7 +181,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
   };
 
   const lookupSku = async (skuRaw: string) => {
-    const sku = skuRaw.trim();
+    const sku = skuRaw.trim().toUpperCase();
     if (!sku) return;
     setScanError(null);
     setSellError(null);
@@ -707,7 +707,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
       </Dialog>
 
       <Dialog open={marketOpen} onOpenChange={setMarketOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Farmers market scan</DialogTitle>
           </DialogHeader>
@@ -719,7 +719,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
                 id="scanSku"
                 ref={scanInputRef}
                 value={scanValue}
-                onChange={e => setScanValue(e.target.value)}
+                onChange={e => setScanValue(e.target.value.toUpperCase())}
                 onKeyDown={e => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
@@ -890,7 +890,8 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
                         <div className="grid gap-2">
                           <a
                             href="https://dashboard.stripe.com/"
-                            rel="noreferrer"
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className="inline-flex items-center justify-center rounded-md border bg-background px-3 py-2 text-sm font-medium hover:bg-accent transition-colors w-full"
                           >
                             Open Stripe Dashboard
