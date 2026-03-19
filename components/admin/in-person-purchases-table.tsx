@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { DateDisplay } from '@/components/date-display';
+// DateDisplay is intentionally not used here; admin table uses a tighter short date format.
 
 export interface InPersonPurchaseRow {
   id: string;
@@ -32,6 +32,15 @@ function formatCurrency(amount: number) {
 export function InPersonPurchasesTable({ purchases }: { purchases: InPersonPurchaseRow[] }) {
   const router = useRouter();
   const [reversingId, setReversingId] = useState<string | null>(null);
+
+  const formatShortDate = (iso: string) => {
+    try {
+      const d = new Date(iso);
+      return new Intl.DateTimeFormat('en-US', { month: 'numeric', day: 'numeric' }).format(d);
+    } catch {
+      return iso;
+    }
+  };
 
   const handleReverse = async (purchaseId: string) => {
     const ok = window.confirm(
@@ -71,17 +80,17 @@ export function InPersonPurchasesTable({ purchases }: { purchases: InPersonPurch
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+      <table className="w-full text-[11px] sm:text-sm">
         <thead>
           <tr className="text-left border-b">
             <th className="pb-3 font-medium">Date</th>
             <th className="pb-3 font-medium">SKU</th>
-            <th className="pb-3 font-medium">Name</th>
+            <th className="pb-3 font-medium hidden sm:table-cell">Name</th>
             <th className="pb-3 font-medium">Qty</th>
             <th className="pb-3 font-medium">Total</th>
-            <th className="pb-3 font-medium">Payment</th>
-            <th className="pb-3 font-medium">Receipt Email</th>
-            <th className="pb-3 font-medium">Inventory</th>
+            <th className="pb-3 font-medium hidden sm:table-cell">Payment</th>
+            <th className="pb-3 font-medium hidden md:table-cell">Receipt Email</th>
+            <th className="pb-3 font-medium hidden md:table-cell">Inventory</th>
             <th className="pb-3 font-medium">Receipt</th>
             <th className="pb-3 font-medium" />
           </tr>
@@ -92,48 +101,46 @@ export function InPersonPurchasesTable({ purchases }: { purchases: InPersonPurch
               key={p.id}
               className="border-b last:border-0 hover:bg-muted/50 transition-colors align-top"
             >
-              <td className="py-3 text-muted-foreground">
-                <DateDisplay date={p.created_at} />
-              </td>
-              <td className="py-3 font-medium">{p.sku}</td>
-              <td className="py-3 font-medium">{p.name}</td>
-              <td className="py-3 text-muted-foreground">{p.quantity}</td>
-              <td className="py-3 font-medium">{formatCurrency(p.total_amount)}</td>
-              <td className="py-3 text-muted-foreground">
+              <td className="py-2 text-muted-foreground whitespace-nowrap">{formatShortDate(p.created_at)}</td>
+              <td className="py-2 font-medium whitespace-nowrap">{p.sku}</td>
+              <td className="py-2 font-medium hidden sm:table-cell">{p.name}</td>
+              <td className="py-2 text-muted-foreground whitespace-nowrap">{p.quantity}</td>
+              <td className="py-2 font-medium whitespace-nowrap">{formatCurrency(p.total_amount)}</td>
+              <td className="py-2 text-muted-foreground hidden sm:table-cell whitespace-nowrap">
                 {p.payment_method ? p.payment_method.toUpperCase() : '—'}
               </td>
-              <td className="py-3">
-                <div className="max-w-[240px] truncate">{p.receipt_email}</div>
+              <td className="py-2 hidden md:table-cell">
+                <div className="max-w-[220px] truncate">{p.receipt_email}</div>
               </td>
-              <td className="py-3 text-muted-foreground">
+              <td className="py-2 text-muted-foreground hidden md:table-cell whitespace-nowrap">
                 {p.inventory_before} → {p.inventory_after}
                 {p.reversed && p.reversed_at ? (
-                  <div className="text-xs text-rose-600 mt-1">
-                    Reversed ({new Date(p.reversed_at).toLocaleString()})
+                  <div className="text-[10px] text-rose-600 mt-1">
+                    Reversed ({new Date(p.reversed_at).toLocaleDateString()})
                   </div>
                 ) : null}
               </td>
-              <td className="py-3">
+              <td className="py-2 whitespace-nowrap">
                 {p.email_sent ? (
-                  <span className="inline-flex items-center text-xs font-medium text-green-700 bg-green-50 px-2 py-1 rounded">
+                  <span className="inline-flex items-center text-[10px] sm:text-xs font-medium text-green-700 bg-green-50 px-1.5 py-0.5 rounded">
                     Sent
                   </span>
                 ) : p.email_error ? (
-                  <span className="inline-flex items-center text-xs font-medium text-rose-700 bg-rose-50 px-2 py-1 rounded">
+                  <span className="inline-flex items-center text-[10px] sm:text-xs font-medium text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded">
                     Error
                   </span>
                 ) : (
-                  <span className="inline-flex items-center text-xs font-medium text-muted-foreground bg-muted px-2 py-1 rounded">
+                  <span className="inline-flex items-center text-[10px] sm:text-xs font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                     Not sent
                   </span>
                 )}
               </td>
-              <td className="py-3 text-right">
+              <td className="py-2 text-right whitespace-nowrap">
                 <button
                   type="button"
                   disabled={p.reversed || reversingId === p.id}
                   onClick={() => handleReverse(p.id)}
-                  className="inline-flex items-center justify-center rounded-md text-xs font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none bg-rose-600 text-white hover:bg-rose-700 h-8 px-3"
+                  className="inline-flex items-center justify-center rounded-md text-[11px] font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none bg-rose-600 text-white hover:bg-rose-700 h-7 px-2.5"
                 >
                   {p.reversed ? 'Reversed' : reversingId === p.id ? 'Reversing…' : 'Reverse'}
                 </button>

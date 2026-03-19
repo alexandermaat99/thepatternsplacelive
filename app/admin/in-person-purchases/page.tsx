@@ -25,6 +25,7 @@ export default async function AdminInPersonPurchasesPage() {
         unit_price,
         total_amount,
         receipt_email,
+        payment_method,
         inventory_before,
         inventory_after,
         email_sent,
@@ -60,39 +61,39 @@ export default async function AdminInPersonPurchasesPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total</CardTitle>
+          <CardHeader className="pb-1 pt-3">
+            <CardTitle className="text-xs font-medium text-muted-foreground">Total</CardTitle>
           </CardHeader>
-          <CardContent className="pt-0">
-            <div className="text-2xl font-bold">{totalCount}</div>
+          <CardContent className="pt-0 pb-3">
+            <div className="text-xl font-bold leading-none">{totalCount}</div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Revenue</CardTitle>
+          <CardHeader className="pb-1 pt-3">
+            <CardTitle className="text-xs font-medium text-muted-foreground">Revenue</CardTitle>
           </CardHeader>
-          <CardContent className="pt-0">
-            <div className="text-2xl font-bold">${totalRevenue.toFixed(2)}</div>
+          <CardContent className="pt-0 pb-3">
+            <div className="text-xl font-bold leading-none">${totalRevenue.toFixed(2)}</div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Reversed</CardTitle>
+          <CardHeader className="pb-1 pt-3">
+            <CardTitle className="text-xs font-medium text-muted-foreground">Reversed</CardTitle>
           </CardHeader>
-          <CardContent className="pt-0">
-            <div className="text-2xl font-bold">{reversedCount}</div>
+          <CardContent className="pt-0 pb-3">
+            <div className="text-xl font-bold leading-none">{reversedCount}</div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+          <CardHeader className="pb-1 pt-3">
+            <CardTitle className="text-xs font-medium text-muted-foreground">
               Email errors
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-0">
-            <div className="text-2xl font-bold">{emailErrors}</div>
+          <CardContent className="pt-0 pb-3">
+            <div className="text-xl font-bold leading-none">{emailErrors}</div>
           </CardContent>
         </Card>
       </div>
