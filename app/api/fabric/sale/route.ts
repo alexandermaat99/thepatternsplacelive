@@ -14,6 +14,11 @@ export async function POST(req: NextRequest) {
     const sku = sanitizeString(String(body?.sku ?? ''), 64).trim();
     const quantity = Number(body?.quantity);
     const receiptEmail = sanitizeString(String(body?.receiptEmail ?? ''), 254).trim();
+    const paymentMethodRaw = String(body?.paymentMethod ?? '').trim().toLowerCase();
+    const paymentMethod =
+      paymentMethodRaw === 'venmo' || paymentMethodRaw === 'stripe' || paymentMethodRaw === 'cash'
+        ? paymentMethodRaw
+        : null;
 
     if (!sku) {
       return NextResponse.json({ success: false, error: 'SKU is required' }, { status: 400 });
@@ -193,6 +198,7 @@ export async function POST(req: NextRequest) {
           unit_price: unitPrice,
           total_amount: total,
           receipt_email: receiptEmail,
+          payment_method: paymentMethod,
           processed_by: user.id,
           inventory_before: Number(currentQty),
           inventory_after: newQty,

@@ -12,6 +12,7 @@ export interface InPersonPurchaseRow {
   unit_price: number;
   total_amount: number;
   receipt_email: string;
+  payment_method?: string | null;
   inventory_before: number;
   inventory_after: number;
   email_sent: boolean;
@@ -78,6 +79,7 @@ export function InPersonPurchasesTable({ purchases }: { purchases: InPersonPurch
             <th className="pb-3 font-medium">Name</th>
             <th className="pb-3 font-medium">Qty</th>
             <th className="pb-3 font-medium">Total</th>
+            <th className="pb-3 font-medium">Payment</th>
             <th className="pb-3 font-medium">Receipt Email</th>
             <th className="pb-3 font-medium">Inventory</th>
             <th className="pb-3 font-medium">Receipt</th>
@@ -97,6 +99,9 @@ export function InPersonPurchasesTable({ purchases }: { purchases: InPersonPurch
               <td className="py-3 font-medium">{p.name}</td>
               <td className="py-3 text-muted-foreground">{p.quantity}</td>
               <td className="py-3 font-medium">{formatCurrency(p.total_amount)}</td>
+              <td className="py-3 text-muted-foreground">
+                {p.payment_method ? p.payment_method.toUpperCase() : '—'}
+              </td>
               <td className="py-3">
                 <div className="max-w-[240px] truncate">{p.receipt_email}</div>
               </td>

@@ -268,7 +268,12 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
       const res = await fetch('/api/fabric/sale', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sku: scannedFabric.sku, quantity: q, receiptEmail: email }),
+        body: JSON.stringify({
+          sku: scannedFabric.sku,
+          quantity: q,
+          receiptEmail: email,
+          paymentMethod: selectedPayment,
+        }),
       });
       const data = await res.json();
       if (!res.ok || !data?.success) {
