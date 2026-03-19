@@ -71,13 +71,8 @@ export function ProfileDropdown() {
             </AvatarFallback>
           </Avatar>
           {profile?.pattern_points !== null && profile?.pattern_points !== undefined && (
-            <Badge className="text-xs font-semibold shrink-0 bg-rose-300 text-white border-0 tabular-nums justify-center min-w-[2.5rem]">
-              <span className="sm:hidden">
-                {profile.pattern_points >= 100 ? '99+' : profile.pattern_points}
-              </span>
-              <span className="hidden sm:inline">
-                {profile.pattern_points} pts
-              </span>
+            <Badge className="text-xs font-semibold shrink-0 bg-rose-300 text-white border-0 tabular-nums whitespace-nowrap">
+              {profile.pattern_points} pts
             </Badge>
           )}
         </DropdownMenuTrigger>

@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Menu, X, ShoppingBag, Package, Home, Info } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 
 interface NavigationProps {
   showMarketplaceLinks?: boolean;
@@ -24,6 +25,7 @@ export function Navigation({ showMarketplaceLinks = false }: NavigationProps) {
   const [isLogoMenuOpen, setIsLogoMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const { resolvedTheme } = useTheme();
+  const pathname = usePathname();
   const logoMenuRef = useRef<HTMLDivElement>(null);
   const logoTriggerRef = useRef<HTMLDivElement>(null);
   const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -36,6 +38,9 @@ export function Navigation({ showMarketplaceLinks = false }: NavigationProps) {
   // Use dark logo for light mode, light logo for dark mode
   const logoSrc =
     mounted && resolvedTheme === 'dark' ? '/logos/back_logo_light.svg' : '/logos/back_logo.svg';
+
+  const showCart =
+    pathname?.startsWith('/marketplace') || pathname?.startsWith('/cart') || pathname?.startsWith('/checkout');
 
   // Handle hover menu for logo (desktop)
   const handleLogoMouseEnter = () => {
@@ -180,7 +185,7 @@ export function Navigation({ showMarketplaceLinks = false }: NavigationProps) {
 
           {/* Right: Cart + Profile */}
           <div className="flex items-center gap-2 justify-end">
-            <CartIcon />
+            {showCart && <CartIcon />}
             <ProfileDropdown />
           </div>
         </div>

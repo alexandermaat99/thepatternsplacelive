@@ -67,7 +67,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
   const [sellError, setSellError] = useState<string | null>(null);
   const [selling, setSelling] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState<'venmo' | 'cash' | null>(null);
+  const [selectedPayment, setSelectedPayment] = useState<'venmo' | 'stripe' | 'cash' | null>(null);
   const scanInputRef = useRef<HTMLInputElement>(null);
 
   const sortedFabric = [...fabric].sort((a, b) => {
@@ -833,6 +833,20 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
                         variant="outline"
                         size="sm"
                         className={
+                          selectedPayment === 'stripe'
+                            ? 'flex-1 bg-rose-400 text-white border-rose-400 hover:bg-rose-500 hover:text-white'
+                            : 'flex-1'
+                        }
+                        onClick={() => setSelectedPayment('stripe')}
+                        disabled={selling}
+                      >
+                        Stripe
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className={
                           selectedPayment === 'cash'
                             ? 'flex-1 bg-rose-400 text-white border-rose-400 hover:bg-rose-500 hover:text-white'
                             : 'flex-1'
@@ -853,6 +867,17 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
                           <div className="rounded-md border bg-white p-2 shadow-sm">
                             <Image src={venmoQrCode} alt="Venmo QR code" width={240} height={240} />
                           </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedPayment === 'stripe' && (
+                      <div className="space-y-2">
+                        <div className="text-lg font-bold text-center text-rose-400">
+                          {sellTotal != null ? `Total: $${sellTotal.toFixed(2)}` : 'Total: —'}
+                        </div>
+                        <div className="text-sm text-muted-foreground text-center">
+                          Charge the card in Stripe, then click &ldquo;Payment complete&rdquo;.
                         </div>
                       </div>
                     )}
