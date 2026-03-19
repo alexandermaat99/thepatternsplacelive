@@ -42,6 +42,17 @@ const emptyForm = {
   photo_url: null as string | null,
 };
 
+type FabricCardGroup = {
+  baseSku: string;
+  bolts: Fabric[];
+  boltCount: number;
+  yardageLeft: number;
+  hasQuantity: boolean;
+  photo_url: string | null;
+  name: string | null;
+  sell_price: number | null;
+};
+
 export function FabricInventory({ initialFabric, userId }: FabricInventoryProps) {
   const router = useRouter();
   const [fabric, setFabric] = useState<Fabric[]>(initialFabric);
@@ -55,7 +66,17 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
   );
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteGroupConfirm, setDeleteGroupConfirm] = useState<{
+    baseSku: string;
+    skus: string[];
+    name: string | null;
+  } | null>(null);
+  const [deletingGroup, setDeletingGroup] = useState(false);
+  const [deleteGroupError, setDeleteGroupError] = useState<string | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'table' | 'images'>('images');
+  const [selectedFabricGroup, setSelectedFabricGroup] = useState<FabricCardGroup | null>(null);
+  const [showAllBoltDetails, setShowAllBoltDetails] = useState(false);
 
   // Market scan flow (barcode scanners usually type SKU + Enter)
   const [marketOpen, setMarketOpen] = useState(false);
@@ -81,6 +102,73 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
     const boltB = pb.ok ? pb.boltIndex : 0;
     return boltA - boltB;
   });
+
+  const fabricGroupsForCards = useMemo(() => {
+    const groups = new Map<string, Fabric[]>();
+
+    for (const row of fabric) {
+      const parsed = parseFabricSku(row.sku);
+      const baseSku = parsed.ok ? parsed.baseSku : row.sku;
+      const existing = groups.get(baseSku) || [];
+      existing.push(row);
+      groups.set(baseSku, existing);
+    }
+
+    const result: FabricCardGroup[] = Array.from(groups.entries()).map(([baseSku, bolts]) => {
+      const sortedBolts = [...bolts].sort((a, b) => {
+        const pa = parseFabricSku(a.sku);
+        const pb = parseFabricSku(b.sku);
+        const boltA = pa.ok ? pa.boltIndex : 0;
+        const boltB = pb.ok ? pb.boltIndex : 0;
+        return boltA - boltB;
+      });
+
+      let hasQuantity = false;
+      let yardageLeft = 0;
+      for (const b of sortedBolts) {
+        if (b.current_quantity != null) {
+          hasQuantity = true;
+          yardageLeft += Number(b.current_quantity);
+        }
+      }
+
+      // Prefer a bolt with photo; break ties by highest yardage.
+      const representative = [...sortedBolts].sort((a, b) => {
+        const aPhoto = a.photo_url ? 1 : 0;
+        const bPhoto = b.photo_url ? 1 : 0;
+        if (bPhoto !== aPhoto) return bPhoto - aPhoto;
+        const aQty = a.current_quantity ?? -Infinity;
+        const bQty = b.current_quantity ?? -Infinity;
+        return bQty - aQty;
+      })[0];
+
+      const photo_url =
+        representative?.photo_url ??
+        sortedBolts.find(b => b.photo_url)?.photo_url ??
+        null;
+      const name =
+        representative?.name ??
+        sortedBolts.find(b => b.name)?.name ??
+        null;
+      const sell_price =
+        representative?.sell_price ??
+        (sortedBolts.find(b => b.sell_price != null)?.sell_price ?? null);
+
+      return {
+        baseSku,
+        bolts: sortedBolts,
+        boltCount: sortedBolts.length,
+        yardageLeft,
+        hasQuantity,
+        photo_url,
+        name,
+        sell_price: sell_price != null ? Number(sell_price) : null,
+      };
+    });
+
+    result.sort((a, b) => a.baseSku.localeCompare(b.baseSku));
+    return result;
+  }, [fabric]);
 
   const sellTotal = useMemo(() => {
     if (!scannedFabric?.sell_price) return null;
@@ -227,7 +315,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
 
     const q = Number(sellQuantity);
     if (!Number.isFinite(q) || q <= 0) {
-      setSellError('Enter a quantity greater than 0.');
+      setSellError('Enter yards greater than 0.');
       return false;
     }
     if (scannedFabric.current_quantity == null) {
@@ -235,7 +323,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
       return false;
     }
     if (q > Number(scannedFabric.current_quantity)) {
-      setSellError('Not enough inventory for that quantity.');
+      setSellError('Not enough inventory for that many yards.');
       return false;
     }
 
@@ -270,7 +358,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sku: scannedFabric.sku,
-          quantity: q,
+          yards: q,
           receiptEmail: email,
           paymentMethod: selectedPayment,
         }),
@@ -281,7 +369,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
         return;
       }
 
-      const newQty = Number(data.newQuantity);
+      const newQty = Number(data.newYards);
       setFabric(prev =>
         prev.map(f => (f.sku === scannedFabric.sku ? { ...f, current_quantity: newQty } : f))
       );
@@ -342,6 +430,8 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
       };
 
       if (editingSku) {
+        // Update the bolt you're editing (everything except photo),
+        // then propagate photo_url across all bolts for the same fabric base SKU.
         const { error: updateError } = await supabase
           .from('fabric')
           .update({
@@ -354,12 +444,38 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
             purchase_quantity: row.purchase_quantity,
             buy_price: row.buy_price,
             sell_price: row.sell_price,
-            photo_url: row.photo_url,
           })
           .eq('sku', editingSku);
 
         if (updateError) throw updateError;
-        setFabric(prev => prev.map(f => (f.sku === editingSku ? { ...f, ...row, sku: f.sku } : f)));
+
+        if (parsed.ok) {
+          const { error: photoError } = await supabase
+            .from('fabric')
+            .update({ photo_url: row.photo_url })
+            // baseSku includes the last-3 digits; bolts share that prefix
+            .ilike('sku', `${parsed.baseSku}%`);
+
+          if (photoError) throw photoError;
+        }
+
+        const baseSku = parsed.ok ? parsed.baseSku : null;
+        setFabric(prev =>
+          prev.map(f => {
+            // Bolt-specific updates
+            if (f.sku === editingSku) return { ...f, ...row, sku: f.sku };
+
+            // Photo applies across same base SKU
+            if (baseSku) {
+              const parsedExisting = parseFabricSku(f.sku);
+              if (parsedExisting.ok && parsedExisting.baseSku === baseSku) {
+                return { ...f, photo_url: row.photo_url };
+              }
+            }
+
+            return f;
+          })
+        );
       } else {
         // Duplicate protection: prevent inserting an existing SKU
         const { data: existing } = await supabase
@@ -415,6 +531,41 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
     }
   };
 
+  const handleDeleteGroup = async () => {
+    if (!deleteGroupConfirm) return;
+    setDeletingGroup(true);
+    setDeleteGroupError(null);
+    try {
+      const supabase = createClient();
+      const { error: err } = await supabase
+        .from('fabric')
+        .delete()
+        .in(
+          'sku',
+          deleteGroupConfirm.skus
+        );
+
+      if (err) throw err;
+
+      setFabric(prev =>
+        prev.filter(f => !deleteGroupConfirm.skus.includes(f.sku))
+      );
+      setDeleteGroupConfirm(null);
+      setSelectedFabricGroup(null);
+      router.refresh();
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'message' in err
+          ? String((err as { message: unknown }).message)
+          : err instanceof Error
+            ? err.message
+            : 'Failed to delete';
+      setDeleteGroupError(message);
+    } finally {
+      setDeletingGroup(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -444,100 +595,179 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
               No fabric yet. Click &quot;Add fabric&quot; to add your first item.
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2 px-2">Photo</th>
-                    <th className="text-left py-2 px-2">SKU</th>
-                    <th className="text-left py-2 px-2">Bolt</th>
-                    <th className="text-left py-2 px-2">Name</th>
-                    <th className="text-left py-2 px-2">Weave</th>
-                    <th className="text-left py-2 px-2">Fiber</th>
-                    <th className="text-right py-2 px-2">Width</th>
-                    <th className="text-right py-2 px-2">Qty</th>
-                    <th className="text-right py-2 px-2">Buy</th>
-                    <th className="text-right py-2 px-2">Sell</th>
-                    <th className="w-20" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedFabric.map(row => {
-                    const parsed = parseFabricSku(row.sku);
-                    const boltLabel = parsed.ok ? formatBoltLabel(parsed.boltIndex) : '—';
-                    return (
-                      <tr key={row.sku} className="border-b hover:bg-muted/50">
-                        <td className="py-2 px-2">
-                          {row.photo_url ? (
-                            <button
-                              type="button"
-                              onClick={() => setLightboxUrl(row.photo_url)}
-                              className="relative w-12 h-12 rounded overflow-hidden bg-muted block cursor-zoom-in hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
-                              aria-label="View photo larger"
-                            >
-                              <Image
-                                src={row.photo_url}
-                                alt={row.name || row.sku}
-                                fill
-                                className="object-cover"
-                              />
-                            </button>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </td>
-                        <td className="py-2 px-2 font-mono">{row.sku}</td>
-                        <td className="py-2 px-2">{boltLabel}</td>
-                        <td className="py-2 px-2">{row.name ?? '—'}</td>
-                        <td className="py-2 px-2">{row.weave ?? '—'}</td>
-                        <td className="py-2 px-2">{row.fiber ?? '—'}</td>
-                        <td className="py-2 px-2 text-right">
-                          {row.width != null ? `${row.width}"` : '—'}
-                        </td>
-                        <td className="py-2 px-2 text-right">{row.current_quantity ?? '—'}</td>
-                        <td className="py-2 px-2 text-right">
-                          {row.buy_price != null ? `$${Number(row.buy_price).toFixed(2)}` : '—'}
-                        </td>
-                        <td className="py-2 px-2 text-right">
-                          {row.sell_price != null ? `$${Number(row.sell_price).toFixed(2)}` : '—'}
-                        </td>
-                        <td className="py-2 px-2 flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openEdit(row)}
-                            aria-label="Edit"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => addNextBoltFromRow(row)}
-                            aria-label="Add next bolt"
-                            title="Add next bolt"
-                          >
-                            <CopyPlus className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setDeleteConfirm({ sku: row.sku, name: row.name });
-                              setDeleteError(null);
-                            }}
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                            aria-label="Delete"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </td>
+            <>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+                <div className="text-sm text-muted-foreground">View</div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant={viewMode === 'table' ? 'default' : 'outline'}
+                    onClick={() => setViewMode('table')}
+                  >
+                    Table
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={viewMode === 'images' ? 'default' : 'outline'}
+                    onClick={() => setViewMode('images')}
+                  >
+                    Images
+                  </Button>
+                </div>
+              </div>
+
+              <div className={viewMode === 'table' ? '' : 'hidden'}>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2 px-2">Photo</th>
+                        <th className="text-left py-2 px-2">SKU</th>
+                        <th className="text-left py-2 px-2">Bolt</th>
+                        <th className="text-left py-2 px-2">Name</th>
+                        <th className="text-left py-2 px-2">Weave</th>
+                        <th className="text-left py-2 px-2">Fiber</th>
+                        <th className="text-right py-2 px-2">Width</th>
+                        <th className="text-right py-2 px-2">Qty</th>
+                        <th className="text-right py-2 px-2">Buy</th>
+                        <th className="text-right py-2 px-2">Sell</th>
+                        <th className="w-20" />
                       </tr>
+                    </thead>
+                    <tbody>
+                      {sortedFabric.map(row => {
+                        const parsed = parseFabricSku(row.sku);
+                        const boltLabel = parsed.ok ? formatBoltLabel(parsed.boltIndex) : '—';
+                        return (
+                          <tr key={row.sku} className="border-b hover:bg-muted/50">
+                            <td className="py-2 px-2">
+                              {row.photo_url ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setLightboxUrl(row.photo_url)}
+                                  className="relative w-12 h-12 rounded overflow-hidden bg-muted block cursor-zoom-in hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
+                                  aria-label="View photo larger"
+                                >
+                                  <Image
+                                    src={row.photo_url}
+                                    alt={row.name || row.sku}
+                                    fill
+                                    className="object-cover"
+                                  />
+                                </button>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </td>
+                            <td className="py-2 px-2 font-mono">{row.sku}</td>
+                            <td className="py-2 px-2">{boltLabel}</td>
+                            <td className="py-2 px-2">{row.name ?? '—'}</td>
+                            <td className="py-2 px-2">{row.weave ?? '—'}</td>
+                            <td className="py-2 px-2">{row.fiber ?? '—'}</td>
+                            <td className="py-2 px-2 text-right">
+                              {row.width != null ? `${row.width}"` : '—'}
+                            </td>
+                            <td className="py-2 px-2 text-right">{row.current_quantity ?? '—'}</td>
+                            <td className="py-2 px-2 text-right">
+                              {row.buy_price != null ? `$${Number(row.buy_price).toFixed(2)}` : '—'}
+                            </td>
+                            <td className="py-2 px-2 text-right">
+                              {row.sell_price != null ? `$${Number(row.sell_price).toFixed(2)}` : '—'}
+                            </td>
+                            <td className="py-2 px-2 flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openEdit(row)}
+                                aria-label="Edit"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => addNextBoltFromRow(row)}
+                                aria-label="Add next bolt"
+                                title="Add next bolt"
+                              >
+                                <CopyPlus className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setDeleteConfirm({ sku: row.sku, name: row.name });
+                                  setDeleteError(null);
+                                }}
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                aria-label="Delete"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className={viewMode === 'images' ? '' : 'hidden'}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {fabricGroupsForCards.map(group => {
+                    const yardageText = group.hasQuantity
+                      ? Number.isInteger(group.yardageLeft)
+                        ? String(group.yardageLeft)
+                        : group.yardageLeft.toFixed(2)
+                      : '—';
+                    const priceText = group.sell_price != null ? `$${group.sell_price.toFixed(2)}/yd` : '—';
+                    return (
+                      <button
+                        key={group.baseSku}
+                        type="button"
+                        onClick={() => {
+                          setSelectedFabricGroup(group);
+                          setShowAllBoltDetails(false);
+                        }}
+                        className="relative text-left group"
+                        aria-label={`View ${group.name || group.baseSku} photo`}
+                      >
+                        <div className="relative aspect-[3/4] rounded-xl overflow-hidden border bg-muted">
+                          {group.photo_url ? (
+                            <Image
+                              src={group.photo_url}
+                              alt={group.name || group.baseSku}
+                              fill
+                              className="object-cover group-hover:scale-[1.02] transition-transform duration-200"
+                            />
+                          ) : (
+                            <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
+                              No photo
+                            </div>
+                          )}
+
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+
+                          <div className="absolute bottom-0 left-0 right-0 p-3">
+                            <div className="text-xs font-mono text-white/90">{group.baseSku}</div>
+                            <div className="font-semibold text-white leading-tight">
+                              {group.name ?? '—'}
+                            </div>
+                            <div className="mt-1 text-xs text-white/90">
+                              {group.boltCount} bolts • {yardageText} yd
+                            </div>
+                            <div className="mt-1 text-sm font-medium text-white">
+                              {priceText}
+                            </div>
+                          </div>
+                        </div>
+                      </button>
                     );
                   })}
-                </tbody>
-              </table>
-            </div>
+                </div>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -766,7 +996,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
 
                 <div className="grid grid-cols-2 gap-3 items-end">
                   <div>
-                    <Label htmlFor="sellQty">Quantity</Label>
+                    <Label htmlFor="sellQty">Yards</Label>
                     <Input
                       id="sellQty"
                       type="number"
@@ -934,6 +1164,194 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
       </Dialog>
 
       <Dialog
+        open={!!selectedFabricGroup}
+        onOpenChange={open => {
+          if (!open) {
+            setSelectedFabricGroup(null);
+            setShowAllBoltDetails(false);
+          }
+        }}
+      >
+        <DialogContent className="max-w-5xl w-[95vw] p-0 border-none bg-black/90">
+          {selectedFabricGroup && (
+            <div className="relative p-4">
+              <DialogTitle className="sr-only">Fabric details</DialogTitle>
+              <DialogClose
+                className="absolute right-2 top-1 z-10 rounded-sm p-1 text-white opacity-90 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-white/50"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </DialogClose>
+
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_1.15fr] gap-4">
+                <div className="relative rounded-xl overflow-hidden border border-white/10 bg-muted aspect-[3/4]">
+                  {selectedFabricGroup.photo_url ? (
+                    <Image
+                      src={selectedFabricGroup.photo_url}
+                      alt={selectedFabricGroup.name || selectedFabricGroup.baseSku}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-white/70">
+                      No photo
+                    </div>
+                  )}
+                </div>
+
+                <div className="text-white pr-10">
+                  <div className="flex items-start justify-between gap-3 pt-1">
+                    <div>
+                      <div className="text-xs font-mono text-white/70">
+                        Base SKU: {selectedFabricGroup.baseSku}
+                      </div>
+                      <div className="text-2xl font-semibold leading-tight">
+                        {selectedFabricGroup.name || selectedFabricGroup.baseSku}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs text-white/70">BOLTS</div>
+                      <div className="text-xl font-semibold">{selectedFabricGroup.boltCount}</div>
+                      <div className="mt-3 flex items-center justify-end gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="bg-transparent border-white/20 text-white hover:bg-white/10"
+                          onClick={() => {
+                            const representative =
+                              selectedFabricGroup.bolts.find(b => b.sku === selectedFabricGroup.baseSku) ||
+                              selectedFabricGroup.bolts[0];
+                            setSelectedFabricGroup(null);
+                            if (representative) openEdit(representative);
+                          }}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          className="bg-red-600 hover:bg-red-700"
+                          onClick={() => {
+                            setDeleteGroupError(null);
+                            setDeleteGroupConfirm({
+                              baseSku: selectedFabricGroup.baseSku,
+                              skus: selectedFabricGroup.bolts.map(b => b.sku),
+                              name: selectedFabricGroup.name,
+                            });
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="rounded-xl bg-white/5 border border-white/10 p-3">
+                      <div className="text-xs text-white/70">YARDAGE LEFT</div>
+                      <div className="text-lg font-semibold">
+                        {selectedFabricGroup.hasQuantity
+                          ? selectedFabricGroup.yardageLeft.toFixed(
+                              Number.isInteger(selectedFabricGroup.yardageLeft)
+                                ? 0
+                                : 2
+                            )
+                          : '—'}{' '}
+                        yd
+                      </div>
+                    </div>
+                      <div className="rounded-xl bg-white/5 border border-white/10 p-3">
+                      <div className="text-xs text-white/70">Price (per yd)</div>
+                      <div className="text-lg font-semibold">
+                        {selectedFabricGroup.sell_price != null
+                          ? `$${selectedFabricGroup.sell_price.toFixed(2)}/yd`
+                          : '—'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <div className="text-sm font-semibold text-white/90">Bolts</div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="bg-transparent border-white/20 text-white hover:bg-white/10"
+                        onClick={() => setShowAllBoltDetails(v => !v)}
+                      >
+                        {showAllBoltDetails ? 'Show less' : 'View all details'}
+                      </Button>
+                    </div>
+                    <div className="overflow-x-auto rounded-xl border border-white/10">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-white/70 text-left border-b border-white/10">
+                            <th className="py-2 px-3">SKU</th>
+                            <th className="py-2 px-3 text-right">Bolt</th>
+                            <th className="py-2 px-3 text-right">Yards left</th>
+                            <th className="py-2 px-3 text-right">Width</th>
+                            <th className="py-2 px-3">Weave</th>
+                            <th className="py-2 px-3">Fiber</th>
+                            <th className="py-2 px-3 text-right">Sell</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedFabricGroup.bolts.map(b => {
+                            const parsed = parseFabricSku(b.sku);
+                            const boltLabel = parsed.ok ? formatBoltLabel(parsed.boltIndex) : '—';
+                            return (
+                              <tr key={b.sku} className="border-b border-white/5">
+                                <td className="py-2 px-3 font-mono">{b.sku}</td>
+                                <td className="py-2 px-3 text-right">{boltLabel}</td>
+                                <td className="py-2 px-3 text-right">{b.current_quantity ?? '—'}</td>
+                                <td className="py-2 px-3 text-right">
+                                  {b.width != null ? `${b.width}"` : '—'}
+                                </td>
+                                <td className="py-2 px-3">{b.weave ?? '—'}</td>
+                                <td className="py-2 px-3">{b.fiber ?? '—'}</td>
+                                <td className="py-2 px-3 text-right">
+                                  {b.sell_price != null ? `$${Number(b.sell_price).toFixed(2)}` : '—'}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+
+                      {showAllBoltDetails && (
+                        <div className="mt-3 rounded-xl bg-white/5 border border-white/10 p-3">
+                          <div className="text-sm text-white/90">
+                            <div className="text-xs font-semibold text-white/70 mb-2">
+                              Buy price (per yd)
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                              {selectedFabricGroup.bolts.map(b => {
+                                const parsed = parseFabricSku(b.sku);
+                                const boltLabel = parsed.ok ? formatBoltLabel(parsed.boltIndex) : b.sku;
+                                return (
+                                  <div key={b.sku} className="flex items-center justify-between gap-2">
+                                    <span className="text-white/80 text-xs">{boltLabel}</span>
+                                    <span className="font-mono text-white/95 text-xs">
+                                      {b.buy_price != null ? `$${Number(b.buy_price).toFixed(2)}` : '—'}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
         open={!!deleteConfirm}
         onOpenChange={open => {
           if (!open) {
@@ -967,6 +1385,51 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
             </Button>
             <Button type="button" variant="destructive" onClick={handleDelete} disabled={deleting}>
               {deleting ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!deleteGroupConfirm}
+        onOpenChange={open => {
+          if (!open) {
+            setDeleteGroupConfirm(null);
+            setDeleteGroupError(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete fabric bolts?</DialogTitle>
+          </DialogHeader>
+          {deleteGroupConfirm && (
+            <p className="text-sm text-muted-foreground">
+              This will permanently remove{' '}
+              <strong>{deleteGroupConfirm.name || deleteGroupConfirm.baseSku}</strong>{' '}
+              and all bolts for base SKU{' '}
+              <span className="font-mono">{deleteGroupConfirm.baseSku}</span>. This cannot be undone.
+            </p>
+          )}
+          {deleteGroupError && (
+            <p className="text-sm text-destructive bg-destructive/10 p-2 rounded">{deleteGroupError}</p>
+          )}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeleteGroupConfirm(null)}
+              disabled={deletingGroup}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDeleteGroup}
+              disabled={deletingGroup}
+            >
+              {deletingGroup ? 'Deleting...' : 'Delete all bolts'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -12,7 +12,8 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const sku = sanitizeString(String(body?.sku ?? ''), 64).trim();
-    const quantity = Number(body?.quantity);
+    // New name: yards. Backward compatible with older clients that send `quantity`.
+    const yards = Number(body?.yards ?? body?.quantity);
     const receiptEmail = sanitizeString(String(body?.receiptEmail ?? ''), 254).trim();
     const paymentMethodRaw = String(body?.paymentMethod ?? '').trim().toLowerCase();
     const paymentMethod =
@@ -23,9 +24,9 @@ export async function POST(req: NextRequest) {
     if (!sku) {
       return NextResponse.json({ success: false, error: 'SKU is required' }, { status: 400 });
     }
-    if (!Number.isFinite(quantity) || quantity <= 0) {
+    if (!Number.isFinite(yards) || yards <= 0) {
       return NextResponse.json(
-        { success: false, error: 'Quantity must be greater than 0' },
+        { success: false, error: 'Yards must be greater than 0' },
         { status: 400 }
       );
     }
@@ -76,20 +77,20 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    if (quantity > Number(currentQty)) {
+    if (yards > Number(currentQty)) {
       return NextResponse.json(
-        { success: false, error: 'Not enough inventory for that quantity.' },
+        { success: false, error: 'Not enough inventory for that many yards.' },
         { status: 400 }
       );
     }
 
-    const newQty = Number(currentQty) - quantity;
+    const newQty = Number(currentQty) - yards;
 
     const { data: updatedRows, error: updateError } = await supabase
       .from('fabric')
       .update({ current_quantity: newQty })
       .eq('sku', sku)
-      .gte('current_quantity', quantity)
+      .gte('current_quantity', yards)
       .select('sku,current_quantity')
       .limit(1);
 
@@ -102,7 +103,7 @@ export async function POST(req: NextRequest) {
     }
 
     const unitPrice = fabric.sell_price != null ? Number(fabric.sell_price) : 0;
-    const total = unitPrice * quantity;
+    const total = unitPrice * yards;
 
     // Send receipt email (non-fatal if email fails)
     let emailSent = false;
@@ -127,7 +128,7 @@ export async function POST(req: NextRequest) {
       <tr>
         <td style="padding:20px 24px; border-bottom:1px solid #eee;">
           <div style="font-size:18px; font-weight:700;">${COMPANY_INFO.name}</div>
-          <div style="color:#666; font-size:13px;">Farmers market receipt</div>
+          <div style="color:#666; font-size:13px;">Fabric sale receipt</div>
         </td>
       </tr>
       <tr>
@@ -137,8 +138,8 @@ export async function POST(req: NextRequest) {
 
           <table role="presentation" style="width:100%; border-collapse:collapse; font-size:14px;">
             <tr>
-              <td style="padding:8px 0; color:#666;">Quantity</td>
-              <td style="padding:8px 0; text-align:right; font-weight:600;">${quantity}</td>
+              <td style="padding:8px 0; color:#666;">Yards</td>
+              <td style="padding:8px 0; text-align:right; font-weight:600;">${yards}</td>
             </tr>
             <tr>
               <td style="padding:8px 0; color:#666;">Unit price</td>
@@ -163,7 +164,7 @@ export async function POST(req: NextRequest) {
           `${COMPANY_INFO.name} - Fabric sale receipt\n\n` +
           `Item: ${title}\n` +
           `SKU: ${fabric.sku}\n` +
-          `Quantity: ${quantity}\n` +
+          `Yards: ${yards}\n` +
           `Unit price: ${formatMoney(unitPrice)}\n` +
           `Total: ${formatMoney(total)}\n`;
 
@@ -194,7 +195,7 @@ export async function POST(req: NextRequest) {
         .insert({
           sku: fabric.sku,
           name: fabric.name,
-          quantity,
+            quantity: yards,
           unit_price: unitPrice,
           total_amount: total,
           receipt_email: receiptEmail,
@@ -220,6 +221,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       sku,
+      newYards: newQty,
+      // Backward compatible keys
       newQuantity: newQty,
       emailSent,
       emailError,
