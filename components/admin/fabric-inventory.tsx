@@ -92,8 +92,20 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<'venmo' | 'stripe' | 'cash' | null>(null);
   const scanInputRef = useRef<HTMLInputElement>(null);
+  const [searchDraft, setSearchDraft] = useState('');
+  const [appliedSearch, setAppliedSearch] = useState('');
 
-  const sortedFabric = [...fabric].sort((a, b) => {
+  const filteredFabric = useMemo(() => {
+    const q = appliedSearch.trim().toUpperCase();
+    if (!q) return fabric;
+    return fabric.filter(row => {
+      const sku = (row.sku || '').toUpperCase();
+      const name = (row.name || '').toUpperCase();
+      return sku.includes(q) || name.includes(q);
+    });
+  }, [fabric, appliedSearch]);
+
+  const sortedFabric = [...filteredFabric].sort((a, b) => {
     const pa = parseFabricSku(a.sku);
     const pb = parseFabricSku(b.sku);
     const baseA = pa.ok ? pa.baseSku : a.sku;
@@ -108,7 +120,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
   const fabricGroupsForCards = useMemo(() => {
     const groups = new Map<string, Fabric[]>();
 
-    for (const row of fabric) {
+    for (const row of filteredFabric) {
       const parsed = parseFabricSku(row.sku);
       const baseSku = parsed.ok ? parsed.baseSku : row.sku;
       const existing = groups.get(baseSku) || [];
@@ -170,7 +182,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
 
     result.sort((a, b) => a.baseSku.localeCompare(b.baseSku));
     return result;
-  }, [fabric]);
+  }, [filteredFabric]);
 
   const sellTotal = useMemo(() => {
     if (!scannedFabric?.sell_price) return null;
@@ -598,17 +610,51 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
 
       <Card>
         <CardHeader>
-          <CardTitle>All fabric ({fabric.length})</CardTitle>
+          <CardTitle>All fabric ({filteredFabric.length})</CardTitle>
         </CardHeader>
         <CardContent>
-          {fabric.length === 0 ? (
+          {filteredFabric.length === 0 ? (
             <p className="text-muted-foreground py-8 text-center">
               No fabric yet. Click &quot;Add fabric&quot; to add your first item.
             </p>
           ) : (
             <>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
-                <div className="text-sm text-muted-foreground">View</div>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
+                  <Input
+                    value={searchDraft}
+                    onChange={e => setSearchDraft(e.target.value)}
+                    placeholder="Search by SKU or name"
+                    className="w-full sm:w-[260px] font-mono"
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        setAppliedSearch(searchDraft);
+                      }
+                    }}
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setAppliedSearch(searchDraft)}
+                      className="whitespace-nowrap"
+                    >
+                      Search
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => {
+                        setSearchDraft('');
+                        setAppliedSearch('');
+                      }}
+                      className="whitespace-nowrap"
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                </div>
                 <div className="flex gap-2">
                   <Button
                     type="button"
