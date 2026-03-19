@@ -73,6 +73,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
   // Camera barcode scanner (mobile)
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [cameraRunning, setCameraRunning] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const cameraRafRef = useRef<number | null>(null);
@@ -197,6 +198,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
 
   const openCameraScanner = () => {
     setCameraError(null);
+    setCameraRunning(false);
     if (typeof window !== 'undefined' && !window.isSecureContext) {
       setCameraError('Camera scanning requires HTTPS (or localhost).');
       setCameraOpen(true);
@@ -205,105 +207,106 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
     setCameraOpen(true);
   };
 
-  useEffect(() => {
-    if (!cameraOpen) return;
+  const stopCamera = () => {
+    if (cameraRafRef.current != null) {
+      cancelAnimationFrame(cameraRafRef.current);
+      cameraRafRef.current = null;
+    }
+    if (cameraStreamRef.current) {
+      cameraStreamRef.current.getTracks().forEach(t => t.stop());
+      cameraStreamRef.current = null;
+    }
+    setCameraRunning(false);
+  };
 
-    let cancelled = false;
+  const startCameraScan = async () => {
+    try {
+      setCameraError(null);
+      setCameraRunning(true);
 
-    const start = async () => {
-      try {
-        setCameraError(null);
+      // Many mobile browsers require getUserMedia to be called from a user gesture
+      // (button tap), otherwise no permission prompt is shown.
+      if (!navigator?.mediaDevices?.getUserMedia) {
+        setCameraError('Camera not available in this browser.');
+        setCameraRunning(false);
+        return;
+      }
 
-        if (!navigator?.mediaDevices?.getUserMedia) {
-          setCameraError('Camera not available in this browser.');
-          return;
-        }
+      const video = videoRef.current;
+      if (!video) return;
 
-        const video = videoRef.current;
-        if (!video) return;
+      const Detector = (globalThis as any).BarcodeDetector as
+        | (new (opts?: { formats?: string[] }) => { detect: (src: any) => Promise<any[]> })
+        | undefined;
 
-        // BarcodeDetector is supported in most modern mobile browsers.
-        // If unavailable, fall back to manual entry.
-        const Detector = (globalThis as any).BarcodeDetector as
-          | (new (opts?: { formats?: string[] }) => { detect: (src: any) => Promise<any[]> })
-          | undefined;
+      if (!Detector) {
+        setCameraError('Barcode scanning is not supported in this browser. Use manual entry.');
+        setCameraRunning(false);
+        return;
+      }
 
-        if (!Detector) {
-          setCameraError('Barcode scanning is not supported in this browser. Use manual entry.');
-          return;
-        }
+      const detector = new Detector({
+        formats: [
+          'ean_13',
+          'ean_8',
+          'upc_a',
+          'upc_e',
+          'code_128',
+          'code_39',
+          'qr_code',
+        ],
+      });
 
-        const detector = new Detector({
-          formats: [
-            'ean_13',
-            'ean_8',
-            'upc_a',
-            'upc_e',
-            'code_128',
-            'code_39',
-            'qr_code',
-          ],
-        });
+      // Prefer the back camera on phones
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false,
+      });
+      cameraStreamRef.current = stream;
+      video.srcObject = stream;
+      await video.play();
 
-        // Prefer the back camera on phones
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' } },
-          audio: false,
-        });
-        cameraStreamRef.current = stream;
-        video.srcObject = stream;
-        await video.play();
-
-        let lastScanAt = 0;
-        const scan = async (now: number) => {
-          if (cancelled) return;
-          cameraRafRef.current = requestAnimationFrame(scan);
-
-          // Throttle detection to reduce CPU
-          if (now - lastScanAt < 250) return;
-          lastScanAt = now;
-
-          try {
-            const results = await detector.detect(video);
-            const value =
-              results?.[0]?.rawValue ||
-              results?.[0]?.data ||
-              results?.[0]?.value ||
-              '';
-            const text = typeof value === 'string' ? value.trim() : '';
-            if (!text) return;
-
-            // Stop scanning immediately to prevent duplicate reads
-            setCameraOpen(false);
-            setMarketOpen(true);
-            setScanValue(text);
-            await lookupSku(text);
-          } catch {
-            // ignore intermittent detect errors while camera warms up
-          }
-        };
-
+      let lastScanAt = 0;
+      const scan = async (now: number) => {
         cameraRafRef.current = requestAnimationFrame(scan);
-      } catch (e) {
-        const msg =
-          e instanceof Error ? e.message : 'Failed to start camera scanner. Check permissions.';
-        setCameraError(msg);
-      }
-    };
+        if (now - lastScanAt < 250) return;
+        lastScanAt = now;
 
-    start();
+        try {
+          const results = await detector.detect(video);
+          const value =
+            results?.[0]?.rawValue ||
+            results?.[0]?.data ||
+            results?.[0]?.value ||
+            '';
+          const text = typeof value === 'string' ? value.trim() : '';
+          if (!text) return;
 
-    return () => {
-      cancelled = true;
-      if (cameraRafRef.current != null) {
-        cancelAnimationFrame(cameraRafRef.current);
-        cameraRafRef.current = null;
-      }
-      if (cameraStreamRef.current) {
-        cameraStreamRef.current.getTracks().forEach(t => t.stop());
-        cameraStreamRef.current = null;
-      }
-    };
+          stopCamera();
+          setCameraOpen(false);
+          setMarketOpen(true);
+          setScanValue(text);
+          await lookupSku(text);
+        } catch {
+          // ignore intermittent detect errors
+        }
+      };
+
+      cameraRafRef.current = requestAnimationFrame(scan);
+    } catch (e) {
+      const msg =
+        e instanceof Error ? e.message : 'Failed to start camera scanner. Check permissions.';
+      setCameraError(msg);
+      stopCamera();
+    }
+  };
+
+  useEffect(() => {
+    if (!cameraOpen) {
+      stopCamera();
+    }
+    return () => stopCamera();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cameraOpen]);
 
   const lookupSku = async (skuRaw: string) => {
@@ -1090,6 +1093,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
           if (!open) {
             setCameraOpen(false);
             setCameraError(null);
+            setCameraRunning(false);
             if (cameraRafRef.current != null) {
               cancelAnimationFrame(cameraRafRef.current);
               cameraRafRef.current = null;
@@ -1108,31 +1112,38 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
             <DialogTitle>Scan barcode</DialogTitle>
           </DialogHeader>
 
-          {cameraError ? (
+          {cameraError && (
             <p className="text-sm text-destructive bg-destructive/10 p-2 rounded">{cameraError}</p>
-          ) : (
-            <div className="space-y-2">
-              <div className="text-xs text-muted-foreground">
-                Point your camera at the barcode. Scanning happens automatically.
-              </div>
-              <div className="relative w-full overflow-hidden rounded-md border bg-black">
-                <video ref={videoRef} className="w-full h-[320px] object-cover" muted playsInline />
-                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                  <div className="w-[75%] h-[40%] rounded-md border-2 border-rose-300/80" />
-                </div>
+          )}
+
+          <div className="space-y-2">
+            <div className="text-xs text-muted-foreground">
+              Tap &ldquo;Start camera&rdquo; to request permission, then point at the barcode.
+            </div>
+            <div className="relative w-full overflow-hidden rounded-md border bg-black">
+              <video ref={videoRef} className="w-full h-[320px] object-cover" muted playsInline />
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <div className="w-[75%] h-[40%] rounded-md border-2 border-rose-300/80" />
               </div>
             </div>
-          )}
+          </div>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setCameraOpen(false)}>
               Cancel
             </Button>
-            {cameraError && (
-              <Button type="button" onClick={openMarket}>
-                Enter SKU manually
-              </Button>
-            )}
+            <Button
+              type="button"
+              onClick={startCameraScan}
+              disabled={cameraRunning || !!cameraError}
+              className="bg-rose-400 text-white border-rose-400 hover:bg-rose-500 hover:text-white"
+              variant="outline"
+            >
+              {cameraRunning ? 'Starting…' : 'Start camera'}
+            </Button>
+            <Button type="button" variant="outline" onClick={openMarket}>
+              Enter SKU manually
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
