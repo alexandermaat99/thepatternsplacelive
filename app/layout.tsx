@@ -5,7 +5,7 @@ import { ThemeProvider } from 'next-themes';
 import { Providers } from '@/components/providers';
 import { Footer } from '@/components/footer';
 import { CookieConsent } from '@/components/cookie-consent';
-import { FeedbackBubble } from '@/components/feedback-bubble';
+import { FeedbackBubbleConditional } from '@/components/feedback-bubble-conditional';
 import './globals.css';
 
 import { COMPANY_INFO } from '@/lib/company-info';
@@ -165,7 +165,7 @@ export default function RootLayout({
             <div className="flex-1">{children}</div>
             <Footer />
             <CookieConsent />
-            <FeedbackBubble />
+            <FeedbackBubbleConditional />
           </Providers>
         </ThemeProvider>
         <SpeedInsights />

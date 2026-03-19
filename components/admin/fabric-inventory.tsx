@@ -61,6 +61,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ sku: string; name: string | null } | null>(
     null
   );
@@ -77,6 +78,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
   const [viewMode, setViewMode] = useState<'table' | 'images'>('images');
   const [selectedFabricGroup, setSelectedFabricGroup] = useState<FabricCardGroup | null>(null);
   const [showAllBoltDetails, setShowAllBoltDetails] = useState(false);
+  const [detailsToRestore, setDetailsToRestore] = useState<FabricCardGroup | null>(null);
 
   // Market scan flow (barcode scanners usually type SKU + Enter)
   const [marketOpen, setMarketOpen] = useState(false);
@@ -187,6 +189,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
     setEditingSku(null);
     setForm(emptyForm);
     setError(null);
+    setPhotoUploading(false);
     setDialogOpen(true);
   };
 
@@ -194,6 +197,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
     setEditingSku(null);
     setForm({ ...emptyForm, ...preset });
     setError(null);
+    setPhotoUploading(false);
     setDialogOpen(true);
   };
 
@@ -213,6 +217,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
       photo_url: row.photo_url,
     });
     setError(null);
+    setPhotoUploading(false);
     setDialogOpen(true);
   };
 
@@ -257,6 +262,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
   };
 
   const openMarket = () => {
+    setDetailsToRestore(null);
     setMarketOpen(true);
     setScanValue('');
     setScanError(null);
@@ -405,6 +411,11 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    if (photoUploading) {
+      setError('Please wait for the photo upload to finish.');
+      setSaving(false);
+      return;
+    }
     setSaving(true);
     try {
       const supabase = createClient();
@@ -894,13 +905,20 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
               value={form.photo_url}
               onChange={url => setForm(f => ({ ...f, photo_url: url }))}
               userId={userId}
+              onUploadingChange={setPhotoUploading}
             />
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={saving}>
-                {saving ? 'Saving...' : editingSku ? 'Update' : 'Add'}
+              <Button type="submit" disabled={saving || photoUploading}>
+                {saving
+                  ? 'Saving...'
+                  : photoUploading
+                    ? 'Uploading photo...'
+                    : editingSku
+                      ? 'Update'
+                      : 'Add'}
               </Button>
             </DialogFooter>
           </form>
@@ -931,7 +949,30 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
         </DialogContent>
       </Dialog>
 
-      <Dialog open={marketOpen} onOpenChange={setMarketOpen}>
+      <Dialog
+        open={marketOpen}
+        onOpenChange={open => {
+          setMarketOpen(open);
+          if (!open) {
+            // Reset sale state
+            setScannedFabric(null);
+            setScanValue('');
+            setSellQuantity('1');
+            setReceiptEmail('');
+            setScanError(null);
+            setSellError(null);
+            setPaymentOpen(false);
+            setSelectedPayment(null);
+
+            // Restore the fabric details popup if the sale was launched from it.
+            if (detailsToRestore) {
+              setSelectedFabricGroup(detailsToRestore);
+              setShowAllBoltDetails(false);
+              setDetailsToRestore(null);
+            }
+          }
+        }}
+      >
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Farmers market scan</DialogTitle>
@@ -1183,21 +1224,50 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
                 <X className="h-4 w-4" />
               </DialogClose>
 
-              <div className="grid grid-cols-1 md:grid-cols-[1fr_1.15fr] gap-4">
-                <div className="relative rounded-xl overflow-hidden border border-white/10 bg-muted aspect-[3/4]">
-                  {selectedFabricGroup.photo_url ? (
-                    <Image
-                      src={selectedFabricGroup.photo_url}
-                      alt={selectedFabricGroup.name || selectedFabricGroup.baseSku}
-                      fill
-                      className="object-cover"
-                      unoptimized
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-white/70">
-                      No photo
-                    </div>
-                  )}
+                <div className="grid grid-cols-1 md:grid-cols-[1fr_1.15fr] gap-4">
+                <div className="flex flex-col gap-3">
+                  <div className="relative rounded-xl overflow-hidden border border-white/10 bg-muted aspect-[3/4]">
+                    {selectedFabricGroup.photo_url ? (
+                      <Image
+                        src={selectedFabricGroup.photo_url}
+                        alt={selectedFabricGroup.name || selectedFabricGroup.baseSku}
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-white/70">
+                        No photo
+                      </div>
+                    )}
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full bg-transparent border-white/20 text-white hover:bg-white/10"
+                    onClick={() => {
+                      const representative =
+                        selectedFabricGroup.bolts.find(b => b.sku === selectedFabricGroup.baseSku) ||
+                        selectedFabricGroup.bolts[0];
+                      setDetailsToRestore(selectedFabricGroup);
+                      setSelectedFabricGroup(null);
+                      setShowAllBoltDetails(false);
+                      if (representative) {
+                        setScannedFabric(representative);
+                        setSellQuantity('1');
+                        setReceiptEmail('');
+                        setSellError(null);
+                        setScanError(null);
+                        setMarketOpen(true);
+                        setPaymentOpen(true);
+                        setSelectedPayment(null);
+                      }
+                      setTimeout(() => scanInputRef.current?.focus(), 0);
+                    }}
+                  >
+                    New sale
+                  </Button>
                 </div>
 
                 <div className="text-white pr-10">

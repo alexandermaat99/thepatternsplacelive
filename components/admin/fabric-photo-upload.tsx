@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { createClient } from '@/lib/supabase/client';
 import { compressImage } from '@/lib/image-compression';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { X, Image as ImageIcon } from 'lucide-react';
 import Image from 'next/image';
 
@@ -21,16 +22,26 @@ interface FabricPhotoUploadProps {
   value?: string | null;
   onChange: (url: string | null) => void;
   userId: string;
+  onUploadingChange?: (uploading: boolean) => void;
 }
 
 const BUCKET = 'fabric-photos';
 
-export function FabricPhotoUpload({ value, onChange, userId }: FabricPhotoUploadProps) {
+export function FabricPhotoUpload({
+  value,
+  onChange,
+  userId,
+  onUploadingChange,
+}: FabricPhotoUploadProps) {
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(value || null);
   const [status, setStatus] = useState<string | null>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    onUploadingChange?.(uploading);
+  }, [uploading, onUploadingChange]);
 
   useEffect(() => {
     setPreview(value || null);
@@ -114,6 +125,11 @@ export function FabricPhotoUpload({ value, onChange, userId }: FabricPhotoUpload
       <Label>Photo</Label>
       {preview ? (
         <div className="relative w-full max-w-[200px] aspect-square border rounded-lg overflow-hidden">
+          {uploading && (
+            <div className="absolute inset-0 bg-black/50 z-20 flex items-center justify-center">
+              <LoadingSpinner size="sm" text={status || 'Uploading...'} />
+            </div>
+          )}
           <button
             type="button"
             onClick={() => setLightboxOpen(true)}
@@ -159,9 +175,14 @@ export function FabricPhotoUpload({ value, onChange, userId }: FabricPhotoUpload
         </div>
       ) : (
         <div
-          className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary transition-colors max-w-[200px]"
+          className="relative border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary transition-colors max-w-[200px]"
           onClick={() => fileInputRef.current?.click()}
         >
+          {uploading && (
+            <div className="absolute inset-0 bg-black/50 z-20 flex items-center justify-center">
+              <LoadingSpinner size="sm" text={status || 'Uploading...'} />
+            </div>
+          )}
           <input
             ref={fileInputRef}
             type="file"
