@@ -1259,7 +1259,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
           }
         }}
       >
-        <DialogContent className="max-w-5xl w-[95vw] p-0 border-none bg-black/90 max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-5xl w-full mx-auto p-0 border-none bg-black/90 max-h-[90vh] overflow-y-auto">
           {selectedFabricGroup && (
             <div className="relative p-4">
               <DialogTitle className="sr-only">Fabric details</DialogTitle>
@@ -1317,7 +1317,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
                   </Button>
                 </div>
 
-                <div className="text-white pr-10">
+                <div className="text-white pr-0 md:pr-10">
                   <div className="flex items-start justify-between gap-3 pt-1">
                     <div>
                       <div className="text-xs font-mono text-white/70">
