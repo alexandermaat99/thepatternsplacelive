@@ -1259,7 +1259,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
           }
         }}
       >
-        <DialogContent className="max-w-5xl w-[95vw] p-0 border-none bg-black/90">
+        <DialogContent className="max-w-5xl w-[95vw] p-0 border-none bg-black/90 max-h-[90vh] overflow-y-auto">
           {selectedFabricGroup && (
             <div className="relative p-4">
               <DialogTitle className="sr-only">Fabric details</DialogTitle>
