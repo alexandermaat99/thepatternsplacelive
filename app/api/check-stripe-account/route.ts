@@ -5,6 +5,8 @@ import { rateLimit, getClientIdentifier, RATE_LIMITS } from '@/lib/security/rate
 import { validateUUID } from '@/lib/security/input-validation';
 
 export async function POST(request: NextRequest) {
+  // accountId is used in error-handling; keep it in outer scope
+  let accountId: string | undefined;
   try {
     // Rate limiting
     const identifier = getClientIdentifier(request);
@@ -34,7 +36,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { accountId } = await request.json();
+    const body = await request.json();
+    accountId = body?.accountId;
 
     if (!accountId) {
       return NextResponse.json({ error: 'Account ID is required' }, { status: 400 });
@@ -57,6 +60,27 @@ export async function POST(request: NextRequest) {
         { error: 'Unauthorized - account does not belong to user' },
         { status: 403 }
       );
+    }
+
+    // On localhost/test environments you may not have Stripe configured.
+    // Don't hard-fail the whole request (which currently shows as a 500 and breaks client UI).
+    if (!process.env.STRIPE_SECRET_KEY) {
+      return NextResponse.json({
+        status: 'unknown',
+        isOnboarded: false,
+        detailsSubmitted: false,
+        chargesEnabled: false,
+        payoutsEnabled: false,
+        requiresMoreInfo: false,
+        pendingVerification: false,
+        requirementsDue: [],
+        account: {
+          id: accountId,
+          details_submitted: false,
+          charges_enabled: false,
+          payouts_enabled: false,
+        },
+      });
     }
 
     const stripe = getStripe();
@@ -116,9 +140,41 @@ export async function POST(request: NextRequest) {
         payouts_enabled: payoutsEnabled,
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     // Log full error server-side but don't expose details
     console.error('Error checking Stripe account:', error);
+
+    // Common localhost/dev case:
+    // - local uses a test key (sk_test_...)
+    // - but the DB still contains a live account id (acct_...)
+    // Stripe will throw StripePermissionError / account_invalid (403).
+    // Treat this as a non-fatal "unknown" status so the UI doesn't break.
+    if (
+      error?.type === 'StripePermissionError' ||
+      error?.code === 'account_invalid' ||
+      error?.statusCode === 403
+    ) {
+      return NextResponse.json(
+        {
+          status: 'unknown',
+          isOnboarded: false,
+          detailsSubmitted: false,
+          chargesEnabled: false,
+          payoutsEnabled: false,
+          requiresMoreInfo: false,
+          pendingVerification: false,
+          requirementsDue: [],
+          account: {
+            id: accountId,
+            details_submitted: false,
+            charges_enabled: false,
+            payouts_enabled: false,
+          },
+        },
+        { status: 200 }
+      );
+    }
+
     return NextResponse.json(
       { error: 'An error occurred while checking account status' },
       { status: 500 }

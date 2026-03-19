@@ -111,7 +111,29 @@ export async function getStripeAccountStatus(accountId: string): Promise<StripeA
       body: JSON.stringify({ accountId }),
     });
 
-    const data = await response.json();
+    // Some failure modes (proxy/server errors) can return an empty body or HTML.
+    // Be defensive: only attempt JSON parsing when we actually have content.
+    const raw = await response.text();
+    if (!raw) {
+      return {
+        isConnected: true,
+        isOnboarded: false,
+        accountId,
+        status: 'error',
+      };
+    }
+
+    let data: any = null;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      return {
+        isConnected: true,
+        isOnboarded: false,
+        accountId,
+        status: 'error',
+      };
+    }
 
     if (!response.ok) {
       return {

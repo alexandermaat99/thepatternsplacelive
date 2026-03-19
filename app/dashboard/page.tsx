@@ -149,8 +149,9 @@ export default async function DashboardPage() {
                   Platform Fee Waiver Active
                 </h3>
                 <p className="text-sm text-green-800 dark:text-green-200">
-                  Your next {5 - (profile.completed_sales_count || 0)} sale{5 - (profile.completed_sales_count || 0) !== 1 ? 's' : ''} have platform fees waived! 
-                  Only the Stripe processing fees (3% + $0.25) will apply on these sales.
+                  Your next {5 - (profile.completed_sales_count || 0)} sale
+                  {5 - (profile.completed_sales_count || 0) !== 1 ? 's' : ''} have platform fees
+                  waived! Only the Stripe processing fees (3% + $0.25) will apply on these sales.
                 </p>
               </div>
             </div>
@@ -161,149 +162,150 @@ export default async function DashboardPage() {
       <div className={`grid grid-cols-1 ${hasSellerIntent ? 'md:grid-cols-2' : ''} gap-6`}>
         {/* Stripe Connect Status - Only show if user has started seller onboarding */}
         {hasSellerIntent && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              Stripe Connect
-              {stripeStatus.isOnboarded ? (
-                <CheckCircle className="h-5 w-5 text-green-500" />
-              ) : stripeStatus.status === 'pending_verification' ? (
-                <Clock className="h-5 w-5 text-yellow-500" />
-              ) : stripeStatus.status === 'requires_info' || stripeStatus.detailsSubmitted ? (
-                <AlertCircle className="h-5 w-5 text-orange-500" />
-              ) : (
-                <XCircle className="h-5 w-5 text-red-500" />
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Status:</span>
-              {stripeStatus.isOnboarded ? (
-                <Badge variant="default">Connected</Badge>
-              ) : stripeStatus.status === 'pending_verification' ? (
-                <Badge
-                  variant="secondary"
-                  className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                >
-                  Pending Verification
-                </Badge>
-              ) : stripeStatus.status === 'requires_info' ? (
-                <Badge
-                  variant="secondary"
-                  className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200"
-                >
-                  More Info Required
-                </Badge>
-              ) : stripeStatus.detailsSubmitted ? (
-                <Badge
-                  variant="secondary"
-                  className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200"
-                >
-                  Setup Incomplete
-                </Badge>
-              ) : (
-                <Badge variant="destructive">Not Connected</Badge>
-              )}
-            </div>
-
-            {stripeStatus.accountId && (
-              <div className="text-xs text-muted-foreground font-mono">
-                ID: {stripeStatus.accountId}
-              </div>
-            )}
-
-            {stripeStatus.isOnboarded ? (
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Your Stripe account is connected and ready to receive payments.
-                </p>
-
-                {/* Migration banner for Standard accounts */}
-                {stripeStatus.accountType === 'standard' && (
-                  <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md p-3 space-y-2">
-                    <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
-                      <ArrowUpCircle className="h-4 w-4" />
-                      <span className="text-sm font-medium">Upgrade Available</span>
-                    </div>
-                    <p className="text-xs text-blue-600 dark:text-blue-400">
-                      You&apos;re using a Standard Stripe account. Upgrade to Express for faster
-                      payouts and a better dashboard experience.
-                    </p>
-                    <StripeConnectButton
-                      userId={user.id}
-                      forceMigrate={true}
-                      variant="outline"
-                      label="Upgrade to Express"
-                    />
-                  </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                Stripe Connect
+                {stripeStatus.isOnboarded ? (
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                ) : stripeStatus.status === 'pending_verification' ? (
+                  <Clock className="h-5 w-5 text-yellow-500" />
+                ) : stripeStatus.status === 'requires_info' || stripeStatus.detailsSubmitted ? (
+                  <AlertCircle className="h-5 w-5 text-orange-500" />
+                ) : (
+                  <XCircle className="h-5 w-5 text-red-500" />
                 )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">Status:</span>
+                {stripeStatus.isOnboarded ? (
+                  <Badge variant="default">Connected</Badge>
+                ) : stripeStatus.status === 'pending_verification' ? (
+                  <Badge
+                    variant="secondary"
+                    className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                  >
+                    Pending Verification
+                  </Badge>
+                ) : stripeStatus.status === 'requires_info' ? (
+                  <Badge
+                    variant="secondary"
+                    className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200"
+                  >
+                    More Info Required
+                  </Badge>
+                ) : stripeStatus.detailsSubmitted ? (
+                  <Badge
+                    variant="secondary"
+                    className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200"
+                  >
+                    Setup Incomplete
+                  </Badge>
+                ) : (
+                  <Badge variant="destructive">Not Connected</Badge>
+                )}
+              </div>
 
-                <Link href="/marketplace/sell">
-                  <Button className="mt-4 w-full">List a Product</Button>
-                </Link>
-              </div>
-            ) : stripeStatus.status === 'pending_verification' ? (
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Stripe is verifying your information. This usually takes just a few minutes.
-                  You&apos;ll be able to start selling once verification is complete.
-                </p>
-                <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-md p-3 text-xs">
-                  <p className="font-medium text-amber-800 dark:text-amber-200 mb-1">
-                    Additional verification may be required
-                  </p>
-                  <p className="text-amber-700 dark:text-amber-300">
-                    For security compliance, Stripe may request your full SSN or a photo ID. This is
-                    standard for all payment platforms. Click below to check if anything is needed.
-                  </p>
+              {stripeStatus.accountId && (
+                <div className="text-xs text-muted-foreground font-mono">
+                  ID: {stripeStatus.accountId}
                 </div>
-                <StripeContinueButton accountId={stripeStatus.accountId!} />
-                <Link href="/dashboard" className="block">
-                  <Button variant="outline" className="w-full">
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Refresh Status
-                  </Button>
-                </Link>
-              </div>
-            ) : stripeStatus.status === 'requires_info' || stripeStatus.detailsSubmitted ? (
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Almost there! Stripe needs additional verification to complete your account:
-                </p>
-                <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-md p-3 text-xs">
-                  <p className="font-medium text-amber-800 dark:text-amber-200 mb-1">
-                    Why is this required?
+              )}
+
+              {stripeStatus.isOnboarded ? (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Your Stripe account is connected and ready to receive payments.
                   </p>
-                  <p className="text-amber-700 dark:text-amber-300">
-                    Financial regulations require Stripe to verify your identity. This may include
-                    your full SSN (not just last 4 digits) and/or a photo of your government-issued
-                    ID. This is a one-time process and only takes a few minutes.
+
+                  {/* Migration banner for Standard accounts */}
+                  {stripeStatus.accountType === 'standard' && (
+                    <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md p-3 space-y-2">
+                      <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                        <ArrowUpCircle className="h-4 w-4" />
+                        <span className="text-sm font-medium">Upgrade Available</span>
+                      </div>
+                      <p className="text-xs text-blue-600 dark:text-blue-400">
+                        You&apos;re using a Standard Stripe account. Upgrade to Express for faster
+                        payouts and a better dashboard experience.
+                      </p>
+                      <StripeConnectButton
+                        userId={user.id}
+                        forceMigrate={true}
+                        variant="outline"
+                        label="Upgrade to Express"
+                      />
+                    </div>
+                  )}
+
+                  <Link href="/marketplace/sell">
+                    <Button className="mt-4 w-full">List a Product</Button>
+                  </Link>
+                </div>
+              ) : stripeStatus.status === 'pending_verification' ? (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Stripe is verifying your information. This usually takes just a few minutes.
+                    You&apos;ll be able to start selling once verification is complete.
                   </p>
+                  <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-md p-3 text-xs">
+                    <p className="font-medium text-amber-800 dark:text-amber-200 mb-1">
+                      Additional verification may be required
+                    </p>
+                    <p className="text-amber-700 dark:text-amber-300">
+                      For security compliance, Stripe may request your full SSN or a photo ID. This
+                      is standard for all payment platforms. Click below to check if anything is
+                      needed.
+                    </p>
+                  </div>
+                  <StripeContinueButton accountId={stripeStatus.accountId!} />
+                  <Link href="/dashboard" className="block">
+                    <Button variant="outline" className="w-full">
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Refresh Status
+                    </Button>
+                  </Link>
                 </div>
-                <StripeContinueButton accountId={stripeStatus.accountId!} />
-                <Link href="/dashboard" className="block">
-                  <Button variant="outline" className="w-full">
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Refresh Status
-                  </Button>
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Connect your Stripe account to start selling products and receiving payments.
-                </p>
-                <div className="bg-muted/50 rounded-md p-3 text-xs text-muted-foreground">
-                  <strong>Quick setup:</strong> You&apos;ll need your email, phone number, SSN (or
-                  EIN for businesses), and bank account details. Most sellers complete setup in
-                  under 5 minutes.
+              ) : stripeStatus.status === 'requires_info' || stripeStatus.detailsSubmitted ? (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Almost there! Stripe needs additional verification to complete your account:
+                  </p>
+                  <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-md p-3 text-xs">
+                    <p className="font-medium text-amber-800 dark:text-amber-200 mb-1">
+                      Why is this required?
+                    </p>
+                    <p className="text-amber-700 dark:text-amber-300">
+                      Financial regulations require Stripe to verify your identity. This may include
+                      your full SSN (not just last 4 digits) and/or a photo of your
+                      government-issued ID. This is a one-time process and only takes a few minutes.
+                    </p>
+                  </div>
+                  <StripeContinueButton accountId={stripeStatus.accountId!} />
+                  <Link href="/dashboard" className="block">
+                    <Button variant="outline" className="w-full">
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Refresh Status
+                    </Button>
+                  </Link>
                 </div>
-                <StripeConnectButton userId={user.id} />
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Connect your Stripe account to start selling products and receiving payments.
+                  </p>
+                  <div className="bg-muted/50 rounded-md p-3 text-xs text-muted-foreground">
+                    <strong>Quick setup:</strong> You&apos;ll need your email, phone number, SSN (or
+                    EIN for businesses), and bank account details. Most sellers complete setup in
+                    under 5 minutes.
+                  </div>
+                  <StripeConnectButton userId={user.id} />
+                </div>
+              )}
+            </CardContent>
+          </Card>
         )}
 
         {/* Quick Actions */}
@@ -340,7 +342,10 @@ export default async function DashboardPage() {
             {!canSell && (
               <div className="pt-3 border-t">
                 <Link href="/marketplace/sell" className="block">
-                  <Button variant="outline" className="w-full justify-start text-green-700 dark:text-green-400 border-green-200 dark:border-green-800 hover:bg-green-50 dark:hover:bg-green-950/30">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-green-700 dark:text-green-400 border-green-200 dark:border-green-800 hover:bg-green-50 dark:hover:bg-green-950/30"
+                  >
                     <Package className="h-4 w-4 mr-2" />
                     List a free pattern (no Stripe needed)
                   </Button>
