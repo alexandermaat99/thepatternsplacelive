@@ -5,6 +5,8 @@ import { rateLimit, getClientIdentifier, RATE_LIMITS } from '@/lib/security/rate
 import { validateUUID } from '@/lib/security/input-validation';
 
 export async function POST(request: NextRequest) {
+  // accountId is used in error-handling; keep it in outer scope
+  let accountId: string | undefined;
   try {
     // Rate limiting
     const identifier = getClientIdentifier(request);
@@ -34,7 +36,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { accountId } = await request.json();
+    const body = await request.json();
+    accountId = body?.accountId;
 
     if (!accountId) {
       return NextResponse.json({ error: 'Account ID is required' }, { status: 400 });
