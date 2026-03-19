@@ -67,7 +67,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
   const [sellError, setSellError] = useState<string | null>(null);
   const [selling, setSelling] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState<'venmo' | 'stripe' | null>(null);
+  const [selectedPayment, setSelectedPayment] = useState<'venmo' | 'stripe' | 'cash' | null>(null);
   const scanInputRef = useRef<HTMLInputElement>(null);
 
   const sortedFabric = [...fabric].sort((a, b) => {
@@ -309,6 +309,16 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
     }
   };
 
+  const copyTotalToClipboard = async () => {
+    try {
+      const text = sellTotal != null ? `$${sellTotal.toFixed(2)}` : '';
+      if (!text) return;
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // non-fatal: clipboard may be unavailable depending on browser permissions
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -461,73 +471,73 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
                     const parsed = parseFabricSku(row.sku);
                     const boltLabel = parsed.ok ? formatBoltLabel(parsed.boltIndex) : '—';
                     return (
-                    <tr key={row.sku} className="border-b hover:bg-muted/50">
-                      <td className="py-2 px-2">
-                        {row.photo_url ? (
-                          <button
-                            type="button"
-                            onClick={() => setLightboxUrl(row.photo_url)}
-                            className="relative w-12 h-12 rounded overflow-hidden bg-muted block cursor-zoom-in hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
-                            aria-label="View photo larger"
+                      <tr key={row.sku} className="border-b hover:bg-muted/50">
+                        <td className="py-2 px-2">
+                          {row.photo_url ? (
+                            <button
+                              type="button"
+                              onClick={() => setLightboxUrl(row.photo_url)}
+                              className="relative w-12 h-12 rounded overflow-hidden bg-muted block cursor-zoom-in hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
+                              aria-label="View photo larger"
+                            >
+                              <Image
+                                src={row.photo_url}
+                                alt={row.name || row.sku}
+                                fill
+                                className="object-cover"
+                              />
+                            </button>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </td>
+                        <td className="py-2 px-2 font-mono">{row.sku}</td>
+                        <td className="py-2 px-2">{boltLabel}</td>
+                        <td className="py-2 px-2">{row.name ?? '—'}</td>
+                        <td className="py-2 px-2">{row.weave ?? '—'}</td>
+                        <td className="py-2 px-2">{row.fiber ?? '—'}</td>
+                        <td className="py-2 px-2 text-right">
+                          {row.width != null ? `${row.width}"` : '—'}
+                        </td>
+                        <td className="py-2 px-2 text-right">{row.current_quantity ?? '—'}</td>
+                        <td className="py-2 px-2 text-right">
+                          {row.buy_price != null ? `$${Number(row.buy_price).toFixed(2)}` : '—'}
+                        </td>
+                        <td className="py-2 px-2 text-right">
+                          {row.sell_price != null ? `$${Number(row.sell_price).toFixed(2)}` : '—'}
+                        </td>
+                        <td className="py-2 px-2 flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openEdit(row)}
+                            aria-label="Edit"
                           >
-                            <Image
-                              src={row.photo_url}
-                              alt={row.name || row.sku}
-                              fill
-                              className="object-cover"
-                            />
-                          </button>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </td>
-                      <td className="py-2 px-2 font-mono">{row.sku}</td>
-                      <td className="py-2 px-2">{boltLabel}</td>
-                      <td className="py-2 px-2">{row.name ?? '—'}</td>
-                      <td className="py-2 px-2">{row.weave ?? '—'}</td>
-                      <td className="py-2 px-2">{row.fiber ?? '—'}</td>
-                      <td className="py-2 px-2 text-right">
-                        {row.width != null ? `${row.width}"` : '—'}
-                      </td>
-                      <td className="py-2 px-2 text-right">{row.current_quantity ?? '—'}</td>
-                      <td className="py-2 px-2 text-right">
-                        {row.buy_price != null ? `$${Number(row.buy_price).toFixed(2)}` : '—'}
-                      </td>
-                      <td className="py-2 px-2 text-right">
-                        {row.sell_price != null ? `$${Number(row.sell_price).toFixed(2)}` : '—'}
-                      </td>
-                      <td className="py-2 px-2 flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openEdit(row)}
-                          aria-label="Edit"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => addNextBoltFromRow(row)}
-                          aria-label="Add next bolt"
-                          title="Add next bolt"
-                        >
-                          <CopyPlus className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setDeleteConfirm({ sku: row.sku, name: row.name });
-                            setDeleteError(null);
-                          }}
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                          aria-label="Delete"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </td>
-                    </tr>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => addNextBoltFromRow(row)}
+                            aria-label="Add next bolt"
+                            title="Add next bolt"
+                          >
+                            <CopyPlus className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setDeleteConfirm({ sku: row.sku, name: row.name });
+                              setDeleteError(null);
+                            }}
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            aria-label="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </td>
+                      </tr>
                     );
                   })}
                 </tbody>
@@ -720,7 +730,9 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
                 className="font-mono"
               />
               {scanError && (
-                <p className="text-sm text-destructive bg-destructive/10 p-2 rounded">{scanError}</p>
+                <p className="text-sm text-destructive bg-destructive/10 p-2 rounded">
+                  {scanError}
+                </p>
               )}
             </div>
 
@@ -791,14 +803,16 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Total</span>
-                  <span className="font-semibold">
+                  <span className="text-sm text-rose-500">Total</span>
+                  <span className="font-semibold text-rose-500">
                     {sellTotal != null ? `$${sellTotal.toFixed(2)}` : '—'}
                   </span>
                 </div>
 
                 {sellError && (
-                  <p className="text-sm text-destructive bg-destructive/10 p-2 rounded">{sellError}</p>
+                  <p className="text-sm text-destructive bg-destructive/10 p-2 rounded">
+                    {sellError}
+                  </p>
                 )}
 
                 {paymentOpen && (
@@ -806,9 +820,6 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="text-sm font-semibold">Payment options</div>
-                        <div className="text-xs text-muted-foreground">
-                          Total: {sellTotal != null ? `$${sellTotal.toFixed(2)}` : '—'} • Receipt: {receiptEmail ? receiptEmail : '—'}
-                        </div>
                       </div>
                     </div>
 
@@ -841,11 +852,27 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
                       >
                         Stripe
                       </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className={
+                          selectedPayment === 'cash'
+                            ? 'flex-1 bg-rose-400 text-white border-rose-400 hover:bg-rose-500 hover:text-white'
+                            : 'flex-1'
+                        }
+                        onClick={() => setSelectedPayment('cash')}
+                        disabled={selling}
+                      >
+                        Cash
+                      </Button>
                     </div>
 
                     {selectedPayment === 'venmo' && (
                       <div className="space-y-2">
-                        <div className="text-sm font-medium text-center">Scan the QR code, pay, then click I&apos;ve paid.</div>
+                        <div className="text-lg font-bold text-center text-rose-400">
+                          {sellTotal != null ? `Total: $${sellTotal.toFixed(2)}` : 'Total: —'}
+                        </div>
                         <div className="flex items-center justify-center">
                           <div className="rounded-md border bg-white p-2 shadow-sm">
                             <Image src={venmoQrCode} alt="Venmo QR code" width={240} height={240} />
@@ -855,8 +882,34 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
                     )}
 
                     {selectedPayment === 'stripe' && (
-                      <div className="text-sm text-muted-foreground">
-                        Complete your in-person Stripe payment, then click &ldquo;Payment complete&rdquo;.
+                      <div className="space-y-3">
+                        <div className="text-lg font-bold text-center text-rose-400">
+                          {sellTotal != null ? `Total: $${sellTotal.toFixed(2)}` : 'Total: —'}
+                        </div>
+
+                        <div className="grid gap-2">
+                          <a
+                            href="https://dashboard.stripe.com/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center justify-center rounded-md border bg-background px-3 py-2 text-sm font-medium hover:bg-accent transition-colors w-full"
+                          >
+                            Open Stripe Dashboard
+                          </a>
+                          <Button type="button" variant="outline" size="sm" onClick={copyTotalToClipboard}>
+                            Copy total
+                          </Button>
+                        </div>
+
+                        <div className="text-sm text-muted-foreground text-center">
+                          Charge the card in Stripe, then click &ldquo;Payment complete&rdquo;.
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedPayment === 'cash' && (
+                      <div className="text-lg font-bold text-center text-rose-400">
+                        {sellTotal != null ? `Total: $${sellTotal.toFixed(2)}` : 'Total: —'}
                       </div>
                     )}
 
@@ -884,9 +937,9 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
                         type="button"
                         onClick={completeSale}
                         disabled={selling || !selectedPayment}
-                        title={!selectedPayment ? 'Select Venmo or Stripe first' : undefined}
+                        title={!selectedPayment ? 'Select a payment option first' : undefined}
                         size="lg"
-                      className="w-full bg-rose-400 text-white border-rose-400 hover:bg-rose-500 hover:text-white"
+                        className="w-full bg-rose-400 text-white border-rose-400 hover:bg-rose-500 hover:text-white"
                         variant="outline"
                       >
                         {selling ? 'Completing...' : 'Payment complete'}
