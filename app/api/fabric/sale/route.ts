@@ -58,7 +58,10 @@ export async function POST(req: NextRequest) {
 
     if (fabricError) throw fabricError;
     if (!fabric) {
-      return NextResponse.json({ success: false, error: `No fabric found for SKU ${sku}` }, { status: 404 });
+      return NextResponse.json(
+        { success: false, error: `No fabric found for SKU ${sku}` },
+        { status: 404 }
+      );
     }
 
     const currentQty = fabric.current_quantity;
@@ -151,7 +154,8 @@ export async function POST(req: NextRequest) {
   </body>
 </html>`;
 
-        const text = `${COMPANY_INFO.name} - Farmers market receipt\n\n` +
+        const text =
+          `${COMPANY_INFO.name} - Farmers market receipt\n\n` +
           `Item: ${title}\n` +
           `SKU: ${fabric.sku}\n` +
           `Quantity: ${quantity}\n` +
@@ -176,12 +180,44 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Record the in-person purchase for auditing.
+    // This should never block inventory changes / email sending if insert fails.
+    let purchaseId: string | null = null;
+    try {
+      const { data: purchase, error: purchaseError } = await supabase
+        .from('in_person_purchases')
+        .insert({
+          sku: fabric.sku,
+          name: fabric.name,
+          quantity,
+          unit_price: unitPrice,
+          total_amount: total,
+          receipt_email: receiptEmail,
+          processed_by: user.id,
+          inventory_before: Number(currentQty),
+          inventory_after: newQty,
+          email_sent: emailSent,
+          email_error: emailError,
+        })
+        .select('id')
+        .maybeSingle();
+
+      if (purchaseError) {
+        console.error('Failed to insert in-person purchase:', purchaseError);
+      } else if (purchase?.id) {
+        purchaseId = purchase.id;
+      }
+    } catch (e) {
+      console.error('Failed to insert in-person purchase (exception):', e);
+    }
+
     return NextResponse.json({
       success: true,
       sku,
       newQuantity: newQty,
       emailSent,
       emailError,
+      purchaseId,
     });
   } catch (error) {
     console.error('Fabric sale error:', error);
@@ -191,4 +227,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

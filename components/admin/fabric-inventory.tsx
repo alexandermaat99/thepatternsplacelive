@@ -21,6 +21,7 @@ import type { Fabric } from '@/types/fabric';
 import { formatBoltLabel, parseFabricSku } from '@/lib/fabric-sku';
 import { Plus, Pencil, Ruler, Trash2, X, CopyPlus, ScanLine } from 'lucide-react';
 import Image from 'next/image';
+import venmoQrCode from '@/assets/venmoCode.png';
 
 interface FabricInventoryProps {
   initialFabric: Fabric[];
@@ -65,6 +66,8 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
   const [receiptEmail, setReceiptEmail] = useState<string>('');
   const [sellError, setSellError] = useState<string | null>(null);
   const [selling, setSelling] = useState(false);
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState<'venmo' | 'stripe' | null>(null);
   const scanInputRef = useRef<HTMLInputElement>(null);
 
   const sortedFabric = [...fabric].sort((a, b) => {
@@ -173,6 +176,8 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
     setSellQuantity('1');
     setReceiptEmail('');
     setSellError(null);
+    setPaymentOpen(false);
+    setSelectedPayment(null);
   };
 
   const lookupSku = async (skuRaw: string) => {
@@ -204,6 +209,8 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
         return;
       }
       setScannedFabric(data as Fabric);
+      // Show payment options immediately after a successful scan
+      setPaymentOpen(true);
     } catch (err: unknown) {
       const message =
         err && typeof err === 'object' && 'message' in err
@@ -215,30 +222,48 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
     }
   };
 
-  const confirmSale = async () => {
-    if (!scannedFabric) return;
+  const validateSaleInputs = (): boolean => {
+    if (!scannedFabric) return false;
+
     const q = Number(sellQuantity);
     if (!Number.isFinite(q) || q <= 0) {
       setSellError('Enter a quantity greater than 0.');
-      return;
+      return false;
     }
     if (scannedFabric.current_quantity == null) {
       setSellError('This fabric has no current quantity set.');
-      return;
+      return false;
     }
     if (q > Number(scannedFabric.current_quantity)) {
       setSellError('Not enough inventory for that quantity.');
-      return;
+      return false;
     }
+
     const email = receiptEmail.trim();
     // quick client-side check; server validates too
     if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
       setSellError('Enter a valid email for the receipt.');
+      return false;
+    }
+    return true;
+  };
+
+  const completeSale = async () => {
+    if (!scannedFabric) return;
+
+    if (!selectedPayment) {
+      setSellError('Select Venmo or Stripe payment option.');
       return;
     }
 
-    setSelling(true);
     setSellError(null);
+    const ok = validateSaleInputs();
+    if (!ok) return;
+
+    const q = Number(sellQuantity);
+    const email = receiptEmail.trim();
+
+    setSelling(true);
     try {
       const res = await fetch('/api/fabric/sale', {
         method: 'POST',
@@ -267,6 +292,8 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
       setScannedFabric(null);
       setSellQuantity('1');
       setReceiptEmail('');
+      setPaymentOpen(false);
+      setSelectedPayment(null);
       setTimeout(() => scanInputRef.current?.focus(), 0);
       router.refresh();
     } catch (err: unknown) {
@@ -774,27 +801,99 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
                   <p className="text-sm text-destructive bg-destructive/10 p-2 rounded">{sellError}</p>
                 )}
 
-                <div className="flex items-center justify-end gap-2 pt-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setScannedFabric(null);
-                      setScanValue('');
-                      setSellQuantity('1');
-                      setReceiptEmail('');
-                      setScanError(null);
-                      setSellError(null);
-                      setTimeout(() => scanInputRef.current?.focus(), 0);
-                    }}
-                    disabled={selling}
-                  >
-                    Clear
-                  </Button>
-                  <Button type="button" onClick={confirmSale} disabled={selling}>
-                    {selling ? 'Updating...' : 'Confirm sale'}
-                  </Button>
-                </div>
+                {paymentOpen && (
+                  <div className="mt-3 rounded-lg border bg-muted/20 p-3 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold">Payment options</div>
+                        <div className="text-xs text-muted-foreground">
+                          Total: {sellTotal != null ? `$${sellTotal.toFixed(2)}` : '—'} • Receipt: {receiptEmail ? receiptEmail : '—'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className={
+                          selectedPayment === 'venmo'
+                            ? 'flex-1 bg-rose-400 text-white border-rose-400 hover:bg-rose-500 hover:text-white'
+                            : 'flex-1'
+                        }
+                        onClick={() => setSelectedPayment('venmo')}
+                        disabled={selling}
+                      >
+                        Venmo
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className={
+                          selectedPayment === 'stripe'
+                            ? 'flex-1 bg-rose-400 text-white border-rose-400 hover:bg-rose-500 hover:text-white'
+                            : 'flex-1'
+                        }
+                        onClick={() => setSelectedPayment('stripe')}
+                        disabled={selling}
+                      >
+                        Stripe
+                      </Button>
+                    </div>
+
+                    {selectedPayment === 'venmo' && (
+                      <div className="space-y-2">
+                        <div className="text-sm font-medium text-center">Scan the QR code, pay, then click I&apos;ve paid.</div>
+                        <div className="flex items-center justify-center">
+                          <div className="rounded-md border bg-white p-2 shadow-sm">
+                            <Image src={venmoQrCode} alt="Venmo QR code" width={240} height={240} />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedPayment === 'stripe' && (
+                      <div className="text-sm text-muted-foreground">
+                        Complete your in-person Stripe payment, then click &ldquo;Payment complete&rdquo;.
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setScannedFabric(null);
+                          setScanValue('');
+                          setSellQuantity('1');
+                          setReceiptEmail('');
+                          setScanError(null);
+                          setSellError(null);
+                          setPaymentOpen(false);
+                          setSelectedPayment(null);
+                          setTimeout(() => scanInputRef.current?.focus(), 0);
+                        }}
+                        disabled={selling}
+                      >
+                        Cancel
+                      </Button>
+
+                      <Button
+                        type="button"
+                        onClick={completeSale}
+                        disabled={selling || !selectedPayment}
+                        title={!selectedPayment ? 'Select Venmo or Stripe first' : undefined}
+                        size="lg"
+                      className="w-full bg-rose-400 text-white border-rose-400 hover:bg-rose-500 hover:text-white"
+                        variant="outline"
+                      >
+                        {selling ? 'Completing...' : 'Payment complete'}
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
