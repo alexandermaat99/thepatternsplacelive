@@ -1255,6 +1255,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
                       setShowAllBoltDetails(false);
                       if (representative) {
                         setScannedFabric(representative);
+                        setScanValue(representative.sku);
                         setSellQuantity('1');
                         setReceiptEmail('');
                         setSellError(null);
