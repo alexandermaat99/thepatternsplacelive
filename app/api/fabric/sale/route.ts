@@ -11,6 +11,7 @@ function formatMoney(amount: number) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    const itemsRaw = Array.isArray(body?.items) ? body.items : null;
     const sku = sanitizeString(String(body?.sku ?? ''), 64).trim();
     // New name: yards. Backward compatible with older clients that send `quantity`.
     const yards = Number(body?.yards ?? body?.quantity);
@@ -21,14 +22,16 @@ export async function POST(req: NextRequest) {
         ? paymentMethodRaw
         : null;
 
-    if (!sku) {
-      return NextResponse.json({ success: false, error: 'SKU is required' }, { status: 400 });
-    }
-    if (!Number.isFinite(yards) || yards <= 0) {
-      return NextResponse.json(
-        { success: false, error: 'Yards must be greater than 0' },
-        { status: 400 }
-      );
+    if (!itemsRaw) {
+      if (!sku) {
+        return NextResponse.json({ success: false, error: 'SKU is required' }, { status: 400 });
+      }
+      if (!Number.isFinite(yards) || yards <= 0) {
+        return NextResponse.json(
+          { success: false, error: 'Yards must be greater than 0' },
+          { status: 400 }
+        );
+      }
     }
     if (!receiptEmail || !validateEmail(receiptEmail)) {
       return NextResponse.json(
@@ -56,54 +59,99 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
     }
 
-    const { data: fabric, error: fabricError } = await supabase
-      .from('fabric')
-      .select('sku,name,sell_price,current_quantity')
-      .eq('sku', sku)
-      .maybeSingle();
+    type SaleLine = {
+      sku: string;
+      name: string | null;
+      yards: number;
+      unitPrice: number;
+      lineTotal: number;
+      inventoryBefore: number;
+      inventoryAfter: number;
+    };
 
-    if (fabricError) throw fabricError;
-    if (!fabric) {
-      return NextResponse.json(
-        { success: false, error: `No fabric found for SKU ${sku}` },
-        { status: 404 }
-      );
-    }
+    const requestedItems: Array<{ sku: string; yards: number }> = itemsRaw
+      ? itemsRaw
+          .map((it: any) => ({
+            sku: sanitizeString(String(it?.sku ?? ''), 64).trim(),
+            yards: Number(it?.yards ?? it?.quantity),
+          }))
+          .filter(it => it.sku && Number.isFinite(it.yards) && it.yards > 0)
+      : [{ sku, yards }];
 
-    const currentQty = fabric.current_quantity;
-    if (currentQty == null) {
+    if (requestedItems.length === 0) {
       return NextResponse.json(
-        { success: false, error: 'This fabric has no current quantity set.' },
+        { success: false, error: 'At least one valid line item is required.' },
         { status: 400 }
       );
     }
-    if (yards > Number(currentQty)) {
-      return NextResponse.json(
-        { success: false, error: 'Not enough inventory for that many yards.' },
-        { status: 400 }
-      );
+
+    const lines: SaleLine[] = [];
+    for (const item of requestedItems) {
+      const { data: fabric, error: fabricError } = await supabase
+        .from('fabric')
+        .select('sku,name,sell_price,current_quantity')
+        .eq('sku', item.sku)
+        .maybeSingle();
+
+      if (fabricError) throw fabricError;
+      if (!fabric) {
+        return NextResponse.json(
+          { success: false, error: `No fabric found for SKU ${item.sku}` },
+          { status: 404 }
+        );
+      }
+
+      const currentQty = fabric.current_quantity;
+      if (currentQty == null) {
+        return NextResponse.json(
+          { success: false, error: `${item.sku} has no current quantity set.` },
+          { status: 400 }
+        );
+      }
+      if (item.yards > Number(currentQty)) {
+        return NextResponse.json(
+          { success: false, error: `${item.sku}: not enough inventory for that many yards.` },
+          { status: 400 }
+        );
+      }
+
+      const newQty = Number(currentQty) - item.yards;
+      const { data: updatedRows, error: updateError } = await supabase
+        .from('fabric')
+        .update({ current_quantity: newQty })
+        .eq('sku', item.sku)
+        .gte('current_quantity', item.yards)
+        .select('sku,current_quantity')
+        .limit(1);
+
+      if (updateError) throw updateError;
+      if (!updatedRows || updatedRows.length === 0) {
+        return NextResponse.json(
+          { success: false, error: `${item.sku}: inventory changed. Re-scan and try again.` },
+          { status: 409 }
+        );
+      }
+
+      const unitPrice = fabric.sell_price != null ? Number(fabric.sell_price) : 0;
+      lines.push({
+        sku: fabric.sku,
+        name: fabric.name,
+        yards: item.yards,
+        unitPrice,
+        lineTotal: unitPrice * item.yards,
+        inventoryBefore: Number(currentQty),
+        inventoryAfter: newQty,
+      });
     }
 
-    const newQty = Number(currentQty) - yards;
-
-    const { data: updatedRows, error: updateError } = await supabase
-      .from('fabric')
-      .update({ current_quantity: newQty })
-      .eq('sku', sku)
-      .gte('current_quantity', yards)
-      .select('sku,current_quantity')
-      .limit(1);
-
-    if (updateError) throw updateError;
-    if (!updatedRows || updatedRows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Inventory changed. Please re-scan and try again.' },
-        { status: 409 }
-      );
-    }
-
-    const unitPrice = fabric.sell_price != null ? Number(fabric.sell_price) : 0;
-    const total = unitPrice * yards;
+    const totalYards = lines.reduce((sum, line) => sum + line.yards, 0);
+    const totalAmount = lines.reduce((sum, line) => sum + line.lineTotal, 0);
+    const avgUnitPrice = totalYards > 0 ? totalAmount / totalYards : 0;
+    const inventoryBeforeSum = lines.reduce((sum, line) => sum + line.inventoryBefore, 0);
+    const inventoryAfterSum = lines.reduce((sum, line) => sum + line.inventoryAfter, 0);
+    const summarySku = lines[0].sku;
+    const summaryName =
+      lines.length === 1 ? lines[0].name : `${lines[0].name || lines[0].sku} + ${lines.length - 1} more`;
 
     // Send receipt email (non-fatal if email fails)
     let emailSent = false;
@@ -117,8 +165,22 @@ export async function POST(req: NextRequest) {
         const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@thepatternsplace.com';
         const fromName = process.env.RESEND_FROM_NAME || COMPANY_INFO.name;
 
-        const title = fabric.name || fabric.sku;
+        const title =
+          lines.length === 1
+            ? lines[0].name || lines[0].sku
+            : `Fabric sale (${lines.length} items)`;
         const subject = `Receipt: ${title}`;
+        const lineRowsHtml = lines
+          .map(
+            line => `
+            <tr>
+              <td style="padding:6px 0; color:#444;">${line.name || line.sku} <span style="color:#777;">(${line.sku})</span></td>
+              <td style="padding:6px 0; text-align:right;">${line.yards}</td>
+              <td style="padding:6px 0; text-align:right;">${formatMoney(line.unitPrice)}</td>
+              <td style="padding:6px 0; text-align:right;">${formatMoney(line.lineTotal)}</td>
+            </tr>`
+          )
+          .join('');
 
         const html = `
 <!doctype html>
@@ -133,21 +195,19 @@ export async function POST(req: NextRequest) {
       </tr>
       <tr>
         <td style="padding:24px;">
-          <div style="font-size:16px; font-weight:700; margin-bottom:8px;">${title}</div>
-          <div style="color:#666; font-size:13px; margin-bottom:18px;">SKU: <code>${fabric.sku}</code></div>
-
           <table role="presentation" style="width:100%; border-collapse:collapse; font-size:14px;">
             <tr>
-              <td style="padding:8px 0; color:#666;">Yards</td>
-              <td style="padding:8px 0; text-align:right; font-weight:600;">${yards}</td>
+              <td style="padding:6px 0; color:#666; font-weight:600;">Item</td>
+              <td style="padding:6px 0; color:#666; text-align:right; font-weight:600;">Yards</td>
+              <td style="padding:6px 0; color:#666; text-align:right; font-weight:600;">Unit</td>
+              <td style="padding:6px 0; color:#666; text-align:right; font-weight:600;">Line total</td>
             </tr>
+            ${lineRowsHtml}
             <tr>
-              <td style="padding:8px 0; color:#666;">Unit price</td>
-              <td style="padding:8px 0; text-align:right; font-weight:600;">${formatMoney(unitPrice)}</td>
-            </tr>
-            <tr>
-              <td style="padding:12px 0; border-top:1px solid #eee; font-weight:700;">Total</td>
-              <td style="padding:12px 0; border-top:1px solid #eee; text-align:right; font-weight:800;">${formatMoney(total)}</td>
+              <td style="padding:10px 0; border-top:1px solid #eee; font-weight:700;">Total</td>
+              <td style="padding:10px 0; border-top:1px solid #eee; text-align:right; font-weight:700;">${totalYards}</td>
+              <td style="padding:10px 0; border-top:1px solid #eee;"></td>
+              <td style="padding:10px 0; border-top:1px solid #eee; text-align:right; font-weight:800;">${formatMoney(totalAmount)}</td>
             </tr>
           </table>
 
@@ -160,13 +220,17 @@ export async function POST(req: NextRequest) {
   </body>
 </html>`;
 
+        const lineRowsText = lines
+          .map(
+            line =>
+              `- ${line.name || line.sku} (${line.sku}): ${line.yards} yd x ${formatMoney(line.unitPrice)} = ${formatMoney(line.lineTotal)}`
+          )
+          .join('\n');
         const text =
           `${COMPANY_INFO.name} - Fabric sale receipt\n\n` +
-          `Item: ${title}\n` +
-          `SKU: ${fabric.sku}\n` +
-          `Yards: ${yards}\n` +
-          `Unit price: ${formatMoney(unitPrice)}\n` +
-          `Total: ${formatMoney(total)}\n`;
+          `${lineRowsText}\n\n` +
+          `Total yards: ${totalYards}\n` +
+          `Total: ${formatMoney(totalAmount)}\n`;
 
         const result = await resend.emails.send({
           from: `${fromName} <${fromEmail}>`,
@@ -193,16 +257,16 @@ export async function POST(req: NextRequest) {
       const { data: purchase, error: purchaseError } = await supabase
         .from('in_person_purchases')
         .insert({
-          sku: fabric.sku,
-          name: fabric.name,
-            quantity: yards,
-          unit_price: unitPrice,
-          total_amount: total,
+          sku: summarySku,
+          name: summaryName,
+          quantity: totalYards,
+          unit_price: avgUnitPrice,
+          total_amount: totalAmount,
           receipt_email: receiptEmail,
           payment_method: paymentMethod,
           processed_by: user.id,
-          inventory_before: Number(currentQty),
-          inventory_after: newQty,
+          inventory_before: inventoryBeforeSum,
+          inventory_after: inventoryAfterSum,
           email_sent: emailSent,
           email_error: emailError,
         })
@@ -220,10 +284,11 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      sku,
-      newYards: newQty,
+      items: lines.map(line => ({ sku: line.sku, newYards: line.inventoryAfter })),
+      sku: lines[0].sku,
+      newYards: lines[0].inventoryAfter,
       // Backward compatible keys
-      newQuantity: newQty,
+      newQuantity: lines[0].inventoryAfter,
       emailSent,
       emailError,
       purchaseId,

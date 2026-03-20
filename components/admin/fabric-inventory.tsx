@@ -101,6 +101,15 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<'venmo' | 'stripe' | 'cash' | null>(null);
   const scanInputRef = useRef<HTMLInputElement>(null);
+
+  const focusScanInput = (selectAll = false) => {
+    setTimeout(() => {
+      const input = scanInputRef.current;
+      if (!input) return;
+      input.focus();
+      if (selectAll) input.select();
+    }, 0);
+  };
   const [searchDraft, setSearchDraft] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
 
@@ -202,7 +211,12 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
 
   useEffect(() => {
     if (!marketOpen) return;
-    const t = setTimeout(() => scanInputRef.current?.focus(), 50);
+    const t = setTimeout(() => {
+      const input = scanInputRef.current;
+      if (!input) return;
+      input.focus();
+      if (input.value) input.select();
+    }, 50);
     return () => clearTimeout(t);
   }, [marketOpen]);
 
@@ -390,7 +404,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
     setScannedFabric(null);
     setSellQuantity('1');
     setSellError(null);
-    setTimeout(() => scanInputRef.current?.focus(), 0);
+    focusScanInput(true);
   };
 
   const rescanCurrentFabric = async () => {
@@ -401,13 +415,13 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
     }
     setScanValue(sku);
     await lookupSku(sku);
-    setTimeout(() => scanInputRef.current?.focus(), 0);
+    focusScanInput(true);
   };
 
   const beginScan = () => {
     setScanError(null);
     setSellError(null);
-    setTimeout(() => scanInputRef.current?.focus(), 0);
+    focusScanInput(true);
   };
 
   const updateTransactionItemYards = (sku: string, rawValue: string) => {
@@ -455,32 +469,47 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
 
     setSelling(true);
     try {
-      for (const line of pending) {
-        const res = await fetch('/api/fabric/sale', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sku: line.sku,
-            yards: line.yards,
-            receiptEmail: email,
-            paymentMethod: selectedPayment,
-          }),
-        });
-        const data = await res.json();
-        if (!res.ok || !data?.success) {
-          setSellError(`${line.sku}: ${data?.error || 'Failed to complete sale'}`);
-          return;
-        }
+      const res = await fetch('/api/fabric/sale', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: pending.map(line => ({ sku: line.sku, yards: line.yards })),
+          receiptEmail: email,
+          paymentMethod: selectedPayment,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        setSellError(data?.error || 'Failed to complete sale');
+        return;
+      }
 
-        const newQty = Number(data.newYards);
+      const updatedBySku = new Map<string, number>(
+        Array.isArray(data?.items)
+          ? data.items
+              .map((item: { sku?: unknown; newYards?: unknown }) => [
+                String(item?.sku ?? ''),
+                Number(item?.newYards),
+              ])
+              .filter(
+                (entry: [string, number]) => entry[0].length > 0 && Number.isFinite(entry[1])
+              )
+          : []
+      );
+
+      if (updatedBySku.size > 0) {
         setFabric(prev =>
-          prev.map(f => (f.sku === line.sku ? { ...f, current_quantity: newQty } : f))
+          prev.map(f =>
+            updatedBySku.has(f.sku)
+              ? { ...f, current_quantity: updatedBySku.get(f.sku) as number }
+              : f
+          )
         );
+      }
 
-        if (data.emailSent === false && data.emailError) {
-          setSellError(`Sale completed but receipt email failed: ${data.emailError}`);
-          return;
-        }
+      if (data.emailSent === false && data.emailError) {
+        setSellError(`Sale completed but receipt email failed: ${data.emailError}`);
+        return;
       }
 
       // Ready for next scan quickly
@@ -491,7 +520,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
       setReceiptEmail('');
       setPaymentOpen(false);
       setSelectedPayment(null);
-      setTimeout(() => scanInputRef.current?.focus(), 0);
+      focusScanInput(true);
       router.refresh();
     } catch (err: unknown) {
       const message =
@@ -1113,6 +1142,12 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
                 ref={scanInputRef}
                 value={scanValue}
                 onChange={e => setScanValue(e.target.value.toUpperCase())}
+                onFocus={e => {
+                  if (e.currentTarget.value) e.currentTarget.select();
+                }}
+                onClick={e => {
+                  if (e.currentTarget.value) e.currentTarget.select();
+                }}
                 onKeyDown={e => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
@@ -1131,6 +1166,21 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
               >
                 Scan
               </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  setScanValue('');
+                  setScannedFabric(null);
+                  setScanError(null);
+                  focusScanInput(false);
+                }}
+                aria-label="Clear scanner input"
+                title="Clear"
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </div>
             {scanError && (
               <p className="text-sm text-destructive bg-destructive/10 p-2 rounded">{scanError}</p>
@@ -1141,68 +1191,68 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
                 <div className="text-sm font-semibold">Current fabric</div>
                 {scannedFabric ? (
                   <>
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-semibold">{scannedFabric.name || scannedFabric.sku}</p>
-                      <p className="text-sm text-muted-foreground">
-                        SKU: <span className="font-mono">{scannedFabric.sku}</span>
-                        {(() => {
-                          const p = parseFabricSku(scannedFabric.sku);
-                          return p.ok ? ` • ${formatBoltLabel(p.boltIndex)}` : '';
-                        })()}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        In stock: {scannedFabric.current_quantity ?? '—'}
-                      </p>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold">{scannedFabric.name || scannedFabric.sku}</p>
+                        <p className="text-sm text-muted-foreground">
+                          SKU: <span className="font-mono">{scannedFabric.sku}</span>
+                          {(() => {
+                            const p = parseFabricSku(scannedFabric.sku);
+                            return p.ok ? ` • ${formatBoltLabel(p.boltIndex)}` : '';
+                          })()}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          In stock: {scannedFabric.current_quantity ?? '—'}
+                        </p>
+                      </div>
+                      {scannedFabric.photo_url && (
+                        <button
+                          type="button"
+                          onClick={() => setLightboxUrl(scannedFabric.photo_url)}
+                          className="relative w-16 h-16 rounded overflow-hidden bg-muted block cursor-zoom-in"
+                          aria-label="View photo larger"
+                        >
+                          <Image
+                            src={scannedFabric.photo_url}
+                            alt={scannedFabric.name || scannedFabric.sku}
+                            fill
+                            className="object-cover"
+                          />
+                        </button>
+                      )}
                     </div>
-                    {scannedFabric.photo_url && (
-                      <button
-                        type="button"
-                        onClick={() => setLightboxUrl(scannedFabric.photo_url)}
-                        className="relative w-16 h-16 rounded overflow-hidden bg-muted block cursor-zoom-in"
-                        aria-label="View photo larger"
-                      >
-                        <Image
-                          src={scannedFabric.photo_url}
-                          alt={scannedFabric.name || scannedFabric.sku}
-                          fill
-                          className="object-cover"
-                        />
-                      </button>
-                    )}
-                  </div>
 
-                  <div className="grid grid-cols-2 gap-3 items-end">
-                    <div>
-                      <Label htmlFor="sellQty">Yards</Label>
-                      <Input
-                        id="sellQty"
-                        type="number"
-                        step="1"
-                        min="1"
-                        value={sellQuantity}
-                        onChange={e => setSellQuantity(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <Label>Price</Label>
-                      <div className="h-10 flex items-center rounded-md border px-3 text-sm">
-                        {scannedFabric.sell_price != null
-                          ? `$${Number(scannedFabric.sell_price).toFixed(2)}`
-                          : '—'}
+                    <div className="grid grid-cols-2 gap-3 items-end">
+                      <div>
+                        <Label htmlFor="sellQty">Yards</Label>
+                        <Input
+                          id="sellQty"
+                          type="number"
+                          step="1"
+                          min="1"
+                          value={sellQuantity}
+                          onChange={e => setSellQuantity(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <Label>Price</Label>
+                        <div className="h-10 flex items-center rounded-md border px-3 text-sm">
+                          {scannedFabric.sell_price != null
+                            ? `$${Number(scannedFabric.sell_price).toFixed(2)}`
+                            : '—'}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={addCurrentToTransaction}
-                    >
-                      Add to purchase
-                    </Button>
-                  </div>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={addCurrentToTransaction}
+                      >
+                        Add to purchase
+                      </Button>
+                    </div>
 
                     <div className="pt-2 border-t border-border/60">
                       <div className="flex items-center justify-between">
