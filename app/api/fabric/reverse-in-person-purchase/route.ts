@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     const { data: purchase, error: purchaseError } = await supabaseAdmin
       .from('in_person_purchases')
       .select(
-        'id, reversed, sku, quantity, inventory_after, inventory_before'
+        'id, reversed, sku, quantity, inventory_after, inventory_before, sale_lines'
       )
       .eq('id', purchaseId)
       .maybeSingle();
@@ -53,29 +53,82 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Already reversed' }, { status: 409 });
     }
 
-    const restoreQuantity = Number(purchase.quantity);
-    const currentShouldBe = purchase.inventory_after;
-    if (!Number.isFinite(restoreQuantity) || currentShouldBe == null) {
+    type SaleLineSnapshot = {
+      sku: string;
+      yards: number;
+      inventory_after: number;
+    };
+    const saleLinesRaw = Array.isArray(purchase.sale_lines) ? purchase.sale_lines : [];
+    const saleLines: SaleLineSnapshot[] = saleLinesRaw
+      .map((line: any) => ({
+        sku: String(line?.sku ?? '').trim(),
+        yards: Number(line?.yards),
+        inventory_after: Number(line?.inventory_after),
+      }))
+      .filter(
+        (line: SaleLineSnapshot) =>
+          line.sku.length > 0 &&
+          Number.isFinite(line.yards) &&
+          line.yards > 0 &&
+          Number.isFinite(line.inventory_after)
+      );
+
+    // Backward compatibility: older rows had one sku+quantity snapshot only.
+    const linesToReverse: SaleLineSnapshot[] =
+      saleLines.length > 0
+        ? saleLines
+        : (() => {
+            const restoreQuantity = Number(purchase.quantity);
+            const currentShouldBe = Number(purchase.inventory_after);
+            if (!purchase.sku || !Number.isFinite(restoreQuantity) || !Number.isFinite(currentShouldBe)) {
+              return [];
+            }
+            return [{ sku: purchase.sku, yards: restoreQuantity, inventory_after: currentShouldBe }];
+          })();
+
+    if (linesToReverse.length === 0) {
       return NextResponse.json({ error: 'Invalid purchase record' }, { status: 500 });
     }
 
-    // Restore inventory only if current quantity still matches what it was after the sale.
-    // This prevents double-reversal or reversing after another sale changed the quantity.
-    const newQty = Number(currentShouldBe) + restoreQuantity;
+    // Pre-check all lines before mutating inventory.
+    for (const line of linesToReverse) {
+      const { data: fabricRow, error: fabricError } = await supabaseAdmin
+        .from('fabric')
+        .select('current_quantity')
+        .eq('sku', line.sku)
+        .maybeSingle();
 
-    const { error: invUpdateError, data: invUpdateData } = await supabaseAdmin
-      .from('fabric')
-      .update({ current_quantity: newQty })
-      .eq('sku', purchase.sku)
-      .eq('current_quantity', currentShouldBe)
-      .select('sku,current_quantity')
-      .maybeSingle();
+      if (fabricError || !fabricRow) {
+        return NextResponse.json(
+          { error: `Unable to verify inventory for ${line.sku}` },
+          { status: 409 }
+        );
+      }
+      if (Number(fabricRow.current_quantity) !== Number(line.inventory_after)) {
+        return NextResponse.json(
+          { error: 'Inventory mismatch; cannot safely reverse this sale' },
+          { status: 409 }
+        );
+      }
+    }
 
-    if (invUpdateError || !invUpdateData) {
-      return NextResponse.json(
-        { error: 'Inventory mismatch; cannot safely reverse this sale' },
-        { status: 409 }
-      );
+    // Restore each SKU line using optimistic match against expected current quantity.
+    for (const line of linesToReverse) {
+      const newQty = Number(line.inventory_after) + Number(line.yards);
+      const { error: invUpdateError, data: invUpdateData } = await supabaseAdmin
+        .from('fabric')
+        .update({ current_quantity: newQty })
+        .eq('sku', line.sku)
+        .eq('current_quantity', line.inventory_after)
+        .select('sku,current_quantity')
+        .maybeSingle();
+
+      if (invUpdateError || !invUpdateData) {
+        return NextResponse.json(
+          { error: 'Inventory mismatch; cannot safely reverse this sale' },
+          { status: 409 }
+        );
+      }
     }
 
     const { data: updated, error: updateError } = await supabaseAdmin
