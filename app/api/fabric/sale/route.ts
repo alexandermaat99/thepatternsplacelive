@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
             sku: sanitizeString(String(it?.sku ?? ''), 64).trim(),
             yards: Number(it?.yards ?? it?.quantity),
           }))
-          .filter(it => it.sku && Number.isFinite(it.yards) && it.yards > 0)
+          .filter((it: { sku: string; yards: number }) => it.sku && Number.isFinite(it.yards) && it.yards > 0)
       : [{ sku, yards }];
 
     if (requestedItems.length === 0) {
