@@ -53,6 +53,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Already reversed' }, { status: 409 });
     }
 
+    const EPSILON = 1e-6;
+    const almostEqual = (a: number, b: number) => Math.abs(a - b) <= EPSILON;
+
     type SaleLineSnapshot = {
       sku: string;
       yards: number;
@@ -90,6 +93,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid purchase record' }, { status: 500 });
     }
 
+    // If sale_lines is missing, this purchase was created by a previous version and may represent
+    // a multi-item transaction. In that case we cannot reliably restore every SKU.
+    if (saleLines.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            'This sale is a multi-item transaction without per-line snapshots (`sale_lines`), so it cannot be safely reversed. Run the updated migration before making new sales.',
+        },
+        { status: 409 }
+      );
+    }
+
     // Pre-check all lines before mutating inventory.
     for (const line of linesToReverse) {
       const { data: fabricRow, error: fabricError } = await supabaseAdmin
@@ -104,7 +119,7 @@ export async function POST(req: NextRequest) {
           { status: 409 }
         );
       }
-      if (Number(fabricRow.current_quantity) !== Number(line.inventory_after)) {
+      if (!almostEqual(Number(fabricRow.current_quantity), Number(line.inventory_after))) {
         return NextResponse.json(
           { error: 'Inventory mismatch; cannot safely reverse this sale' },
           { status: 409 }
@@ -119,7 +134,9 @@ export async function POST(req: NextRequest) {
         .from('fabric')
         .update({ current_quantity: newQty })
         .eq('sku', line.sku)
-        .eq('current_quantity', line.inventory_after)
+        // Use range match to tolerate numeric rounding drift.
+        .gte('current_quantity', Number(line.inventory_after) - EPSILON)
+        .lte('current_quantity', Number(line.inventory_after) + EPSILON)
         .select('sku,current_quantity')
         .maybeSingle();
 

@@ -28,6 +28,7 @@ export default async function AdminInPersonPurchasesPage() {
         payment_method,
         inventory_before,
         inventory_after,
+        sale_lines,
         email_sent,
         email_error,
         reversed,

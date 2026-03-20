@@ -20,6 +20,13 @@ export interface InPersonPurchaseRow {
   reversed: boolean;
   reversed_at: string | null;
   name: string | null;
+  sale_lines?: Array<{
+    sku?: string;
+    name?: string | null;
+    yards?: number;
+    inventory_before?: number;
+    inventory_after?: number;
+  }> | null;
 }
 
 function formatCurrency(amount: number) {
@@ -40,6 +47,31 @@ export function InPersonPurchasesTable({ purchases }: { purchases: InPersonPurch
     } catch {
       return iso;
     }
+  };
+
+  const getDisplayLines = (purchase: InPersonPurchaseRow) => {
+    const raw = Array.isArray(purchase.sale_lines) ? purchase.sale_lines : [];
+    const lines = raw
+      .map(line => ({
+        sku: String(line?.sku ?? '').trim(),
+        name: line?.name ?? null,
+        yards: Number(line?.yards),
+        inventoryBefore: Number(line?.inventory_before),
+        inventoryAfter: Number(line?.inventory_after),
+      }))
+      .filter(line => line.sku && Number.isFinite(line.yards) && line.yards > 0);
+
+    if (lines.length > 0) return lines;
+
+    return [
+      {
+        sku: purchase.sku,
+        name: purchase.name,
+        yards: Number(purchase.quantity),
+        inventoryBefore: Number(purchase.inventory_before),
+        inventoryAfter: Number(purchase.inventory_after),
+      },
+    ];
   };
 
   const handleReverse = async (purchaseId: string) => {
@@ -96,15 +128,37 @@ export function InPersonPurchasesTable({ purchases }: { purchases: InPersonPurch
           </tr>
         </thead>
         <tbody>
-          {purchases.map(p => (
+          {purchases.map(p => {
+            const lines = getDisplayLines(p);
+            return (
             <tr
               key={p.id}
               className="border-b last:border-0 hover:bg-muted/50 transition-colors align-top"
             >
               <td className="py-2 text-muted-foreground whitespace-nowrap">{formatShortDate(p.created_at)}</td>
-              <td className="py-2 font-medium whitespace-nowrap">{p.sku}</td>
-              <td className="py-2 font-medium hidden sm:table-cell">{p.name}</td>
-              <td className="py-2 text-muted-foreground whitespace-nowrap">{p.quantity}</td>
+              <td className="py-2 font-medium whitespace-nowrap">
+                <div className="space-y-1">
+                  {lines.map((line, idx) => (
+                    <div key={`${p.id}-sku-${idx}`} className="font-mono">
+                      {line.sku}
+                    </div>
+                  ))}
+                </div>
+              </td>
+              <td className="py-2 font-medium hidden sm:table-cell">
+                <div className="space-y-1">
+                  {lines.map((line, idx) => (
+                    <div key={`${p.id}-name-${idx}`}>{line.name || line.sku}</div>
+                  ))}
+                </div>
+              </td>
+              <td className="py-2 text-muted-foreground whitespace-nowrap">
+                <div className="space-y-1">
+                  {lines.map((line, idx) => (
+                    <div key={`${p.id}-qty-${idx}`}>{line.yards}</div>
+                  ))}
+                </div>
+              </td>
               <td className="py-2 font-medium whitespace-nowrap">{formatCurrency(p.total_amount)}</td>
               <td className="py-2 text-muted-foreground hidden sm:table-cell whitespace-nowrap">
                 {p.payment_method ? p.payment_method.toUpperCase() : '—'}
@@ -112,10 +166,16 @@ export function InPersonPurchasesTable({ purchases }: { purchases: InPersonPurch
               <td className="py-2 hidden md:table-cell">
                 <div className="max-w-[220px] truncate">{p.receipt_email}</div>
               </td>
-              <td className="py-2 text-muted-foreground hidden md:table-cell whitespace-nowrap">
-                {p.inventory_before} → {p.inventory_after}
+              <td className="py-2 text-muted-foreground hidden md:table-cell">
+                <div className="space-y-1 whitespace-nowrap">
+                  {lines.map((line, idx) => (
+                    <div key={`${p.id}-inv-${idx}`} className="font-mono">
+                      {line.inventoryBefore} → {line.inventoryAfter}
+                    </div>
+                  ))}
+                </div>
                 {p.reversed && p.reversed_at ? (
-                  <div className="text-[10px] text-rose-600 mt-1">
+                  <div className="text-[10px] text-rose-600 mt-1 whitespace-normal">
                     Reversed ({new Date(p.reversed_at).toLocaleDateString()})
                   </div>
                 ) : null}
@@ -146,7 +206,8 @@ export function InPersonPurchasesTable({ purchases }: { purchases: InPersonPurch
                 </button>
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>

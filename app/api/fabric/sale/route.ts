@@ -132,6 +132,10 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      // Use the DB-returned value for the post-sale snapshot to avoid numeric rounding drift.
+      const inventoryAfterFromDb = updatedRows[0]?.current_quantity;
+      const inventoryAfterNumber = Number(inventoryAfterFromDb);
+
       const unitPrice = fabric.sell_price != null ? Number(fabric.sell_price) : 0;
       lines.push({
         sku: fabric.sku,
@@ -140,7 +144,7 @@ export async function POST(req: NextRequest) {
         unitPrice,
         lineTotal: unitPrice * item.yards,
         inventoryBefore: Number(currentQty),
-        inventoryAfter: newQty,
+        inventoryAfter: Number.isFinite(inventoryAfterNumber) ? inventoryAfterNumber : newQty,
       });
     }
 
