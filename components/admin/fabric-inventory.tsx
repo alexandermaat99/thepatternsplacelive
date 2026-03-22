@@ -53,6 +53,8 @@ type FabricCardGroup = {
   photo_url: string | null;
   name: string | null;
   sell_price: number | null;
+  /** Inches; from representative bolt, else first bolt with width set. */
+  width: number | null;
 };
 
 type SaleLineItem = {
@@ -191,6 +193,10 @@ export function FabricInventory({
         representative?.sell_price ??
         sortedBolts.find(b => b.sell_price != null)?.sell_price ??
         null;
+      const width =
+        representative?.width != null
+          ? representative.width
+          : sortedBolts.find(b => b.width != null)?.width ?? null;
 
       return {
         baseSku,
@@ -201,6 +207,7 @@ export function FabricInventory({
         photo_url,
         name,
         sell_price: sell_price != null ? Number(sell_price) : null,
+        width,
       };
     });
 
@@ -991,6 +998,7 @@ export function FabricInventory({
                               {group.name ?? '—'}
                             </div>
                             <div className="mt-1 text-xs text-white/90">
+                              {group.width != null ? `${group.width}" • ` : ''}
                               {group.boltCount} bolts • {yardageText} yd
                             </div>
                             <div className="mt-1 text-sm font-medium text-white">{priceText}</div>
