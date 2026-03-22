@@ -64,6 +64,7 @@ export function FabricCatalogGrid({ rows }: { rows: FabricCatalogRow[] }) {
                     fill
                     className="object-cover"
                     sizes="(max-width: 1023px) 50vw, (max-width: 1279px) 33vw, 25vw"
+                    quality={85}
                     priority={priority}
                     decoding="async"
                   />

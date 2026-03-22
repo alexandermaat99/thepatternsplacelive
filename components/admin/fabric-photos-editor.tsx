@@ -9,13 +9,12 @@ import {
   DialogTitle,
   DialogClose,
 } from '@/components/ui/dialog';
-import { compressImage } from '@/lib/image-compression';
+import { prepareFabricPhotoForUpload } from '@/lib/fabric-photo-compression';
 import { uploadFabricImageToStorage } from '@/lib/fabric-photo-storage';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { ChevronDown, ChevronUp, Image as ImageIcon, X } from 'lucide-react';
 import Image from 'next/image';
 
-const MAX_UPLOAD_MB = 5;
 const MAX_INPUT_MB = 15;
 
 interface FabricPhotosEditorProps {
@@ -48,22 +47,16 @@ export function FabricPhotosEditor({ urls, onChange, userId, onUploadingChange }
     }
 
     setUploading(true);
-    setStatus('Compressing...');
-    let fileToUpload = file;
-    if (file.size > MAX_UPLOAD_MB * 1024 * 1024) {
-      try {
-        fileToUpload = await compressImage(file, {
-          maxSizeMB: 2,
-          maxWidthOrHeight: 1920,
-          useWebWorker: false,
-        });
-      } catch (err) {
-        console.error('Compression error:', err);
-        setStatus(null);
-        setUploading(false);
-        alert('Failed to compress image. Try a smaller file.');
-        return;
-      }
+    setStatus('Optimizing...');
+    let fileToUpload: File;
+    try {
+      fileToUpload = await prepareFabricPhotoForUpload(file);
+    } catch (err) {
+      console.error('Compression error:', err);
+      setStatus(null);
+      setUploading(false);
+      alert('Failed to process image. Try a smaller file.');
+      return;
     }
     setStatus('Uploading...');
 
