@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Instagram } from 'lucide-react';
 import { Navigation } from '@/components/navigation';
 import { Footer } from '@/components/footer';
 import { Button } from '@/components/ui/button';
@@ -41,8 +41,17 @@ export default async function FabricCatalogPage() {
           <header className="space-y-2 max-w-2xl">
             <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">In-stock fabric</h1>
             <p className="text-muted-foreground">
-              Current yardage and pricing per bolt. Inventory updates regularly; visit or call to
-              confirm before you make a special trip.
+              Current yardage and price per yard. Currently only selling in person in the Utah
+              Valley area. Follow us on Instagram{' '}
+              <Link
+                href="https://www.instagram.com/thepatternsplace/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-primary hover:underline"
+              >
+                @thepatternsplace
+              </Link>{' '}
+              for updates on when we're selling in person!
             </p>
           </header>
         </div>
