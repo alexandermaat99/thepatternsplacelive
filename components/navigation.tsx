@@ -13,7 +13,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Menu, X, ShoppingBag, Package, Home, Info } from 'lucide-react';
+import { Menu, X, ShoppingBag, Package, Home, Info, Layers } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 
 interface NavigationProps {
@@ -107,6 +107,12 @@ export function Navigation({ showMarketplaceLinks = false }: NavigationProps) {
                         <span>Sell</span>
                       </AuthLink>
                     </DropdownMenuItem>
+                    <DropdownMenuItem asChild onClick={() => setIsMenuOpen(false)}>
+                      <Link href="/fabric" className="flex items-center">
+                        <Layers className="mr-2 h-4 w-4" />
+                        <span>Fabric</span>
+                      </Link>
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
 
@@ -123,6 +129,12 @@ export function Navigation({ showMarketplaceLinks = false }: NavigationProps) {
                       <Package className="h-4 w-4" />
                       <span>Sell</span>
                     </AuthLink>
+                  </Button>
+                  <Button asChild variant="ghost" size="sm">
+                    <Link href="/fabric" className="flex items-center gap-2">
+                      <Layers className="h-4 w-4" />
+                      <span>Fabric</span>
+                    </Link>
                   </Button>
                 </div>
               </>

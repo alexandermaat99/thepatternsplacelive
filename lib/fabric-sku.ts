@@ -47,3 +47,10 @@ export function formatBoltLabel(boltIndex: number) {
   return `Bolt ${boltIndex + 1}`;
 }
 
+/** SKUs to query for a base fabric (bolt 0 + up to 9 extra bolts). */
+export function boltSkuCandidatesForBase(baseSku: string): string[] {
+  const out = [baseSku];
+  for (let i = 1; i <= 9; i++) out.push(`${baseSku}${i}`);
+  return out;
+}
+

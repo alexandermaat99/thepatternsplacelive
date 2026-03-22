@@ -59,6 +59,14 @@ export function Footer() {
                   Difficulty Levels
                 </Link>
               </li>
+              <li>
+                <Link
+                  href="/fabric"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  In-stock fabric
+                </Link>
+              </li>
             </ul>
           </div>
 

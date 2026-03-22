@@ -9,8 +9,8 @@ import {
   DialogTitle,
   DialogClose,
 } from '@/components/ui/dialog';
-import { createClient } from '@/lib/supabase/client';
 import { compressImage } from '@/lib/image-compression';
+import { uploadFabricImageToStorage } from '@/lib/fabric-photo-storage';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { X, Image as ImageIcon } from 'lucide-react';
 import Image from 'next/image';
@@ -24,8 +24,6 @@ interface FabricPhotoUploadProps {
   userId: string;
   onUploadingChange?: (uploading: boolean) => void;
 }
-
-const BUCKET = 'fabric-photos';
 
 export function FabricPhotoUpload({
   value,
@@ -87,23 +85,13 @@ export function FabricPhotoUpload({
     reader.readAsDataURL(fileToUpload);
 
     try {
-      const supabase = createClient();
-      const fileExt = fileToUpload.name.split('.').pop() || 'jpg';
-      const fileName = `fabric/${userId}/${Date.now()}.${fileExt}`;
-
-      const { data, error } = await supabase.storage
-        .from(BUCKET)
-        .upload(fileName, fileToUpload, { cacheControl: '3600', upsert: false });
-
-      if (error) {
-        console.error('Upload error:', error);
-        alert('Failed to upload image. Please try again.');
+      const result = await uploadFabricImageToStorage(fileToUpload, userId);
+      if ('error' in result) {
+        alert(result.error);
         setPreview(null);
         return;
       }
-
-      const { data: { publicUrl } } = supabase.storage.from(BUCKET).getPublicUrl(data.path);
-      onChange(publicUrl);
+      onChange(result.publicUrl);
     } catch (err) {
       console.error('Upload error:', err);
       alert('Failed to upload image. Please try again.');

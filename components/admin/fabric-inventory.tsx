@@ -16,7 +16,7 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
-import { FabricPhotoUpload } from '@/components/admin/fabric-photo-upload';
+import { FabricPhotosEditor } from '@/components/admin/fabric-photos-editor';
 import type { Fabric } from '@/types/fabric';
 import { formatBoltLabel, parseFabricSku } from '@/lib/fabric-sku';
 import { Plus, Pencil, Ruler, Trash2, X, CopyPlus, ScanLine } from 'lucide-react';
@@ -25,6 +25,8 @@ import venmoQrCode from '@/assets/venmoCode.png';
 
 interface FabricInventoryProps {
   initialFabric: Fabric[];
+  /** Ordered gallery URLs keyed by base SKU (from `fabric_photos`). */
+  initialFabricPhotosByBase?: Record<string, string[]>;
   userId: string;
 }
 
@@ -61,7 +63,11 @@ type SaleLineItem = {
   unitPrice: number;
 };
 
-export function FabricInventory({ initialFabric, userId }: FabricInventoryProps) {
+export function FabricInventory({
+  initialFabric,
+  initialFabricPhotosByBase = {},
+  userId,
+}: FabricInventoryProps) {
   const router = useRouter();
   const [fabric, setFabric] = useState<Fabric[]>(initialFabric);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -70,6 +76,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
+  const [galleryUrls, setGalleryUrls] = useState<string[]>([]);
   const [deleteConfirm, setDeleteConfirm] = useState<{ sku: string; name: string | null } | null>(
     null
   );
@@ -175,7 +182,10 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
       })[0];
 
       const photo_url =
-        representative?.photo_url ?? sortedBolts.find(b => b.photo_url)?.photo_url ?? null;
+        initialFabricPhotosByBase[baseSku]?.[0] ??
+        representative?.photo_url ??
+        sortedBolts.find(b => b.photo_url)?.photo_url ??
+        null;
       const name = representative?.name ?? sortedBolts.find(b => b.name)?.name ?? null;
       const sell_price =
         representative?.sell_price ??
@@ -196,7 +206,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
 
     result.sort((a, b) => a.baseSku.localeCompare(b.baseSku));
     return result;
-  }, [filteredFabric]);
+  }, [filteredFabric, initialFabricPhotosByBase]);
 
   const sellTotal = useMemo(() => {
     if (!scannedFabric?.sell_price) return null;
@@ -223,6 +233,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
   const openAdd = () => {
     setEditingSku(null);
     setForm(emptyForm);
+    setGalleryUrls([]);
     setError(null);
     setPhotoUploading(false);
     setDialogOpen(true);
@@ -231,13 +242,32 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
   const openAddWithPreset = (preset: Partial<typeof emptyForm>) => {
     setEditingSku(null);
     setForm({ ...emptyForm, ...preset });
+    setGalleryUrls(preset.photo_url ? [preset.photo_url] : []);
     setError(null);
     setPhotoUploading(false);
     setDialogOpen(true);
   };
 
-  const openEdit = (row: Fabric) => {
+  const openEdit = async (row: Fabric) => {
     setEditingSku(row.sku);
+    const parsed = parseFabricSku(row.sku);
+    const baseSku = parsed.ok ? parsed.baseSku : row.sku;
+
+    const supabase = createClient();
+    const { data: photos } = await supabase
+      .from('fabric_photos')
+      .select('photo_url')
+      .eq('base_sku', baseSku)
+      .order('sort_order', { ascending: true });
+
+    const urls =
+      photos && photos.length > 0
+        ? photos.map(p => p.photo_url)
+        : row.photo_url
+          ? [row.photo_url]
+          : [];
+    setGalleryUrls(urls);
+
     setForm({
       sku: row.sku,
       name: row.name ?? '',
@@ -249,7 +279,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
       purchase_quantity: row.purchase_quantity != null ? String(row.purchase_quantity) : '',
       buy_price: row.buy_price != null ? String(row.buy_price) : '',
       sell_price: row.sell_price != null ? String(row.sell_price) : '',
-      photo_url: row.photo_url,
+      photo_url: urls[0] ?? null,
     });
     setError(null);
     setPhotoUploading(false);
@@ -553,6 +583,7 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
         return;
       }
 
+      const primaryPhoto = galleryUrls[0] ?? null;
       const row = {
         sku: parsed.normalizedSku,
         name: form.name.trim() || null,
@@ -564,12 +595,33 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
         purchase_quantity: form.purchase_quantity ? Number(form.purchase_quantity) : null,
         buy_price: form.buy_price ? Number(form.buy_price) : null,
         sell_price: form.sell_price ? Number(form.sell_price) : null,
-        photo_url: form.photo_url,
+        photo_url: primaryPhoto,
+      };
+
+      const syncGalleryForBase = async () => {
+        const { error: delErr } = await supabase
+          .from('fabric_photos')
+          .delete()
+          .eq('base_sku', parsed.baseSku);
+        if (delErr) throw delErr;
+        if (galleryUrls.length > 0) {
+          const { error: insErr } = await supabase.from('fabric_photos').insert(
+            galleryUrls.map((url, i) => ({
+              base_sku: parsed.baseSku,
+              photo_url: url,
+              sort_order: i,
+            }))
+          );
+          if (insErr) throw insErr;
+        }
+        const { error: photoErr } = await supabase
+          .from('fabric')
+          .update({ photo_url: primaryPhoto })
+          .ilike('sku', `${parsed.baseSku}%`);
+        if (photoErr) throw photoErr;
       };
 
       if (editingSku) {
-        // Update the bolt you're editing (everything except photo),
-        // then propagate photo_url across all bolts for the same fabric base SKU.
         const { error: updateError } = await supabase
           .from('fabric')
           .update({
@@ -587,28 +639,16 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
 
         if (updateError) throw updateError;
 
-        if (parsed.ok) {
-          const { error: photoError } = await supabase
-            .from('fabric')
-            .update({ photo_url: row.photo_url })
-            // baseSku includes the last-3 digits; bolts share that prefix
-            .ilike('sku', `${parsed.baseSku}%`);
+        await syncGalleryForBase();
 
-          if (photoError) throw photoError;
-        }
-
-        const baseSku = parsed.ok ? parsed.baseSku : null;
+        const baseSku = parsed.baseSku;
         setFabric(prev =>
           prev.map(f => {
-            // Bolt-specific updates
             if (f.sku === editingSku) return { ...f, ...row, sku: f.sku };
 
-            // Photo applies across same base SKU
-            if (baseSku) {
-              const parsedExisting = parseFabricSku(f.sku);
-              if (parsedExisting.ok && parsedExisting.baseSku === baseSku) {
-                return { ...f, photo_url: row.photo_url };
-              }
+            const parsedExisting = parseFabricSku(f.sku);
+            if (parsedExisting.ok && parsedExisting.baseSku === baseSku) {
+              return { ...f, photo_url: primaryPhoto };
             }
 
             return f;
@@ -628,6 +668,9 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
         }
         const { error: insertError } = await supabase.from('fabric').insert(row);
         if (insertError) throw insertError;
+
+        await syncGalleryForBase();
+
         setFabric(prev => [{ ...row, created_at: new Date().toISOString() } as Fabric, ...prev]);
       }
       setDialogOpen(false);
@@ -653,6 +696,23 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
       const supabase = createClient();
       const { error: err } = await supabase.from('fabric').delete().eq('sku', deleteConfirm.sku);
       if (err) throw err;
+
+      const parsed = parseFabricSku(deleteConfirm.sku);
+      if (parsed.ok) {
+        const othersSameBase = fabric.filter(f => {
+          if (f.sku === deleteConfirm.sku) return false;
+          const p = parseFabricSku(f.sku);
+          return p.ok && p.baseSku === parsed.baseSku;
+        });
+        if (othersSameBase.length === 0) {
+          const { error: phErr } = await supabase
+            .from('fabric_photos')
+            .delete()
+            .eq('base_sku', parsed.baseSku);
+          if (phErr) throw phErr;
+        }
+      }
+
       setFabric(prev => prev.filter(f => f.sku !== deleteConfirm.sku));
       setDeleteConfirm(null);
       router.refresh();
@@ -681,6 +741,12 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
         .in('sku', deleteGroupConfirm.skus);
 
       if (err) throw err;
+
+      const { error: phErr } = await supabase
+        .from('fabric_photos')
+        .delete()
+        .eq('base_sku', deleteGroupConfirm.baseSku);
+      if (phErr) throw phErr;
 
       setFabric(prev => prev.filter(f => !deleteGroupConfirm.skus.includes(f.sku)));
       setDeleteGroupConfirm(null);
@@ -1058,9 +1124,12 @@ export function FabricInventory({ initialFabric, userId }: FabricInventoryProps)
                 />
               </div>
             </div>
-            <FabricPhotoUpload
-              value={form.photo_url}
-              onChange={url => setForm(f => ({ ...f, photo_url: url }))}
+            <FabricPhotosEditor
+              urls={galleryUrls}
+              onChange={urls => {
+                setGalleryUrls(urls);
+                setForm(f => ({ ...f, photo_url: urls[0] ?? null }));
+              }}
               userId={userId}
               onUploadingChange={setPhotoUploading}
             />

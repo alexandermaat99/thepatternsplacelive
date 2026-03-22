@@ -19,9 +19,28 @@ export default async function AdminFabricPage() {
     console.error('Error fetching fabric:', error);
   }
 
+  const initialFabricPhotosByBase: Record<string, string[]> = {};
+  const { data: photoRows, error: photosError } = await supabase
+    .from('fabric_photos')
+    .select('base_sku, photo_url, sort_order')
+    .order('base_sku', { ascending: true })
+    .order('sort_order', { ascending: true });
+
+  if (photosError) {
+    console.error('Error fetching fabric_photos:', photosError);
+  } else {
+    for (const r of photoRows ?? []) {
+      if (!initialFabricPhotosByBase[r.base_sku]) {
+        initialFabricPhotosByBase[r.base_sku] = [];
+      }
+      initialFabricPhotosByBase[r.base_sku].push(r.photo_url);
+    }
+  }
+
   return (
     <FabricInventory
       initialFabric={fabric ?? []}
+      initialFabricPhotosByBase={initialFabricPhotosByBase}
       userId={authData.user.id}
     />
   );
