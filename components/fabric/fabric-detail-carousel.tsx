@@ -1,24 +1,38 @@
 'use client';
 
 import Image from 'next/image';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+
+/** Indices to keep in the DOM so prev/next slides are often already cached (retail-style carousel behavior). */
+function neighborIndices(center: number, count: number): number[] {
+  if (count <= 1) return [center];
+  const next = (center + 1) % count;
+  const prev = (center - 1 + count) % count;
+  return [...new Set([center, next, prev])];
+}
 
 export function FabricDetailCarousel({ urls, alt }: { urls: string[]; alt: string }) {
   const [index, setIndex] = useState(0);
   const [imageReady, setImageReady] = useState(false);
   const prevActiveUrlRef = useRef<string | null>(null);
+  const loadedUrlsRef = useRef<Set<string>>(new Set());
   const n = urls.length;
   const activeUrl = urls[index];
+  const preloadIndices = useMemo(() => neighborIndices(index, n), [index, n]);
 
   const prev = useCallback(() => setIndex(i => (i - 1 + n) % n), [n]);
   const next = useCallback(() => setIndex(i => (i + 1) % n), [n]);
 
   useEffect(() => {
     if (prevActiveUrlRef.current !== null && prevActiveUrlRef.current !== activeUrl) {
-      setImageReady(false);
+      if (loadedUrlsRef.current.has(activeUrl)) {
+        setImageReady(true);
+      } else {
+        setImageReady(false);
+      }
     }
     prevActiveUrlRef.current = activeUrl;
   }, [activeUrl]);
@@ -30,19 +44,34 @@ export function FabricDetailCarousel({ urls, alt }: { urls: string[]; alt: strin
       className="relative aspect-[4/5] w-full max-w-xl mx-auto lg:mx-0 rounded-lg border border-border bg-muted overflow-hidden group"
       aria-busy={!imageReady}
     >
-      <Image
-        key={activeUrl}
-        src={activeUrl}
-        alt={n > 1 ? `${alt} — photo ${index + 1} of ${n}` : alt}
-        fill
-        className="object-cover"
-        sizes="(max-width: 1024px) 100vw, 50vw"
-        quality={85}
-        priority
-        decoding="async"
-        onLoadingComplete={() => setImageReady(true)}
-        onError={() => setImageReady(true)}
-      />
+      {preloadIndices.map(i => {
+        const isActive = i === index;
+        return (
+          <Image
+            key={urls[i]}
+            src={urls[i]}
+            alt={isActive ? (n > 1 ? `${alt} — photo ${i + 1} of ${n}` : alt) : ''}
+            fill
+            className={cn(
+              'object-cover transition-opacity duration-200 absolute inset-0',
+              isActive ? 'z-[1] opacity-100' : 'pointer-events-none z-0 opacity-0'
+            )}
+            sizes="(max-width: 1024px) 100vw, 50vw"
+            quality={85}
+            priority={i === 0}
+            decoding="async"
+            aria-hidden={!isActive}
+            onLoadingComplete={() => {
+              loadedUrlsRef.current.add(urls[i]);
+              if (i === index) setImageReady(true);
+            }}
+            onError={() => {
+              loadedUrlsRef.current.add(urls[i]);
+              if (i === index) setImageReady(true);
+            }}
+          />
+        );
+      })}
       <div
         className={cn(
           'absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-muted/70 backdrop-blur-[1px] transition-opacity duration-200',
