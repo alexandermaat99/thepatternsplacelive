@@ -104,15 +104,6 @@ export function FabricDetailView({ fabric }: { fabric: FabricPublicDetail }) {
               </ul>
             </section>
           ) : null}
-
-          {fabric.description?.trim() ? (
-            <section className="space-y-2">
-              <h2 className="text-lg font-semibold">Details</h2>
-              <p className="text-muted-foreground whitespace-pre-wrap leading-relaxed">
-                {fabric.description.trim()}
-              </p>
-            </section>
-          ) : null}
         </div>
       </div>
     </div>
