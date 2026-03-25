@@ -6,7 +6,7 @@ export default function AdminBarcodesPage() {
       <h1 className="text-2xl font-bold mb-4">Fabric Barcodes</h1>
       <p className="text-muted-foreground mb-6">
         Generate CODE128 barcodes that scan as SKUs. Optionally show each fabric&apos;s name on the label
-        for reference.
+        for reference. Download individual PNGs or a single US Letter PDF with multiple labels per page.
       </p>
       <BarcodeGenerator />
     </div>

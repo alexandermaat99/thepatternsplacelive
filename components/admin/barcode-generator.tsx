@@ -2,13 +2,14 @@
 
 import { useMemo, useState } from 'react';
 import JsBarcode from 'jsbarcode';
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { createClient } from '@/lib/supabase/client';
-import { Barcode, Download, RefreshCw } from 'lucide-react';
+import { Barcode, Download, FileDown, RefreshCw } from 'lucide-react';
 
 const TEXT_STRIP_WIDTH = 44;
 const BARCODE_OPTIONS = {
@@ -55,6 +56,61 @@ function flushUI(): Promise<void> {
   return new Promise(resolve => {
     requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
   });
+}
+
+/** US Letter in PDF points (72 pt/in). */
+const LETTER_W = 612;
+const LETTER_H = 792;
+const PDF_MARGIN = 36;
+const PDF_COL_GAP = 14;
+const PDF_ROW_GAP = 18;
+const PDF_COLS = 2;
+const PDF_CAPTION_SIZE = 8;
+const PDF_CAPTION_LEADING = 10;
+/** Keep each barcode image from dominating vertical space. */
+const PDF_MAX_IMAGE_H = 108;
+
+/**
+ * Decode a canvas data URL to PNG bytes without `fetch`.
+ * `fetch(data:...)` often fails with "Failed to fetch" under CSP or in some browsers.
+ */
+function dataUrlToUint8Array(dataUrl: string): Uint8Array {
+  const comma = dataUrl.indexOf(',');
+  if (comma === -1) throw new Error('Invalid data URL');
+  const header = dataUrl.slice(0, comma);
+  const body = dataUrl.slice(comma + 1);
+  if (header.includes(';base64')) {
+    const binary = atob(body);
+    const out = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      out[i] = binary.charCodeAt(i);
+    }
+    return out;
+  }
+  const decoded = decodeURIComponent(body);
+  const out = new Uint8Array(decoded.length);
+  for (let i = 0; i < decoded.length; i += 1) {
+    out[i] = decoded.charCodeAt(i);
+  }
+  return out;
+}
+
+function wrapLines(text: string, maxChars: number): string[] {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  const lines: string[] = [];
+  let line = '';
+  for (const w of words) {
+    const next = line ? `${line} ${w}` : w;
+    if (next.length <= maxChars) {
+      line = next;
+    } else {
+      if (line) lines.push(line);
+      line = w.length > maxChars ? `${w.slice(0, maxChars - 1)}…` : w;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
 }
 
 /** Bars and the vertical strip both use the SKU only. */
@@ -108,6 +164,7 @@ export function BarcodeGenerator() {
   const [error, setError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isPdfExporting, setIsPdfExporting] = useState(false);
   const parsedCount = useMemo(() => parseValues(inputValue).length, [inputValue]);
 
   const generate = async () => {
@@ -228,6 +285,114 @@ export function BarcodeGenerator() {
     }
   };
 
+  const exportLetterPdf = async () => {
+    if (!items.length) return;
+    setIsPdfExporting(true);
+    await flushUI();
+    try {
+      const pdfDoc = await PDFDocument.create();
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const innerW = LETTER_W - 2 * PDF_MARGIN;
+      const cellW = (innerW - PDF_COL_GAP) / PDF_COLS;
+
+      const pngImages = await Promise.all(
+        items.map(item => pdfDoc.embedPng(dataUrlToUint8Array(item.dataUrl)))
+      );
+
+      let page = pdfDoc.addPage([LETTER_W, LETTER_H]);
+      let rowTopY = LETTER_H - PDF_MARGIN;
+      let i = 0;
+
+      while (i < items.length) {
+        const remaining = items.length - i;
+        const rowCount = Math.min(PDF_COLS, remaining);
+        const rowIndices = Array.from({ length: rowCount }, (_, k) => i + k);
+
+        const placed = rowIndices.map(idx => {
+          const png = pngImages[idx];
+          let scale = (cellW - 8) / png.width;
+          if (png.height * scale > PDF_MAX_IMAGE_H) {
+            scale = PDF_MAX_IMAGE_H / png.height;
+          }
+          const drawW = png.width * scale;
+          const drawH = png.height * scale;
+          const caption = items[idx].displayLabel;
+          const maxChars = Math.max(12, Math.floor(cellW / (PDF_CAPTION_SIZE * 0.55)));
+          const captionLines = wrapLines(caption, maxChars);
+          const captionH =
+            captionLines.length > 0 ? captionLines.length * PDF_CAPTION_LEADING + 4 : 0;
+          return { idx, png, drawW, drawH, captionLines, captionH };
+        });
+
+        const rowImageH = Math.max(...placed.map(p => p.drawH));
+        const rowCaptionH = Math.max(...placed.map(p => p.captionH));
+        const rowH = rowImageH + rowCaptionH;
+        const minBottom = PDF_MARGIN;
+        const pageTopY = LETTER_H - PDF_MARGIN;
+        const rowFitsFromCurrentTop = rowTopY - rowH >= minBottom;
+        const rowTallerThanFullPage = rowH > pageTopY - minBottom;
+
+        if (!rowFitsFromCurrentTop && !rowTallerThanFullPage) {
+          page = pdfDoc.addPage([LETTER_W, LETTER_H]);
+          rowTopY = pageTopY;
+          continue;
+        }
+        /** If row is taller than one page, still draw from the top of the current page (rare). */
+        if (rowTallerThanFullPage && rowTopY < pageTopY - 0.5) {
+          page = pdfDoc.addPage([LETTER_W, LETTER_H]);
+          rowTopY = pageTopY;
+        }
+
+        for (let c = 0; c < placed.length; c += 1) {
+          const p = placed[c];
+          const cellLeft = PDF_MARGIN + c * (cellW + PDF_COL_GAP);
+          const imgX = cellLeft + (cellW - p.drawW) / 2;
+          const imgBottom = rowTopY - p.drawH;
+          page.drawImage(p.png, {
+            x: imgX,
+            y: imgBottom,
+            width: p.drawW,
+            height: p.drawH,
+          });
+
+          let capY = imgBottom - 6;
+          for (const line of p.captionLines) {
+            capY -= PDF_CAPTION_LEADING;
+            const textW = font.widthOfTextAtSize(line, PDF_CAPTION_SIZE);
+            const textX = cellLeft + (cellW - textW) / 2;
+            page.drawText(line, {
+              x: Math.max(cellLeft, textX),
+              y: capY,
+              size: PDF_CAPTION_SIZE,
+              font,
+              color: rgb(0.15, 0.15, 0.15),
+              maxWidth: cellW,
+            });
+          }
+        }
+
+        i += rowCount;
+        rowTopY -= rowH + PDF_ROW_GAP;
+      }
+
+      const bytes = await pdfDoc.save();
+      const blob = new Blob([bytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const stamp = new Date().toISOString().slice(0, 10);
+      a.download = `fabric-barcodes-${stamp}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(
+        `Could not build PDF: ${e instanceof Error ? e.message : String(e)}`
+      );
+    } finally {
+      setIsPdfExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -290,6 +455,15 @@ export function BarcodeGenerator() {
             <Button type="button" variant="outline" onClick={downloadPng} disabled={!items.length || isDownloading}>
               <Download className="h-4 w-4 mr-2" />
               {isDownloading ? 'Downloading...' : 'Download PNGs'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void exportLetterPdf()}
+              disabled={!items.length || isPdfExporting || isDownloading}
+            >
+              <FileDown className="h-4 w-4 mr-2" />
+              {isPdfExporting ? 'Building PDF…' : 'Letter PDF'}
             </Button>
             <Button
               type="button"

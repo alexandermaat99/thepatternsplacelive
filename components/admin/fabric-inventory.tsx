@@ -19,7 +19,7 @@ import {
 import { FabricPhotosEditor } from '@/components/admin/fabric-photos-editor';
 import type { Fabric } from '@/types/fabric';
 import { formatBoltLabel, parseFabricSku } from '@/lib/fabric-sku';
-import { Plus, Pencil, Ruler, Trash2, X, CopyPlus, ScanLine } from 'lucide-react';
+import { Download, Plus, Pencil, Ruler, Trash2, X, CopyPlus, ScanLine } from 'lucide-react';
 import Image from 'next/image';
 import venmoQrCode from '@/assets/venmoCode.png';
 
@@ -65,6 +65,38 @@ type SaleLineItem = {
   unitPrice: number;
 };
 
+function fileExtFromImageUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    const m = u.pathname.match(/\.(jpe?g|png|webp|gif)$/i);
+    if (m) return m[0].toLowerCase();
+  } catch {
+    /* ignore */
+  }
+  return '.jpg';
+}
+
+/** Save remote image; on CORS/network failure open URL in a new tab. */
+async function downloadImageUrl(url: string, filename: string): Promise<void> {
+  try {
+    const res = await fetch(url, { mode: 'cors' });
+    if (!res.ok) throw new Error(String(res.status));
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(objectUrl);
+  } catch {
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.click();
+  }
+}
+
 export function FabricInventory({
   initialFabric,
   initialFabricPhotosByBase = {},
@@ -96,6 +128,8 @@ export function FabricInventory({
   const [selectedFabricGroup, setSelectedFabricGroup] = useState<FabricCardGroup | null>(null);
   const [showAllBoltDetails, setShowAllBoltDetails] = useState(false);
   const [detailsToRestore, setDetailsToRestore] = useState<FabricCardGroup | null>(null);
+  const [fabricDetailImagesBusy, setFabricDetailImagesBusy] = useState(false);
+  const [fabricDetailImagesError, setFabricDetailImagesError] = useState<string | null>(null);
 
   // Market scan flow (barcode scanners usually type SKU + Enter)
   const [marketOpen, setMarketOpen] = useState(false);
@@ -214,6 +248,21 @@ export function FabricInventory({
     result.sort((a, b) => a.baseSku.localeCompare(b.baseSku));
     return result;
   }, [filteredFabric, initialFabricPhotosByBase]);
+
+  const detailImageCountHint = useMemo(() => {
+    if (!selectedFabricGroup) return 0;
+    const base = selectedFabricGroup.baseSku;
+    const seen = new Set<string>();
+    for (const u of initialFabricPhotosByBase[base] ?? []) {
+      const t = u?.trim();
+      if (t) seen.add(t);
+    }
+    for (const b of selectedFabricGroup.bolts) {
+      const t = b.photo_url?.trim();
+      if (t) seen.add(t);
+    }
+    return seen.size;
+  }, [selectedFabricGroup, initialFabricPhotosByBase]);
 
   const sellTotal = useMemo(() => {
     if (!scannedFabric?.sell_price) return null;
@@ -769,6 +818,66 @@ export function FabricInventory({
       setDeleteGroupError(message);
     } finally {
       setDeletingGroup(false);
+    }
+  };
+
+  const downloadFabricGroupImages = async () => {
+    if (!selectedFabricGroup) return;
+    setFabricDetailImagesError(null);
+    setFabricDetailImagesBusy(true);
+    try {
+      const supabase = createClient();
+      const baseSku = selectedFabricGroup.baseSku;
+      const { data: photoRows, error: photoErr } = await supabase
+        .from('fabric_photos')
+        .select('photo_url, sort_order')
+        .eq('base_sku', baseSku)
+        .order('sort_order');
+      if (photoErr) throw photoErr;
+
+      const seen = new Set<string>();
+      const urls: string[] = [];
+      for (const row of photoRows ?? []) {
+        const u = row.photo_url?.trim();
+        if (u && !seen.has(u)) {
+          seen.add(u);
+          urls.push(u);
+        }
+      }
+      for (const b of selectedFabricGroup.bolts) {
+        const u = b.photo_url?.trim();
+        if (u && !seen.has(u)) {
+          seen.add(u);
+          urls.push(u);
+        }
+      }
+
+      if (urls.length === 0) {
+        setFabricDetailImagesError('No images are linked to this fabric yet.');
+        return;
+      }
+
+      const safeBase = baseSku.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 80);
+      for (let i = 0; i < urls.length; i += 1) {
+        const u = urls[i];
+        const ext = fileExtFromImageUrl(u);
+        const filename =
+          urls.length === 1
+            ? `${safeBase}${ext}`
+            : `${safeBase}_${String(i + 1).padStart(2, '0')}${ext}`;
+        await downloadImageUrl(u, filename);
+        if (i < urls.length - 1) {
+          await new Promise<void>(resolve => {
+            setTimeout(resolve, 200);
+          });
+        }
+      }
+    } catch (e) {
+      setFabricDetailImagesError(
+        e instanceof Error ? e.message : 'Could not load image list for download.'
+      );
+    } finally {
+      setFabricDetailImagesBusy(false);
     }
   };
 
@@ -1564,6 +1673,7 @@ export function FabricInventory({
           if (!open) {
             setSelectedFabricGroup(null);
             setShowAllBoltDetails(false);
+            setFabricDetailImagesError(null);
           }
         }}
       >
@@ -1596,10 +1706,48 @@ export function FabricInventory({
                     )}
                   </div>
 
+                  <div className="space-y-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full bg-transparent border-white/20 text-white hover:bg-white/10"
+                      onClick={() => void downloadFabricGroupImages()}
+                      disabled={fabricDetailImagesBusy}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      {fabricDetailImagesBusy
+                        ? 'Downloading…'
+                        : detailImageCountHint > 1
+                          ? `Download images (${detailImageCountHint})`
+                          : detailImageCountHint === 1
+                            ? 'Download image'
+                            : 'Download images'}
+                    </Button>
+                    {fabricDetailImagesError ? (
+                      <p className="text-xs text-amber-200/90">{fabricDetailImagesError}</p>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="text-white pr-0 md:pr-10">
+                  <div className="flex items-start justify-between gap-3 pt-1">
+                    <div className="min-w-0">
+                      <div className="text-xs font-mono text-white/70">
+                        Base SKU: {selectedFabricGroup.baseSku}
+                      </div>
+                      <div className="text-2xl font-semibold leading-tight">
+                        {selectedFabricGroup.name || selectedFabricGroup.baseSku}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="text-xs text-white/70">BOLTS</div>
+                      <div className="text-xl font-semibold">{selectedFabricGroup.boltCount}</div>
+                    </div>
+                  </div>
                   <Button
                     type="button"
                     variant="outline"
-                    className="w-full bg-transparent border-white/20 text-white hover:bg-white/10"
+                    className="mt-3 w-full bg-rose-400 text-white border-rose-400 hover:bg-rose-500 hover:text-white hover:border-rose-500"
                     onClick={() => {
                       const representative =
                         selectedFabricGroup.bolts.find(
@@ -1624,22 +1772,41 @@ export function FabricInventory({
                   >
                     New sale
                   </Button>
-                </div>
 
-                <div className="text-white pr-0 md:pr-10">
-                  <div className="flex items-start justify-between gap-3 pt-1">
-                    <div>
-                      <div className="text-xs font-mono text-white/70">
-                        Base SKU: {selectedFabricGroup.baseSku}
-                      </div>
-                      <div className="text-2xl font-semibold leading-tight">
-                        {selectedFabricGroup.name || selectedFabricGroup.baseSku}
+                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="rounded-xl bg-white/5 border border-white/10 p-3">
+                      <div className="text-xs text-white/70">YARDAGE LEFT</div>
+                      <div className="text-lg font-semibold">
+                        {selectedFabricGroup.hasQuantity
+                          ? selectedFabricGroup.yardageLeft.toFixed(
+                              Number.isInteger(selectedFabricGroup.yardageLeft) ? 0 : 2
+                            )
+                          : '—'}{' '}
+                        yd
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-xs text-white/70">BOLTS</div>
-                      <div className="text-xl font-semibold">{selectedFabricGroup.boltCount}</div>
-                      <div className="mt-3 flex items-center justify-end gap-2">
+                    <div className="rounded-xl bg-white/5 border border-white/10 p-3">
+                      <div className="text-xs text-white/70">Price (per yd)</div>
+                      <div className="text-lg font-semibold">
+                        {selectedFabricGroup.sell_price != null
+                          ? `$${selectedFabricGroup.sell_price.toFixed(2)}/yd`
+                          : '—'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 mb-2">
+                      <div className="text-sm font-semibold text-white/90">Bolts</div>
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="bg-transparent border-white/20 text-white hover:bg-white/10"
+                          onClick={() => setShowAllBoltDetails(v => !v)}
+                        >
+                          {showAllBoltDetails ? 'Show less' : 'View all details'}
+                        </Button>
                         <Button
                           type="button"
                           variant="outline"
@@ -1671,42 +1838,6 @@ export function FabricInventory({
                           Delete
                         </Button>
                       </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="rounded-xl bg-white/5 border border-white/10 p-3">
-                      <div className="text-xs text-white/70">YARDAGE LEFT</div>
-                      <div className="text-lg font-semibold">
-                        {selectedFabricGroup.hasQuantity
-                          ? selectedFabricGroup.yardageLeft.toFixed(
-                              Number.isInteger(selectedFabricGroup.yardageLeft) ? 0 : 2
-                            )
-                          : '—'}{' '}
-                        yd
-                      </div>
-                    </div>
-                    <div className="rounded-xl bg-white/5 border border-white/10 p-3">
-                      <div className="text-xs text-white/70">Price (per yd)</div>
-                      <div className="text-lg font-semibold">
-                        {selectedFabricGroup.sell_price != null
-                          ? `$${selectedFabricGroup.sell_price.toFixed(2)}/yd`
-                          : '—'}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-4">
-                    <div className="flex items-center justify-between gap-3 mb-2">
-                      <div className="text-sm font-semibold text-white/90">Bolts</div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="bg-transparent border-white/20 text-white hover:bg-white/10"
-                        onClick={() => setShowAllBoltDetails(v => !v)}
-                      >
-                        {showAllBoltDetails ? 'Show less' : 'View all details'}
-                      </Button>
                     </div>
                     <div className="overflow-x-auto rounded-xl border border-white/10">
                       <table className="w-full text-sm">
