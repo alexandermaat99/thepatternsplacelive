@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { createClient } from '@/lib/supabase/server';
 import { COMPANY_INFO } from '@/lib/company-info';
+import {
+  buyPriceMapFromFabricRows,
+  expandSkusForBuyPriceLookup,
+  resolveBuyPricePerYard,
+} from '@/lib/in-person-purchase-cost';
 import { sanitizeString, validateEmail } from '@/lib/security/input-validation';
 
 function formatMoney(amount: number) {
@@ -16,7 +21,9 @@ export async function POST(req: NextRequest) {
     // New name: yards. Backward compatible with older clients that send `quantity`.
     const yards = Number(body?.yards ?? body?.quantity);
     const receiptEmail = sanitizeString(String(body?.receiptEmail ?? ''), 254).trim();
-    const paymentMethodRaw = String(body?.paymentMethod ?? '').trim().toLowerCase();
+    const paymentMethodRaw = String(body?.paymentMethod ?? '')
+      .trim()
+      .toLowerCase();
     const paymentMethod =
       paymentMethodRaw === 'venmo' || paymentMethodRaw === 'stripe' || paymentMethodRaw === 'cash'
         ? paymentMethodRaw
@@ -65,17 +72,26 @@ export async function POST(req: NextRequest) {
       yards: number;
       unitPrice: number;
       lineTotal: number;
+      buyPricePerYard: number | null;
+      lineCost: number | null;
       inventoryBefore: number;
       inventoryAfter: number;
     };
 
-    const requestedItems: Array<{ sku: string; yards: number }> = itemsRaw
+    const requestedItems: Array<{ sku: string; yards: number; unitPrice?: number }> = itemsRaw
       ? itemsRaw
           .map((it: any) => ({
             sku: sanitizeString(String(it?.sku ?? ''), 64).trim(),
             yards: Number(it?.yards ?? it?.quantity),
+            unitPrice:
+              it?.unitPrice != null || it?.unit_price != null
+                ? Number(it?.unitPrice ?? it?.unit_price)
+                : undefined,
           }))
-          .filter((it: { sku: string; yards: number }) => it.sku && Number.isFinite(it.yards) && it.yards > 0)
+          .filter(
+            (it: { sku: string; yards: number }) =>
+              it.sku && Number.isFinite(it.yards) && it.yards > 0
+          )
       : [{ sku, yards }];
 
     if (requestedItems.length === 0) {
@@ -85,11 +101,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const buyPriceLookupSkus = expandSkusForBuyPriceLookup(requestedItems.map(i => i.sku));
+    const { data: buyPriceRows, error: buyPriceError } = await supabase
+      .from('fabric')
+      .select('sku,buy_price')
+      .in('sku', buyPriceLookupSkus);
+    if (buyPriceError) throw buyPriceError;
+    const buyPriceBySku = buyPriceMapFromFabricRows(buyPriceRows || []);
+
     const lines: SaleLine[] = [];
     for (const item of requestedItems) {
       const { data: fabric, error: fabricError } = await supabase
         .from('fabric')
-        .select('sku,name,sell_price,current_quantity')
+        .select('sku,name,sell_price,buy_price,current_quantity')
         .eq('sku', item.sku)
         .maybeSingle();
 
@@ -136,13 +160,27 @@ export async function POST(req: NextRequest) {
       const inventoryAfterFromDb = updatedRows[0]?.current_quantity;
       const inventoryAfterNumber = Number(inventoryAfterFromDb);
 
-      const unitPrice = fabric.sell_price != null ? Number(fabric.sell_price) : 0;
+      const unitPriceFromClient = item.unitPrice;
+      const unitPrice =
+        unitPriceFromClient != null &&
+        Number.isFinite(unitPriceFromClient) &&
+        unitPriceFromClient >= 0
+          ? unitPriceFromClient
+          : fabric.sell_price != null
+            ? Number(fabric.sell_price)
+            : 0;
+      const buyPricePerYard = resolveBuyPricePerYard(fabric.sku, buyPriceBySku);
+      const lineCost =
+        buyPricePerYard != null ? buyPricePerYard * item.yards : null;
+
       lines.push({
         sku: fabric.sku,
         name: fabric.name,
         yards: item.yards,
         unitPrice,
         lineTotal: unitPrice * item.yards,
+        buyPricePerYard,
+        lineCost,
         inventoryBefore: Number(currentQty),
         inventoryAfter: Number.isFinite(inventoryAfterNumber) ? inventoryAfterNumber : newQty,
       });
@@ -150,12 +188,26 @@ export async function POST(req: NextRequest) {
 
     const totalYards = lines.reduce((sum, line) => sum + line.yards, 0);
     const totalAmount = lines.reduce((sum, line) => sum + line.lineTotal, 0);
+
+    let costAmount: number | null = 0;
+    for (const line of lines) {
+      if (line.lineCost == null) {
+        costAmount = null;
+        break;
+      }
+      costAmount += line.lineCost;
+    }
+    const profitAmount = costAmount != null ? totalAmount - costAmount : null;
+    const profitCalculationError =
+      costAmount == null ? 'Unable to calculate, need buy price.' : null;
     const avgUnitPrice = totalYards > 0 ? totalAmount / totalYards : 0;
     const inventoryBeforeSum = lines.reduce((sum, line) => sum + line.inventoryBefore, 0);
     const inventoryAfterSum = lines.reduce((sum, line) => sum + line.inventoryAfter, 0);
     const summarySku = lines[0].sku;
     const summaryName =
-      lines.length === 1 ? lines[0].name : `${lines[0].name || lines[0].sku} + ${lines.length - 1} more`;
+      lines.length === 1
+        ? lines[0].name
+        : `${lines[0].name || lines[0].sku} + ${lines.length - 1} more`;
 
     // Send receipt email (non-fatal if email fails)
     let emailSent = false;
@@ -266,12 +318,17 @@ export async function POST(req: NextRequest) {
           quantity: totalYards,
           unit_price: avgUnitPrice,
           total_amount: totalAmount,
+          cost_amount: costAmount,
+          profit_amount: profitAmount,
+          profit_calculation_error: profitCalculationError,
           sale_lines: lines.map(line => ({
             sku: line.sku,
             name: line.name,
             yards: line.yards,
             unit_price: line.unitPrice,
             line_total: line.lineTotal,
+            buy_price_per_yard: line.buyPricePerYard,
+            line_cost: line.lineCost,
             inventory_before: line.inventoryBefore,
             inventory_after: line.inventoryAfter,
           })),

@@ -61,8 +61,8 @@ type SaleLineItem = {
   sku: string;
   name: string | null;
   photoUrl: string | null;
-  yards: number;
-  unitPrice: number;
+  yards: string;
+  unitPrice: string;
 };
 
 function fileExtFromImageUrl(url: string): string {
@@ -137,6 +137,7 @@ export function FabricInventory({
   const [scanError, setScanError] = useState<string | null>(null);
   const [scannedFabric, setScannedFabric] = useState<Fabric | null>(null);
   const [sellQuantity, setSellQuantity] = useState<string>('1');
+  const [sellUnitPrice, setSellUnitPrice] = useState<string>('');
   const [receiptEmail, setReceiptEmail] = useState<string>('');
   const [transactionItems, setTransactionItems] = useState<SaleLineItem[]>([]);
   const [sellError, setSellError] = useState<string | null>(null);
@@ -265,14 +266,22 @@ export function FabricInventory({
   }, [selectedFabricGroup, initialFabricPhotosByBase]);
 
   const sellTotal = useMemo(() => {
-    if (!scannedFabric?.sell_price) return null;
+    const price = Number(sellUnitPrice);
+    if (!Number.isFinite(price) || price < 0) return null;
     const q = Number(sellQuantity);
     if (!Number.isFinite(q) || q <= 0) return null;
-    return Number(scannedFabric.sell_price) * q;
-  }, [scannedFabric?.sell_price, sellQuantity]);
+    return price * q;
+  }, [sellUnitPrice, sellQuantity]);
 
   const transactionTotal = useMemo(() => {
-    return transactionItems.reduce((sum, i) => sum + i.unitPrice * i.yards, 0);
+    return transactionItems.reduce((sum, i) => {
+      const yards = Number(i.yards);
+      const unitPrice = Number(i.unitPrice);
+      if (!Number.isFinite(yards) || !Number.isFinite(unitPrice) || yards <= 0 || unitPrice < 0) {
+        return sum;
+      }
+      return sum + unitPrice * yards;
+    }, 0);
   }, [transactionItems]);
 
   useEffect(() => {
@@ -389,6 +398,7 @@ export function FabricInventory({
     setScanError(null);
     setScannedFabric(null);
     setSellQuantity('1');
+    setSellUnitPrice('');
     setReceiptEmail('');
     setTransactionItems([]);
     setSellError(null);
@@ -403,6 +413,7 @@ export function FabricInventory({
     setSellError(null);
     setScannedFabric(null);
     setSellQuantity('1');
+    setSellUnitPrice('');
     // keep receiptEmail
 
     const parsed = parseFabricSku(sku);
@@ -424,7 +435,9 @@ export function FabricInventory({
         setScanError(`No fabric found for SKU ${parsed.normalizedSku}`);
         return;
       }
-      setScannedFabric(data as Fabric);
+      const row = data as Fabric;
+      setScannedFabric(row);
+      setSellUnitPrice(row.sell_price != null ? String(row.sell_price) : '');
       // Show payment options immediately after a successful scan
       setPaymentOpen(true);
     } catch (err: unknown) {
@@ -460,18 +473,29 @@ export function FabricInventory({
       return;
     }
 
-    const alreadyReserved = transactionItems.find(i => i.sku === scannedFabric.sku)?.yards ?? 0;
+    const alreadyReserved = Number(
+      transactionItems.find(i => i.sku === scannedFabric.sku)?.yards ?? 0
+    );
     if (q + alreadyReserved > Number(scannedFabric.current_quantity)) {
       setSellError('Not enough inventory for that many yards.');
       return;
     }
 
-    const unitPrice = scannedFabric.sell_price != null ? Number(scannedFabric.sell_price) : 0;
+    const unitPrice = Number(sellUnitPrice);
+    if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+      setSellError('Enter a valid price per yard.');
+      return;
+    }
     setTransactionItems(prev => {
       const idx = prev.findIndex(i => i.sku === scannedFabric.sku);
       if (idx >= 0) {
         const next = [...prev];
-        next[idx] = { ...next[idx], yards: next[idx].yards + q };
+        const existingYards = Number(next[idx].yards);
+        next[idx] = {
+          ...next[idx],
+          yards: String((Number.isFinite(existingYards) ? existingYards : 0) + q),
+          unitPrice: sellUnitPrice,
+        };
         return next;
       }
       return [
@@ -480,8 +504,8 @@ export function FabricInventory({
           sku: scannedFabric.sku,
           name: scannedFabric.name ?? null,
           photoUrl: scannedFabric.photo_url ?? null,
-          yards: q,
-          unitPrice,
+          yards: String(q),
+          unitPrice: sellUnitPrice,
         },
       ];
     });
@@ -489,6 +513,7 @@ export function FabricInventory({
     setScanValue('');
     setScannedFabric(null);
     setSellQuantity('1');
+    setSellUnitPrice('');
     setSellError(null);
     focusScanInput(true);
   };
@@ -511,10 +536,14 @@ export function FabricInventory({
   };
 
   const updateTransactionItemYards = (sku: string, rawValue: string) => {
-    const nextValue = Number(rawValue);
-    if (!Number.isFinite(nextValue)) return;
     setTransactionItems(prev =>
-      prev.map(item => (item.sku === sku ? { ...item, yards: nextValue } : item))
+      prev.map(item => (item.sku === sku ? { ...item, yards: rawValue } : item))
+    );
+  };
+
+  const updateTransactionItemUnitPrice = (sku: string, rawValue: string) => {
+    setTransactionItems(prev =>
+      prev.map(item => (item.sku === sku ? { ...item, unitPrice: rawValue } : item))
     );
   };
 
@@ -534,10 +563,16 @@ export function FabricInventory({
       return;
     }
 
-    // Validate edited line-item yardage before processing payment.
+    // Validate edited line-item yardage and price before processing payment.
     for (const line of pending) {
-      if (!Number.isFinite(line.yards) || line.yards <= 0) {
+      const yards = Number(line.yards);
+      const unitPrice = Number(line.unitPrice);
+      if (!Number.isFinite(yards) || yards <= 0) {
         setSellError(`Enter valid yards for ${line.sku}.`);
+        return;
+      }
+      if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+        setSellError(`Enter valid price for ${line.sku}.`);
         return;
       }
       const inventoryRow = fabric.find(f => f.sku === line.sku);
@@ -545,8 +580,8 @@ export function FabricInventory({
         setSellError(`Missing inventory for ${line.sku}.`);
         return;
       }
-      if (line.yards > Number(inventoryRow.current_quantity)) {
-        setSellError(`${line.sku}: not enough inventory for ${line.yards} yd.`);
+      if (yards > Number(inventoryRow.current_quantity)) {
+        setSellError(`${line.sku}: not enough inventory for ${yards} yd.`);
         return;
       }
     }
@@ -559,7 +594,11 @@ export function FabricInventory({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items: pending.map(line => ({ sku: line.sku, yards: line.yards })),
+          items: pending.map(line => ({
+            sku: line.sku,
+            yards: Number(line.yards),
+            unitPrice: Number(line.unitPrice),
+          })),
           receiptEmail: email,
           paymentMethod: selectedPayment,
         }),
@@ -603,6 +642,7 @@ export function FabricInventory({
       setScannedFabric(null);
       setTransactionItems([]);
       setSellQuantity('1');
+      setSellUnitPrice('');
       setReceiptEmail('');
       setPaymentOpen(false);
       setSelectedPayment(null);
@@ -1301,6 +1341,7 @@ export function FabricInventory({
             setScannedFabric(null);
             setScanValue('');
             setSellQuantity('1');
+            setSellUnitPrice('');
             setReceiptEmail('');
             setScanError(null);
             setSellError(null);
@@ -1359,6 +1400,7 @@ export function FabricInventory({
                 onClick={() => {
                   setScanValue('');
                   setScannedFabric(null);
+                  setSellUnitPrice('');
                   setScanError(null);
                   focusScanInput(false);
                 }}
@@ -1421,12 +1463,18 @@ export function FabricInventory({
                         />
                       </div>
                       <div>
-                        <Label>Price</Label>
-                        <div className="h-10 flex items-center rounded-md border px-3 text-sm">
-                          {scannedFabric.sell_price != null
-                            ? `$${Number(scannedFabric.sell_price).toFixed(2)}`
-                            : '—'}
-                        </div>
+                        <Label htmlFor="sellUnitPrice">Price ($/yd)</Label>
+                        <Input
+                          id="sellUnitPrice"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={sellUnitPrice}
+                          onChange={e => setSellUnitPrice(e.target.value)}
+                          onFocus={e => {
+                            if (e.currentTarget.value) e.currentTarget.select();
+                          }}
+                        />
                       </div>
                     </div>
                     <div className="flex justify-end gap-2">
@@ -1492,19 +1540,46 @@ export function FabricInventory({
                           </div>
                         </div>
                       </div>
-                      <div className="grid grid-cols-[3rem_auto_auto_auto] items-center gap-2 shrink-0">
+                      <div className="grid grid-cols-[3rem_auto_4rem_auto_auto] items-center gap-1.5 shrink-0">
                         <Input
                           type="number"
                           min="1"
                           step="1"
                           value={item.yards}
                           onChange={e => updateTransactionItemYards(item.sku, e.target.value)}
+                          onFocus={e => {
+                            if (e.currentTarget.value) e.currentTarget.select();
+                          }}
                           className="h-8 w-12 min-w-[3rem] px-1 text-center"
                           aria-label={`Yards for ${item.sku}`}
                         />
-                        <span className="text-xs text-muted-foreground">yd</span>
+                        <span className="text-xs text-muted-foreground">yd @</span>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={item.unitPrice}
+                          onChange={e => updateTransactionItemUnitPrice(item.sku, e.target.value)}
+                          onFocus={e => {
+                            if (e.currentTarget.value) e.currentTarget.select();
+                          }}
+                          className="h-8 w-16 min-w-[4rem] px-1 text-center"
+                          aria-label={`Price per yard for ${item.sku}`}
+                        />
                         <span className="text-xs sm:text-sm font-medium tabular-nums text-right min-w-[4rem]">
-                          ${(item.unitPrice * item.yards).toFixed(2)}
+                          {(() => {
+                            const yards = Number(item.yards);
+                            const unitPrice = Number(item.unitPrice);
+                            if (
+                              !Number.isFinite(yards) ||
+                              !Number.isFinite(unitPrice) ||
+                              yards <= 0 ||
+                              unitPrice < 0
+                            ) {
+                              return '—';
+                            }
+                            return `$${(unitPrice * yards).toFixed(2)}`;
+                          })()}
                         </span>
                         <Button
                           type="button"
@@ -1636,6 +1711,7 @@ export function FabricInventory({
                         setScanValue('');
                         setTransactionItems([]);
                         setSellQuantity('1');
+                        setSellUnitPrice('');
                         setReceiptEmail('');
                         setScanError(null);
                         setSellError(null);
@@ -1760,6 +1836,11 @@ export function FabricInventory({
                         setScannedFabric(representative);
                         setScanValue(representative.sku);
                         setSellQuantity('1');
+                        setSellUnitPrice(
+                          representative.sell_price != null
+                            ? String(representative.sell_price)
+                            : ''
+                        );
                         setReceiptEmail('');
                         setSellError(null);
                         setScanError(null);
