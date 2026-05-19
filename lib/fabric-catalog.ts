@@ -6,6 +6,11 @@ import {
   parseFabricSku,
 } from '@/lib/fabric-sku';
 
+/** True when total yardage is known and zero (all bolts sold through). */
+export function isFabricSoldOut(currentQuantity: number | null): boolean {
+  return currentQuantity != null && Number.isFinite(currentQuantity) && currentQuantity <= 0;
+}
+
 /** Public catalog fields only (no cost or internal notes). */
 export type FabricCatalogRow = {
   /** Base SKU — one card per fabric, even when multiple bolts exist. */

@@ -1,7 +1,8 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { Ruler } from 'lucide-react';
-import type { FabricCatalogRow } from '@/lib/fabric-catalog';
+import { isFabricSoldOut, type FabricCatalogRow } from '@/lib/fabric-catalog';
+import { cn } from '@/lib/utils';
 
 function formatPrice(value: number | null) {
   if (value == null || !Number.isFinite(value)) return '—';
@@ -48,13 +49,23 @@ export function FabricCatalogGrid({ rows }: { rows: FabricCatalogRow[] }) {
         const imageAlt = `${label} — SKU ${row.sku}`;
 
         const href = `/fabric/${encodeURIComponent(row.sku)}`;
+        const soldOut = isFabricSoldOut(row.current_quantity);
 
         return (
           <li key={row.sku} className="[content-visibility:auto] [contain-intrinsic-size:320px]">
             <Link
               href={href}
-              className="block h-full rounded-lg border border-border bg-card text-card-foreground shadow-sm overflow-hidden transition-shadow hover:shadow-md hover:border-primary/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
-              aria-label={`View details for ${label}, SKU ${row.sku}`}
+              className={cn(
+                'block h-full rounded-lg border border-border bg-card text-card-foreground shadow-sm overflow-hidden transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background',
+                soldOut
+                  ? 'opacity-[0.82] grayscale-[0.25] hover:opacity-90 hover:shadow-sm'
+                  : 'hover:shadow-md hover:border-primary/35'
+              )}
+              aria-label={
+                soldOut
+                  ? `${label}, SKU ${row.sku}, sold out`
+                  : `View details for ${label}, SKU ${row.sku}`
+              }
             >
               <div className="relative aspect-[4/5] w-full bg-muted">
                 {showImage ? (
@@ -74,9 +85,25 @@ export function FabricCatalogGrid({ rows }: { rows: FabricCatalogRow[] }) {
                     <span className="text-xs">Photo coming soon</span>
                   </div>
                 )}
+                {soldOut ? (
+                  <>
+                    <div
+                      className="absolute inset-0 z-10 bg-rose-950/15 pointer-events-none"
+                      aria-hidden
+                    />
+                    <span className="absolute left-2 top-2 z-20 rounded-md border border-rose-400/90 bg-rose-400 px-3.5 py-2 text-base font-semibold text-white shadow-md">
+                      Sold out
+                    </span>
+                  </>
+                ) : null}
               </div>
               <div className="p-3 sm:p-4 space-y-2">
-                <h2 className="font-semibold text-sm sm:text-base leading-snug line-clamp-2 min-h-[2.25rem] sm:min-h-[2.5rem]">
+                <h2
+                  className={cn(
+                    'font-semibold text-sm sm:text-base leading-snug line-clamp-2 min-h-[2.25rem] sm:min-h-[2.5rem]',
+                    soldOut && 'text-muted-foreground'
+                  )}
+                >
                   {row.name?.trim() || 'Unnamed fabric'}
                 </h2>
                 <dl className="grid grid-cols-[auto_1fr] gap-x-2 sm:gap-x-3 gap-y-1 text-xs sm:text-sm">
@@ -91,7 +118,9 @@ export function FabricCatalogGrid({ rows }: { rows: FabricCatalogRow[] }) {
                   <dt className="text-muted-foreground">Price / yd</dt>
                   <dd className="font-medium tabular-nums">{formatPrice(row.sell_price)}</dd>
                   <dt className="text-muted-foreground">Yards left</dt>
-                  <dd className="tabular-nums">{formatYards(row.current_quantity)}</dd>
+                  <dd className={cn('tabular-nums', soldOut && 'font-semibold text-rose-500')}>
+                    {soldOut ? 'Sold out' : formatYards(row.current_quantity)}
+                  </dd>
                 </dl>
               </div>
             </Link>

@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { ArrowLeft, Ruler } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import type { FabricPublicDetail } from '@/lib/fabric-catalog';
+import { isFabricSoldOut, type FabricPublicDetail } from '@/lib/fabric-catalog';
+import { cn } from '@/lib/utils';
 import { FabricDetailCarousel } from '@/components/fabric/fabric-detail-carousel';
 
 function formatPrice(value: number | null) {
@@ -39,6 +40,7 @@ export function FabricDetailView({ fabric }: { fabric: FabricPublicDetail }) {
   const title = fabric.name?.trim() || 'Unnamed fabric';
   const imageAlt = `${title} — SKU ${fabric.sku}`;
   const galleryUrls = fabric.photo_urls.filter((u): u is string => isPublicImageUrl(u));
+  const soldOut = isFabricSoldOut(fabric.current_quantity);
 
   return (
     <div className="space-y-8">
@@ -63,7 +65,19 @@ export function FabricDetailView({ fabric }: { fabric: FabricPublicDetail }) {
 
         <div className="space-y-6 min-w-0">
           <header className="space-y-2">
-            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">{title}</h1>
+            {soldOut ? (
+              <p className="inline-flex items-center rounded-md border border-rose-400/90 bg-rose-400 px-2.5 py-1 text-sm font-semibold text-white">
+                Sold out
+              </p>
+            ) : null}
+            <h1
+              className={cn(
+                'text-3xl sm:text-4xl font-bold tracking-tight',
+                soldOut && 'text-muted-foreground'
+              )}
+            >
+              {title}
+            </h1>
             <p className="font-mono text-sm text-muted-foreground break-all">
               {fabric.boltCount > 1 ? 'Base SKU ' : 'SKU '}
               {fabric.sku}
@@ -79,7 +93,9 @@ export function FabricDetailView({ fabric }: { fabric: FabricPublicDetail }) {
             <dt className="text-muted-foreground">Price / yd</dt>
             <dd className="font-semibold tabular-nums">{formatPrice(fabric.sell_price)}</dd>
             <dt className="text-muted-foreground">Total yards left</dt>
-            <dd className="tabular-nums">{formatYards(fabric.current_quantity)}</dd>
+            <dd className={cn('tabular-nums', soldOut && 'font-semibold text-rose-500')}>
+              {soldOut ? 'Sold out' : formatYards(fabric.current_quantity)}
+            </dd>
             <dt className="text-muted-foreground">Width</dt>
             <dd className="tabular-nums">{formatWidth(fabric.width)}</dd>
             <dt className="text-muted-foreground">Fiber</dt>
@@ -92,15 +108,31 @@ export function FabricDetailView({ fabric }: { fabric: FabricPublicDetail }) {
             <section className="space-y-2">
               <h2 className="text-lg font-semibold">Yardage by bolt</h2>
               <ul className="rounded-md border border-border divide-y divide-border text-sm">
-                {fabric.bolts.map(b => (
-                  <li key={b.sku} className="flex flex-wrap items-baseline justify-between gap-2 px-3 py-2">
-                    <span className="text-muted-foreground">
-                      {b.label}{' '}
-                      <span className="font-mono text-foreground/90">({b.sku})</span>
-                    </span>
-                    <span className="tabular-nums font-medium">{formatYards(b.current_quantity)}</span>
-                  </li>
-                ))}
+                {fabric.bolts.map(b => {
+                  const boltSoldOut = isFabricSoldOut(b.current_quantity);
+                  return (
+                    <li
+                      key={b.sku}
+                      className={cn(
+                        'flex flex-wrap items-baseline justify-between gap-2 px-3 py-2',
+                        boltSoldOut && 'bg-rose-50 dark:bg-rose-950/30'
+                      )}
+                    >
+                      <span className={cn('text-muted-foreground', boltSoldOut && 'text-rose-700/80 dark:text-rose-300/80')}>
+                        {b.label}{' '}
+                        <span className="font-mono text-foreground/90">({b.sku})</span>
+                      </span>
+                      <span
+                        className={cn(
+                          'tabular-nums font-medium',
+                          boltSoldOut && 'font-semibold text-rose-500'
+                        )}
+                      >
+                        {boltSoldOut ? 'Sold out' : formatYards(b.current_quantity)}
+                      </span>
+                    </li>
+                  );
+                })}
               </ul>
             </section>
           ) : null}
