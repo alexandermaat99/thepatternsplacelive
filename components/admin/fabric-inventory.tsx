@@ -57,15 +57,33 @@ type FabricCardGroup = {
   width: number | null;
 };
 
+type PriceMode = 'per_yard' | 'total';
+
 type SaleLineItem = {
   id: string;
   sku: string;
   name: string | null;
   photoUrl: string | null;
   yards: string;
-  unitPrice: string;
+  /** Entered amount: $/yd when priceMode is per_yard, or line total when total. */
+  priceAmount: string;
+  priceMode: PriceMode;
   custom: boolean;
 };
+
+const DEFAULT_RECEIPT_EMAIL = 'thepatternsplacemarketplace@gmail.com';
+
+function resolveLinePricing(yardsRaw: string, priceAmountRaw: string, priceMode: PriceMode) {
+  const yards = Number(yardsRaw);
+  const amount = Number(priceAmountRaw);
+  if (!Number.isFinite(yards) || yards <= 0 || !Number.isFinite(amount) || amount < 0) {
+    return null;
+  }
+  if (priceMode === 'total') {
+    return { yards, unitPrice: amount / yards, lineTotal: amount };
+  }
+  return { yards, unitPrice: amount, lineTotal: amount * yards };
+}
 
 function fileExtFromImageUrl(url: string): string {
   try {
@@ -139,7 +157,8 @@ export function FabricInventory({
   const [scanError, setScanError] = useState<string | null>(null);
   const [scannedFabric, setScannedFabric] = useState<Fabric | null>(null);
   const [sellQuantity, setSellQuantity] = useState<string>('1');
-  const [sellUnitPrice, setSellUnitPrice] = useState<string>('');
+  const [sellPriceAmount, setSellPriceAmount] = useState<string>('');
+  const [sellPriceMode, setSellPriceMode] = useState<PriceMode>('per_yard');
   const [receiptEmail, setReceiptEmail] = useState<string>('');
   const [transactionItems, setTransactionItems] = useState<SaleLineItem[]>([]);
   const [sellError, setSellError] = useState<string | null>(null);
@@ -149,7 +168,8 @@ export function FabricInventory({
   const [customItemOpen, setCustomItemOpen] = useState(false);
   const [customItemName, setCustomItemName] = useState('');
   const [customItemYards, setCustomItemYards] = useState('1');
-  const [customItemUnitPrice, setCustomItemUnitPrice] = useState('');
+  const [customItemPriceAmount, setCustomItemPriceAmount] = useState('');
+  const [customItemPriceMode, setCustomItemPriceMode] = useState<PriceMode>('total');
   const [customItemCounter, setCustomItemCounter] = useState(1);
   const scanInputRef = useRef<HTMLInputElement>(null);
 
@@ -273,21 +293,14 @@ export function FabricInventory({
   }, [selectedFabricGroup, initialFabricPhotosByBase]);
 
   const sellTotal = useMemo(() => {
-    const price = Number(sellUnitPrice);
-    if (!Number.isFinite(price) || price < 0) return null;
-    const q = Number(sellQuantity);
-    if (!Number.isFinite(q) || q <= 0) return null;
-    return price * q;
-  }, [sellUnitPrice, sellQuantity]);
+    const pricing = resolveLinePricing(sellQuantity, sellPriceAmount, sellPriceMode);
+    return pricing?.lineTotal ?? null;
+  }, [sellQuantity, sellPriceAmount, sellPriceMode]);
 
   const transactionTotal = useMemo(() => {
     return transactionItems.reduce((sum, i) => {
-      const yards = Number(i.yards);
-      const unitPrice = Number(i.unitPrice);
-      if (!Number.isFinite(yards) || !Number.isFinite(unitPrice) || yards <= 0 || unitPrice < 0) {
-        return sum;
-      }
-      return sum + unitPrice * yards;
+      const pricing = resolveLinePricing(i.yards, i.priceAmount, i.priceMode);
+      return sum + (pricing?.lineTotal ?? 0);
     }, 0);
   }, [transactionItems]);
 
@@ -405,7 +418,8 @@ export function FabricInventory({
     setScanError(null);
     setScannedFabric(null);
     setSellQuantity('1');
-    setSellUnitPrice('');
+    setSellPriceAmount('');
+    setSellPriceMode('per_yard');
     setReceiptEmail('');
     setTransactionItems([]);
     setSellError(null);
@@ -414,7 +428,8 @@ export function FabricInventory({
     setCustomItemOpen(false);
     setCustomItemName('');
     setCustomItemYards('1');
-    setCustomItemUnitPrice('');
+    setCustomItemPriceAmount('');
+    setCustomItemPriceMode('total');
     setCustomItemCounter(1);
   };
 
@@ -425,7 +440,8 @@ export function FabricInventory({
     setSellError(null);
     setScannedFabric(null);
     setSellQuantity('1');
-    setSellUnitPrice('');
+    setSellPriceAmount('');
+    setSellPriceMode('per_yard');
     // keep receiptEmail
 
     const parsed = parseFabricSku(sku);
@@ -449,7 +465,8 @@ export function FabricInventory({
       }
       const row = data as Fabric;
       setScannedFabric(row);
-      setSellUnitPrice(row.sell_price != null ? String(row.sell_price) : '');
+      setSellPriceAmount(row.sell_price != null ? String(row.sell_price) : '');
+      setSellPriceMode('per_yard');
       // Show payment options immediately after a successful scan
       setPaymentOpen(true);
     } catch (err: unknown) {
@@ -465,9 +482,9 @@ export function FabricInventory({
 
   const validateSaleInputs = (): boolean => {
     const email = receiptEmail.trim();
-    // quick client-side check; server validates too
-    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-      setSellError('Enter a valid email for the receipt.');
+    // Blank is allowed (server defaults to marketplace inbox).
+    if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      setSellError('Enter a valid email for the receipt, or leave blank.');
       return false;
     }
     return true;
@@ -475,9 +492,13 @@ export function FabricInventory({
 
   const addCurrentToTransaction = () => {
     if (!scannedFabric) return;
-    const q = Number(sellQuantity);
-    if (!Number.isFinite(q) || q <= 0) {
-      setSellError('Enter yards greater than 0.');
+    const pricing = resolveLinePricing(sellQuantity, sellPriceAmount, sellPriceMode);
+    if (!pricing) {
+      setSellError(
+        sellPriceMode === 'total'
+          ? 'Enter yards and a valid total price.'
+          : 'Enter yards and a valid price per yard.'
+      );
       return;
     }
     if (scannedFabric.current_quantity == null) {
@@ -488,25 +509,25 @@ export function FabricInventory({
     const alreadyReserved = Number(
       transactionItems.find(i => !i.custom && i.sku === scannedFabric.sku)?.yards ?? 0
     );
-    if (q + alreadyReserved > Number(scannedFabric.current_quantity)) {
+    if (pricing.yards + alreadyReserved > Number(scannedFabric.current_quantity)) {
       setSellError('Not enough inventory for that many yards.');
       return;
     }
 
-    const unitPrice = Number(sellUnitPrice);
-    if (!Number.isFinite(unitPrice) || unitPrice < 0) {
-      setSellError('Enter a valid price per yard.');
-      return;
-    }
     setTransactionItems(prev => {
       const idx = prev.findIndex(i => !i.custom && i.sku === scannedFabric.sku);
       if (idx >= 0) {
         const next = [...prev];
-        const existingYards = Number(next[idx].yards);
+        const existing = next[idx];
+        const existingYards = Number(existing.yards);
+        const mergedYards =
+          (Number.isFinite(existingYards) ? existingYards : 0) + pricing.yards;
+        // Keep the newly entered pricing mode/amount for the merged line.
         next[idx] = {
-          ...next[idx],
-          yards: String((Number.isFinite(existingYards) ? existingYards : 0) + q),
-          unitPrice: sellUnitPrice,
+          ...existing,
+          yards: String(mergedYards),
+          priceAmount: sellPriceAmount,
+          priceMode: sellPriceMode,
         };
         return next;
       }
@@ -517,8 +538,9 @@ export function FabricInventory({
           sku: scannedFabric.sku,
           name: scannedFabric.name ?? null,
           photoUrl: scannedFabric.photo_url ?? null,
-          yards: String(q),
-          unitPrice: sellUnitPrice,
+          yards: String(pricing.yards),
+          priceAmount: sellPriceAmount,
+          priceMode: sellPriceMode,
           custom: false,
         },
       ];
@@ -527,7 +549,8 @@ export function FabricInventory({
     setScanValue('');
     setScannedFabric(null);
     setSellQuantity('1');
-    setSellUnitPrice('');
+    setSellPriceAmount('');
+    setSellPriceMode('per_yard');
     setSellError(null);
     setPaymentOpen(true);
     focusScanInput(true);
@@ -539,14 +562,17 @@ export function FabricInventory({
       setSellError('Enter a name for the custom item.');
       return;
     }
-    const q = Number(customItemYards);
-    if (!Number.isFinite(q) || q <= 0) {
-      setSellError('Enter yards greater than 0.');
-      return;
-    }
-    const unitPrice = Number(customItemUnitPrice);
-    if (!Number.isFinite(unitPrice) || unitPrice < 0) {
-      setSellError('Enter a valid price per yard.');
+    const pricing = resolveLinePricing(
+      customItemYards,
+      customItemPriceAmount,
+      customItemPriceMode
+    );
+    if (!pricing) {
+      setSellError(
+        customItemPriceMode === 'total'
+          ? 'Enter yards and a valid total price.'
+          : 'Enter yards and a valid price per yard.'
+      );
       return;
     }
 
@@ -559,14 +585,16 @@ export function FabricInventory({
         sku,
         name,
         photoUrl: null,
-        yards: String(q),
-        unitPrice: customItemUnitPrice,
+        yards: String(pricing.yards),
+        priceAmount: customItemPriceAmount,
+        priceMode: customItemPriceMode,
         custom: true,
       },
     ]);
     setCustomItemName('');
     setCustomItemYards('1');
-    setCustomItemUnitPrice('');
+    setCustomItemPriceAmount('');
+    setCustomItemPriceMode('total');
     setCustomItemOpen(false);
     setSellError(null);
     setPaymentOpen(true);
@@ -596,9 +624,25 @@ export function FabricInventory({
     );
   };
 
-  const updateTransactionItemUnitPrice = (id: string, rawValue: string) => {
+  const updateTransactionItemPriceAmount = (id: string, rawValue: string) => {
     setTransactionItems(prev =>
-      prev.map(item => (item.id === id ? { ...item, unitPrice: rawValue } : item))
+      prev.map(item => (item.id === id ? { ...item, priceAmount: rawValue } : item))
+    );
+  };
+
+  const updateTransactionItemPriceMode = (id: string, priceMode: PriceMode) => {
+    setTransactionItems(prev =>
+      prev.map(item => {
+        if (item.id !== id || item.priceMode === priceMode) return item;
+        const pricing = resolveLinePricing(item.yards, item.priceAmount, item.priceMode);
+        if (!pricing) return { ...item, priceMode };
+        // Convert the entered amount so the line total stays the same when switching modes.
+        const nextAmount =
+          priceMode === 'total'
+            ? String(Number(pricing.lineTotal.toFixed(2)))
+            : String(Number(pricing.unitPrice.toFixed(4)));
+        return { ...item, priceMode, priceAmount: nextAmount };
+      })
     );
   };
 
@@ -624,20 +668,24 @@ export function FabricInventory({
       return;
     }
 
+    const resolvedItems: Array<{
+      sku: string;
+      name: string | null;
+      yards: number;
+      unitPrice: number;
+      lineTotal: number;
+      custom: boolean;
+    }> = [];
+
     // Validate edited line-item yardage and price before processing payment.
     for (const line of pending) {
-      const yards = Number(line.yards);
-      const unitPrice = Number(line.unitPrice);
       if (line.custom && !String(line.name ?? '').trim()) {
         setSellError('Enter a name for each custom item.');
         return;
       }
-      if (!Number.isFinite(yards) || yards <= 0) {
-        setSellError(`Enter valid yards for ${line.name || line.sku}.`);
-        return;
-      }
-      if (!Number.isFinite(unitPrice) || unitPrice < 0) {
-        setSellError(`Enter valid price for ${line.name || line.sku}.`);
+      const pricing = resolveLinePricing(line.yards, line.priceAmount, line.priceMode);
+      if (!pricing) {
+        setSellError(`Enter valid yards and price for ${line.name || line.sku}.`);
         return;
       }
       if (!line.custom) {
@@ -646,11 +694,19 @@ export function FabricInventory({
           setSellError(`Missing inventory for ${line.sku}.`);
           return;
         }
-        if (yards > Number(inventoryRow.current_quantity)) {
-          setSellError(`${line.sku}: not enough inventory for ${yards} yd.`);
+        if (pricing.yards > Number(inventoryRow.current_quantity)) {
+          setSellError(`${line.sku}: not enough inventory for ${pricing.yards} yd.`);
           return;
         }
       }
+      resolvedItems.push({
+        sku: line.sku,
+        name: line.name,
+        yards: pricing.yards,
+        unitPrice: pricing.unitPrice,
+        lineTotal: pricing.lineTotal,
+        custom: line.custom,
+      });
     }
 
     const email = receiptEmail.trim();
@@ -661,13 +717,7 @@ export function FabricInventory({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items: pending.map(line => ({
-            sku: line.sku,
-            name: line.name,
-            yards: Number(line.yards),
-            unitPrice: Number(line.unitPrice),
-            custom: line.custom,
-          })),
+          items: resolvedItems,
           receiptEmail: email,
           paymentMethod: selectedPayment,
         }),
@@ -711,14 +761,16 @@ export function FabricInventory({
       setScannedFabric(null);
       setTransactionItems([]);
       setSellQuantity('1');
-      setSellUnitPrice('');
+      setSellPriceAmount('');
+      setSellPriceMode('per_yard');
       setReceiptEmail('');
       setPaymentOpen(false);
       setSelectedPayment(null);
       setCustomItemOpen(false);
       setCustomItemName('');
       setCustomItemYards('1');
-      setCustomItemUnitPrice('');
+      setCustomItemPriceAmount('');
+      setCustomItemPriceMode('total');
       setCustomItemCounter(1);
       focusScanInput(true);
       router.refresh();
@@ -1415,7 +1467,8 @@ export function FabricInventory({
             setScannedFabric(null);
             setScanValue('');
             setSellQuantity('1');
-            setSellUnitPrice('');
+            setSellPriceAmount('');
+            setSellPriceMode('per_yard');
             setReceiptEmail('');
             setScanError(null);
             setSellError(null);
@@ -1425,7 +1478,8 @@ export function FabricInventory({
             setCustomItemOpen(false);
             setCustomItemName('');
             setCustomItemYards('1');
-            setCustomItemUnitPrice('');
+            setCustomItemPriceAmount('');
+            setCustomItemPriceMode('total');
             setCustomItemCounter(1);
 
             // Restore the fabric details popup if the sale was launched from it.
@@ -1480,7 +1534,8 @@ export function FabricInventory({
                 onClick={() => {
                   setScanValue('');
                   setScannedFabric(null);
-                  setSellUnitPrice('');
+                  setSellPriceAmount('');
+                  setSellPriceMode('per_yard');
                   setScanError(null);
                   focusScanInput(false);
                 }}
@@ -1530,31 +1585,85 @@ export function FabricInventory({
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 items-end">
-                      <div>
-                        <Label htmlFor="sellQty">Yards</Label>
-                        <Input
-                          id="sellQty"
-                          type="number"
-                          step="1"
-                          min="1"
-                          value={sellQuantity}
-                          onChange={e => setSellQuantity(e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="sellUnitPrice">Price ($/yd)</Label>
-                        <Input
-                          id="sellUnitPrice"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={sellUnitPrice}
-                          onChange={e => setSellUnitPrice(e.target.value)}
-                          onFocus={e => {
-                            if (e.currentTarget.value) e.currentTarget.select();
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className={
+                            sellPriceMode === 'per_yard'
+                              ? 'bg-rose-400 text-white border-rose-400 hover:bg-rose-500 hover:text-white'
+                              : undefined
+                          }
+                          onClick={() => {
+                            if (sellPriceMode === 'per_yard') return;
+                            const pricing = resolveLinePricing(
+                              sellQuantity,
+                              sellPriceAmount,
+                              sellPriceMode
+                            );
+                            setSellPriceMode('per_yard');
+                            if (pricing) {
+                              setSellPriceAmount(String(Number(pricing.unitPrice.toFixed(4))));
+                            }
                           }}
-                        />
+                        >
+                          $/yd
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className={
+                            sellPriceMode === 'total'
+                              ? 'bg-rose-400 text-white border-rose-400 hover:bg-rose-500 hover:text-white'
+                              : undefined
+                          }
+                          onClick={() => {
+                            if (sellPriceMode === 'total') return;
+                            const pricing = resolveLinePricing(
+                              sellQuantity,
+                              sellPriceAmount,
+                              sellPriceMode
+                            );
+                            setSellPriceMode('total');
+                            if (pricing) {
+                              setSellPriceAmount(String(Number(pricing.lineTotal.toFixed(2))));
+                            }
+                          }}
+                        >
+                          Total $
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 items-end">
+                        <div>
+                          <Label htmlFor="sellQty">Yards</Label>
+                          <Input
+                            id="sellQty"
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            value={sellQuantity}
+                            onChange={e => setSellQuantity(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="sellPriceAmount">
+                            {sellPriceMode === 'total' ? 'Total ($)' : 'Price ($/yd)'}
+                          </Label>
+                          <Input
+                            id="sellPriceAmount"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={sellPriceAmount}
+                            onChange={e => setSellPriceAmount(e.target.value)}
+                            onFocus={e => {
+                              if (e.currentTarget.value) e.currentTarget.select();
+                            }}
+                          />
+                        </div>
                       </div>
                     </div>
                     <div className="flex justify-end gap-2">
@@ -1613,6 +1722,60 @@ export function FabricInventory({
                         placeholder="e.g. Remnant cut, no barcode"
                       />
                     </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className={
+                          customItemPriceMode === 'per_yard'
+                            ? 'bg-rose-400 text-white border-rose-400 hover:bg-rose-500 hover:text-white'
+                            : undefined
+                        }
+                        onClick={() => {
+                          if (customItemPriceMode === 'per_yard') return;
+                          const pricing = resolveLinePricing(
+                            customItemYards,
+                            customItemPriceAmount,
+                            customItemPriceMode
+                          );
+                          setCustomItemPriceMode('per_yard');
+                          if (pricing) {
+                            setCustomItemPriceAmount(
+                              String(Number(pricing.unitPrice.toFixed(4)))
+                            );
+                          }
+                        }}
+                      >
+                        $/yd
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className={
+                          customItemPriceMode === 'total'
+                            ? 'bg-rose-400 text-white border-rose-400 hover:bg-rose-500 hover:text-white'
+                            : undefined
+                        }
+                        onClick={() => {
+                          if (customItemPriceMode === 'total') return;
+                          const pricing = resolveLinePricing(
+                            customItemYards,
+                            customItemPriceAmount,
+                            customItemPriceMode
+                          );
+                          setCustomItemPriceMode('total');
+                          if (pricing) {
+                            setCustomItemPriceAmount(
+                              String(Number(pricing.lineTotal.toFixed(2)))
+                            );
+                          }
+                        }}
+                      >
+                        Total $
+                      </Button>
+                    </div>
                     <div className="grid grid-cols-2 gap-3 items-end">
                       <div>
                         <Label htmlFor="customItemYards">Yards</Label>
@@ -1626,14 +1789,16 @@ export function FabricInventory({
                         />
                       </div>
                       <div>
-                        <Label htmlFor="customItemUnitPrice">Price ($/yd)</Label>
+                        <Label htmlFor="customItemPriceAmount">
+                          {customItemPriceMode === 'total' ? 'Total ($)' : 'Price ($/yd)'}
+                        </Label>
                         <Input
-                          id="customItemUnitPrice"
+                          id="customItemPriceAmount"
                           type="number"
                           step="0.01"
                           min="0"
-                          value={customItemUnitPrice}
-                          onChange={e => setCustomItemUnitPrice(e.target.value)}
+                          value={customItemPriceAmount}
+                          onChange={e => setCustomItemPriceAmount(e.target.value)}
                           onFocus={e => {
                             if (e.currentTarget.value) e.currentTarget.select();
                           }}
@@ -1649,7 +1814,8 @@ export function FabricInventory({
                           setCustomItemOpen(false);
                           setCustomItemName('');
                           setCustomItemYards('1');
-                          setCustomItemUnitPrice('');
+                          setCustomItemPriceAmount('');
+                          setCustomItemPriceMode('total');
                         }}
                       >
                         Cancel
@@ -1721,7 +1887,7 @@ export function FabricInventory({
                           </div>
                         </div>
                       </div>
-                      <div className="grid grid-cols-[3rem_auto_4rem_auto_auto] items-center gap-1.5 shrink-0">
+                      <div className="grid grid-cols-[3rem_auto_4.5rem_auto_auto_auto] items-center gap-1.5 shrink-0">
                         <Input
                           type="number"
                           min="0.01"
@@ -1734,32 +1900,48 @@ export function FabricInventory({
                           className="h-8 w-12 min-w-[3rem] px-1 text-center"
                           aria-label={`Yards for ${item.name || item.sku}`}
                         />
-                        <span className="text-xs text-muted-foreground">yd @</span>
+                        <span className="text-xs text-muted-foreground">yd</span>
                         <Input
                           type="number"
                           min="0"
                           step="0.01"
-                          value={item.unitPrice}
-                          onChange={e => updateTransactionItemUnitPrice(item.id, e.target.value)}
+                          value={item.priceAmount}
+                          onChange={e => updateTransactionItemPriceAmount(item.id, e.target.value)}
                           onFocus={e => {
                             if (e.currentTarget.value) e.currentTarget.select();
                           }}
-                          className="h-8 w-16 min-w-[4rem] px-1 text-center"
-                          aria-label={`Price per yard for ${item.name || item.sku}`}
+                          className="h-8 w-[4.5rem] min-w-[4.5rem] px-1 text-center"
+                          aria-label={
+                            item.priceMode === 'total'
+                              ? `Total price for ${item.name || item.sku}`
+                              : `Price per yard for ${item.name || item.sku}`
+                          }
                         />
-                        <span className="text-xs sm:text-sm font-medium tabular-nums text-right min-w-[4rem]">
+                        <button
+                          type="button"
+                          className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline px-0.5"
+                          onClick={() =>
+                            updateTransactionItemPriceMode(
+                              item.id,
+                              item.priceMode === 'total' ? 'per_yard' : 'total'
+                            )
+                          }
+                          title="Switch between total and per-yard pricing"
+                        >
+                          {item.priceMode === 'total' ? 'total' : '/yd'}
+                        </button>
+                        <span className="text-xs sm:text-sm font-medium tabular-nums text-right min-w-[3.5rem]">
                           {(() => {
-                            const yards = Number(item.yards);
-                            const unitPrice = Number(item.unitPrice);
-                            if (
-                              !Number.isFinite(yards) ||
-                              !Number.isFinite(unitPrice) ||
-                              yards <= 0 ||
-                              unitPrice < 0
-                            ) {
-                              return '—';
-                            }
-                            return `$${(unitPrice * yards).toFixed(2)}`;
+                            const pricing = resolveLinePricing(
+                              item.yards,
+                              item.priceAmount,
+                              item.priceMode
+                            );
+                            if (!pricing) return '—';
+                            // Show the counterpart so both total and $/yd are visible.
+                            return item.priceMode === 'total'
+                              ? `$${pricing.unitPrice.toFixed(2)}/yd`
+                              : `$${pricing.lineTotal.toFixed(2)}`;
                           })()}
                         </span>
                         <Button
@@ -1802,10 +1984,13 @@ export function FabricInventory({
                     <Input
                       id="receiptEmail"
                       type="email"
-                      placeholder="customer@email.com"
+                      placeholder="Optional — defaults to marketplace inbox"
                       value={receiptEmail}
                       onChange={e => setReceiptEmail(e.target.value)}
                     />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Leave blank to send to {DEFAULT_RECEIPT_EMAIL}
+                    </p>
                   </div>
 
                   <div className="flex gap-2">
@@ -1892,7 +2077,8 @@ export function FabricInventory({
                         setScanValue('');
                         setTransactionItems([]);
                         setSellQuantity('1');
-                        setSellUnitPrice('');
+                        setSellPriceAmount('');
+                        setSellPriceMode('per_yard');
                         setReceiptEmail('');
                         setScanError(null);
                         setSellError(null);
@@ -1901,7 +2087,8 @@ export function FabricInventory({
                         setCustomItemOpen(false);
                         setCustomItemName('');
                         setCustomItemYards('1');
-                        setCustomItemUnitPrice('');
+                        setCustomItemPriceAmount('');
+                        setCustomItemPriceMode('total');
                         setCustomItemCounter(1);
                         setTimeout(() => scanInputRef.current?.focus(), 0);
                       }}
@@ -2022,11 +2209,12 @@ export function FabricInventory({
                         setScannedFabric(representative);
                         setScanValue(representative.sku);
                         setSellQuantity('1');
-                        setSellUnitPrice(
+                        setSellPriceAmount(
                           representative.sell_price != null
                             ? String(representative.sell_price)
                             : ''
                         );
+                        setSellPriceMode('per_yard');
                         setReceiptEmail('');
                         setSellError(null);
                         setScanError(null);

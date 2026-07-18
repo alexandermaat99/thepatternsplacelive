@@ -13,6 +13,8 @@ function formatMoney(amount: number) {
   return `$${amount.toFixed(2)}`;
 }
 
+const DEFAULT_RECEIPT_EMAIL = 'thepatternsplacemarketplace@gmail.com';
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -20,7 +22,12 @@ export async function POST(req: NextRequest) {
     const sku = sanitizeString(String(body?.sku ?? ''), 64).trim();
     // New name: yards. Backward compatible with older clients that send `quantity`.
     const yards = Number(body?.yards ?? body?.quantity);
-    const receiptEmail = sanitizeString(String(body?.receiptEmail ?? ''), 254).trim();
+    const receiptEmailRaw = sanitizeString(String(body?.receiptEmail ?? ''), 254).trim();
+    const receiptEmail = !receiptEmailRaw
+      ? DEFAULT_RECEIPT_EMAIL
+      : validateEmail(receiptEmailRaw)
+        ? receiptEmailRaw
+        : '';
     const paymentMethodRaw = String(body?.paymentMethod ?? '')
       .trim()
       .toLowerCase();
@@ -40,7 +47,7 @@ export async function POST(req: NextRequest) {
         );
       }
     }
-    if (!receiptEmail || !validateEmail(receiptEmail)) {
+    if (!receiptEmail) {
       return NextResponse.json(
         { success: false, error: 'Valid receipt email is required' },
         { status: 400 }
@@ -84,6 +91,7 @@ export async function POST(req: NextRequest) {
       name: string | null;
       yards: number;
       unitPrice?: number;
+      lineTotal?: number;
       custom: boolean;
     }> = itemsRaw
       ? itemsRaw
@@ -100,6 +108,10 @@ export async function POST(req: NextRequest) {
               unitPrice:
                 it?.unitPrice != null || it?.unit_price != null
                   ? Number(it?.unitPrice ?? it?.unit_price)
+                  : undefined,
+              lineTotal:
+                it?.lineTotal != null || it?.line_total != null
+                  ? Number(it?.lineTotal ?? it?.line_total)
                   : undefined,
               custom,
             };
@@ -132,13 +144,38 @@ export async function POST(req: NextRequest) {
 
     const lines: SaleLine[] = [];
     for (const item of requestedItems) {
-      if (item.custom) {
-        const unitPriceFromClient = item.unitPrice;
+      const resolveUnitAndTotal = (
+        fallbackUnitPrice: number | null
+      ): { unitPrice: number; lineTotal: number } | null => {
         if (
-          unitPriceFromClient == null ||
-          !Number.isFinite(unitPriceFromClient) ||
-          unitPriceFromClient < 0
+          item.lineTotal != null &&
+          Number.isFinite(item.lineTotal) &&
+          item.lineTotal >= 0
         ) {
+          return { unitPrice: item.lineTotal / item.yards, lineTotal: item.lineTotal };
+        }
+        if (
+          item.unitPrice != null &&
+          Number.isFinite(item.unitPrice) &&
+          item.unitPrice >= 0
+        ) {
+          return {
+            unitPrice: item.unitPrice,
+            lineTotal: item.unitPrice * item.yards,
+          };
+        }
+        if (fallbackUnitPrice != null && Number.isFinite(fallbackUnitPrice) && fallbackUnitPrice >= 0) {
+          return {
+            unitPrice: fallbackUnitPrice,
+            lineTotal: fallbackUnitPrice * item.yards,
+          };
+        }
+        return null;
+      };
+
+      if (item.custom) {
+        const priced = resolveUnitAndTotal(null);
+        if (!priced) {
           return NextResponse.json(
             { success: false, error: `Custom item "${item.name}" needs a valid price.` },
             { status: 400 }
@@ -148,8 +185,8 @@ export async function POST(req: NextRequest) {
           sku: item.sku,
           name: item.name,
           yards: item.yards,
-          unitPrice: unitPriceFromClient,
-          lineTotal: unitPriceFromClient * item.yards,
+          unitPrice: priced.unitPrice,
+          lineTotal: priced.lineTotal,
           // No tracked buy price for one-off / unscanned cuts.
           buyPricePerYard: 0,
           lineCost: 0,
@@ -209,15 +246,15 @@ export async function POST(req: NextRequest) {
       const inventoryAfterFromDb = updatedRows[0]?.current_quantity;
       const inventoryAfterNumber = Number(inventoryAfterFromDb);
 
-      const unitPriceFromClient = item.unitPrice;
-      const unitPrice =
-        unitPriceFromClient != null &&
-        Number.isFinite(unitPriceFromClient) &&
-        unitPriceFromClient >= 0
-          ? unitPriceFromClient
-          : fabric.sell_price != null
-            ? Number(fabric.sell_price)
-            : 0;
+      const priced = resolveUnitAndTotal(
+        fabric.sell_price != null ? Number(fabric.sell_price) : 0
+      );
+      if (!priced) {
+        return NextResponse.json(
+          { success: false, error: `${item.sku}: needs a valid price.` },
+          { status: 400 }
+        );
+      }
       const buyPricePerYard = resolveBuyPricePerYard(fabric.sku, buyPriceBySku);
       const lineCost =
         buyPricePerYard != null ? buyPricePerYard * item.yards : null;
@@ -226,8 +263,8 @@ export async function POST(req: NextRequest) {
         sku: fabric.sku,
         name: fabric.name,
         yards: item.yards,
-        unitPrice,
-        lineTotal: unitPrice * item.yards,
+        unitPrice: priced.unitPrice,
+        lineTotal: priced.lineTotal,
         buyPricePerYard,
         lineCost,
         inventoryBefore: Number(currentQty),
