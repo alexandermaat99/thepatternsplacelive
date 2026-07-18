@@ -60,6 +60,7 @@ export async function POST(req: NextRequest) {
       sku: string;
       yards: number;
       inventory_after: number;
+      custom: boolean;
     };
     const saleLinesRaw = Array.isArray(purchase.sale_lines) ? purchase.sale_lines : [];
     const saleLines: SaleLineSnapshot[] = saleLinesRaw
@@ -67,27 +68,57 @@ export async function POST(req: NextRequest) {
         sku: String(line?.sku ?? '').trim(),
         yards: Number(line?.yards),
         inventory_after: Number(line?.inventory_after),
+        custom: Boolean(line?.custom),
       }))
-      .filter(
-        (line: SaleLineSnapshot) =>
-          line.sku.length > 0 &&
-          Number.isFinite(line.yards) &&
-          line.yards > 0 &&
-          Number.isFinite(line.inventory_after)
-      );
+      .filter((line: SaleLineSnapshot) => {
+        if (!Number.isFinite(line.yards) || line.yards <= 0) return false;
+        if (line.custom) return true;
+        return line.sku.length > 0 && Number.isFinite(line.inventory_after);
+      });
 
     // Backward compatibility: older rows had one sku+quantity snapshot only.
     const linesToReverse: SaleLineSnapshot[] =
       saleLines.length > 0
-        ? saleLines
+        ? saleLines.filter(line => !line.custom)
         : (() => {
             const restoreQuantity = Number(purchase.quantity);
             const currentShouldBe = Number(purchase.inventory_after);
             if (!purchase.sku || !Number.isFinite(restoreQuantity) || !Number.isFinite(currentShouldBe)) {
               return [];
             }
-            return [{ sku: purchase.sku, yards: restoreQuantity, inventory_after: currentShouldBe }];
+            // Synthetic custom-only sales have no inventory to restore.
+            if (String(purchase.sku).startsWith('CUSTOM')) {
+              return [];
+            }
+            return [
+              {
+                sku: purchase.sku,
+                yards: restoreQuantity,
+                inventory_after: currentShouldBe,
+                custom: false,
+              },
+            ];
           })();
+
+    // Custom-only sales: mark reversed without touching inventory.
+    if (saleLines.length > 0 && linesToReverse.length === 0) {
+      const { data: updated, error: updateError } = await supabaseAdmin
+        .from('in_person_purchases')
+        .update({
+          reversed: true,
+          reversed_at: new Date().toISOString(),
+          reversed_by: user.id,
+        })
+        .eq('id', purchaseId)
+        .select('id')
+        .maybeSingle();
+
+      if (updateError || !updated) {
+        return NextResponse.json({ error: 'Failed to mark purchase reversed' }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true });
+    }
 
     if (linesToReverse.length === 0) {
       return NextResponse.json({ error: 'Invalid purchase record' }, { status: 500 });

@@ -58,11 +58,13 @@ type FabricCardGroup = {
 };
 
 type SaleLineItem = {
+  id: string;
   sku: string;
   name: string | null;
   photoUrl: string | null;
   yards: string;
   unitPrice: string;
+  custom: boolean;
 };
 
 function fileExtFromImageUrl(url: string): string {
@@ -144,6 +146,11 @@ export function FabricInventory({
   const [selling, setSelling] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<'venmo' | 'stripe' | 'cash' | null>(null);
+  const [customItemOpen, setCustomItemOpen] = useState(false);
+  const [customItemName, setCustomItemName] = useState('');
+  const [customItemYards, setCustomItemYards] = useState('1');
+  const [customItemUnitPrice, setCustomItemUnitPrice] = useState('');
+  const [customItemCounter, setCustomItemCounter] = useState(1);
   const scanInputRef = useRef<HTMLInputElement>(null);
 
   const focusScanInput = (selectAll = false) => {
@@ -404,6 +411,11 @@ export function FabricInventory({
     setSellError(null);
     setPaymentOpen(false);
     setSelectedPayment(null);
+    setCustomItemOpen(false);
+    setCustomItemName('');
+    setCustomItemYards('1');
+    setCustomItemUnitPrice('');
+    setCustomItemCounter(1);
   };
 
   const lookupSku = async (skuRaw: string) => {
@@ -474,7 +486,7 @@ export function FabricInventory({
     }
 
     const alreadyReserved = Number(
-      transactionItems.find(i => i.sku === scannedFabric.sku)?.yards ?? 0
+      transactionItems.find(i => !i.custom && i.sku === scannedFabric.sku)?.yards ?? 0
     );
     if (q + alreadyReserved > Number(scannedFabric.current_quantity)) {
       setSellError('Not enough inventory for that many yards.');
@@ -487,7 +499,7 @@ export function FabricInventory({
       return;
     }
     setTransactionItems(prev => {
-      const idx = prev.findIndex(i => i.sku === scannedFabric.sku);
+      const idx = prev.findIndex(i => !i.custom && i.sku === scannedFabric.sku);
       if (idx >= 0) {
         const next = [...prev];
         const existingYards = Number(next[idx].yards);
@@ -501,11 +513,13 @@ export function FabricInventory({
       return [
         ...prev,
         {
+          id: scannedFabric.sku,
           sku: scannedFabric.sku,
           name: scannedFabric.name ?? null,
           photoUrl: scannedFabric.photo_url ?? null,
           yards: String(q),
           unitPrice: sellUnitPrice,
+          custom: false,
         },
       ];
     });
@@ -515,6 +529,47 @@ export function FabricInventory({
     setSellQuantity('1');
     setSellUnitPrice('');
     setSellError(null);
+    setPaymentOpen(true);
+    focusScanInput(true);
+  };
+
+  const addCustomItemToTransaction = () => {
+    const name = customItemName.trim();
+    if (!name) {
+      setSellError('Enter a name for the custom item.');
+      return;
+    }
+    const q = Number(customItemYards);
+    if (!Number.isFinite(q) || q <= 0) {
+      setSellError('Enter yards greater than 0.');
+      return;
+    }
+    const unitPrice = Number(customItemUnitPrice);
+    if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+      setSellError('Enter a valid price per yard.');
+      return;
+    }
+
+    const sku = `CUSTOM-${customItemCounter}`;
+    setCustomItemCounter(c => c + 1);
+    setTransactionItems(prev => [
+      ...prev,
+      {
+        id: sku,
+        sku,
+        name,
+        photoUrl: null,
+        yards: String(q),
+        unitPrice: customItemUnitPrice,
+        custom: true,
+      },
+    ]);
+    setCustomItemName('');
+    setCustomItemYards('1');
+    setCustomItemUnitPrice('');
+    setCustomItemOpen(false);
+    setSellError(null);
+    setPaymentOpen(true);
     focusScanInput(true);
   };
 
@@ -535,15 +590,21 @@ export function FabricInventory({
     focusScanInput(true);
   };
 
-  const updateTransactionItemYards = (sku: string, rawValue: string) => {
+  const updateTransactionItemYards = (id: string, rawValue: string) => {
     setTransactionItems(prev =>
-      prev.map(item => (item.sku === sku ? { ...item, yards: rawValue } : item))
+      prev.map(item => (item.id === id ? { ...item, yards: rawValue } : item))
     );
   };
 
-  const updateTransactionItemUnitPrice = (sku: string, rawValue: string) => {
+  const updateTransactionItemUnitPrice = (id: string, rawValue: string) => {
     setTransactionItems(prev =>
-      prev.map(item => (item.sku === sku ? { ...item, unitPrice: rawValue } : item))
+      prev.map(item => (item.id === id ? { ...item, unitPrice: rawValue } : item))
+    );
+  };
+
+  const updateTransactionItemName = (id: string, rawValue: string) => {
+    setTransactionItems(prev =>
+      prev.map(item => (item.id === id ? { ...item, name: rawValue } : item))
     );
   };
 
@@ -559,7 +620,7 @@ export function FabricInventory({
 
     const pending: SaleLineItem[] = [...transactionItems];
     if (pending.length === 0) {
-      setSellError('Add at least one fabric to the transaction.');
+      setSellError('Add at least one item to the transaction.');
       return;
     }
 
@@ -567,22 +628,28 @@ export function FabricInventory({
     for (const line of pending) {
       const yards = Number(line.yards);
       const unitPrice = Number(line.unitPrice);
+      if (line.custom && !String(line.name ?? '').trim()) {
+        setSellError('Enter a name for each custom item.');
+        return;
+      }
       if (!Number.isFinite(yards) || yards <= 0) {
-        setSellError(`Enter valid yards for ${line.sku}.`);
+        setSellError(`Enter valid yards for ${line.name || line.sku}.`);
         return;
       }
       if (!Number.isFinite(unitPrice) || unitPrice < 0) {
-        setSellError(`Enter valid price for ${line.sku}.`);
+        setSellError(`Enter valid price for ${line.name || line.sku}.`);
         return;
       }
-      const inventoryRow = fabric.find(f => f.sku === line.sku);
-      if (!inventoryRow || inventoryRow.current_quantity == null) {
-        setSellError(`Missing inventory for ${line.sku}.`);
-        return;
-      }
-      if (yards > Number(inventoryRow.current_quantity)) {
-        setSellError(`${line.sku}: not enough inventory for ${yards} yd.`);
-        return;
+      if (!line.custom) {
+        const inventoryRow = fabric.find(f => f.sku === line.sku);
+        if (!inventoryRow || inventoryRow.current_quantity == null) {
+          setSellError(`Missing inventory for ${line.sku}.`);
+          return;
+        }
+        if (yards > Number(inventoryRow.current_quantity)) {
+          setSellError(`${line.sku}: not enough inventory for ${yards} yd.`);
+          return;
+        }
       }
     }
 
@@ -596,8 +663,10 @@ export function FabricInventory({
         body: JSON.stringify({
           items: pending.map(line => ({
             sku: line.sku,
+            name: line.name,
             yards: Number(line.yards),
             unitPrice: Number(line.unitPrice),
+            custom: line.custom,
           })),
           receiptEmail: email,
           paymentMethod: selectedPayment,
@@ -646,6 +715,11 @@ export function FabricInventory({
       setReceiptEmail('');
       setPaymentOpen(false);
       setSelectedPayment(null);
+      setCustomItemOpen(false);
+      setCustomItemName('');
+      setCustomItemYards('1');
+      setCustomItemUnitPrice('');
+      setCustomItemCounter(1);
       focusScanInput(true);
       router.refresh();
     } catch (err: unknown) {
@@ -1347,6 +1421,12 @@ export function FabricInventory({
             setSellError(null);
             setPaymentOpen(false);
             setSelectedPayment(null);
+            setTransactionItems([]);
+            setCustomItemOpen(false);
+            setCustomItemName('');
+            setCustomItemYards('1');
+            setCustomItemUnitPrice('');
+            setCustomItemCounter(1);
 
             // Restore the fabric details popup if the sale was launched from it.
             if (detailsToRestore) {
@@ -1498,7 +1578,96 @@ export function FabricInventory({
                     </div>
                   </>
                 ) : (
-                  <p className="text-sm text-muted-foreground">Scan a fabric to load details.</p>
+                  <p className="text-sm text-muted-foreground">
+                    Scan a fabric, or add a custom item below.
+                  </p>
+                )}
+              </div>
+
+              <div className="rounded-lg border bg-muted/20 p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-sm font-semibold">Custom item</div>
+                  {!customItemOpen ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setCustomItemOpen(true);
+                        setSellError(null);
+                      }}
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add custom
+                    </Button>
+                  ) : null}
+                </div>
+                {customItemOpen ? (
+                  <>
+                    <div>
+                      <Label htmlFor="customItemName">Name</Label>
+                      <Input
+                        id="customItemName"
+                        value={customItemName}
+                        onChange={e => setCustomItemName(e.target.value)}
+                        placeholder="e.g. Remnant cut, no barcode"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 items-end">
+                      <div>
+                        <Label htmlFor="customItemYards">Yards</Label>
+                        <Input
+                          id="customItemYards"
+                          type="number"
+                          step="0.01"
+                          min="0.01"
+                          value={customItemYards}
+                          onChange={e => setCustomItemYards(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="customItemUnitPrice">Price ($/yd)</Label>
+                        <Input
+                          id="customItemUnitPrice"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={customItemUnitPrice}
+                          onChange={e => setCustomItemUnitPrice(e.target.value)}
+                          onFocus={e => {
+                            if (e.currentTarget.value) e.currentTarget.select();
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setCustomItemOpen(false);
+                          setCustomItemName('');
+                          setCustomItemYards('1');
+                          setCustomItemUnitPrice('');
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={addCustomItemToTransaction}
+                      >
+                        Add to purchase
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    For fabrics without a barcode or one-off cuts.
+                  </p>
                 )}
               </div>
 
@@ -1512,7 +1681,7 @@ export function FabricInventory({
                   </div>
                   {transactionItems.map(item => (
                     <div
-                      key={item.sku}
+                      key={item.id}
                       className="flex items-center justify-between text-sm gap-3 min-w-0"
                     >
                       <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -1525,33 +1694,45 @@ export function FabricInventory({
                               className="object-cover"
                             />
                           ) : (
-                            <div className="w-full h-full bg-muted" />
+                            <div className="w-full h-full bg-muted flex items-center justify-center text-[10px] text-muted-foreground px-1 text-center leading-tight">
+                              {item.custom ? 'Custom' : null}
+                            </div>
                           )}
                         </div>
-                        <div className="min-w-0">
-                          <div className="truncate">
-                            {(() => {
-                              const name = item.name || 'Unnamed fabric';
-                              return name.length > 10 ? `${name.slice(0, 10)}...` : name;
-                            })()}
-                          </div>
+                        <div className="min-w-0 flex-1">
+                          {item.custom ? (
+                            <Input
+                              value={item.name ?? ''}
+                              onChange={e => updateTransactionItemName(item.id, e.target.value)}
+                              className="h-8 text-sm"
+                              aria-label="Custom item name"
+                              placeholder="Item name"
+                            />
+                          ) : (
+                            <div className="truncate">
+                              {(() => {
+                                const name = item.name || 'Unnamed fabric';
+                                return name.length > 10 ? `${name.slice(0, 10)}...` : name;
+                              })()}
+                            </div>
+                          )}
                           <div className="text-xs text-muted-foreground font-mono truncate">
-                            {item.sku}
+                            {item.custom ? 'Custom item' : item.sku}
                           </div>
                         </div>
                       </div>
                       <div className="grid grid-cols-[3rem_auto_4rem_auto_auto] items-center gap-1.5 shrink-0">
                         <Input
                           type="number"
-                          min="1"
-                          step="1"
+                          min="0.01"
+                          step="0.01"
                           value={item.yards}
-                          onChange={e => updateTransactionItemYards(item.sku, e.target.value)}
+                          onChange={e => updateTransactionItemYards(item.id, e.target.value)}
                           onFocus={e => {
                             if (e.currentTarget.value) e.currentTarget.select();
                           }}
                           className="h-8 w-12 min-w-[3rem] px-1 text-center"
-                          aria-label={`Yards for ${item.sku}`}
+                          aria-label={`Yards for ${item.name || item.sku}`}
                         />
                         <span className="text-xs text-muted-foreground">yd @</span>
                         <Input
@@ -1559,12 +1740,12 @@ export function FabricInventory({
                           min="0"
                           step="0.01"
                           value={item.unitPrice}
-                          onChange={e => updateTransactionItemUnitPrice(item.sku, e.target.value)}
+                          onChange={e => updateTransactionItemUnitPrice(item.id, e.target.value)}
                           onFocus={e => {
                             if (e.currentTarget.value) e.currentTarget.select();
                           }}
                           className="h-8 w-16 min-w-[4rem] px-1 text-center"
-                          aria-label={`Price per yard for ${item.sku}`}
+                          aria-label={`Price per yard for ${item.name || item.sku}`}
                         />
                         <span className="text-xs sm:text-sm font-medium tabular-nums text-right min-w-[4rem]">
                           {(() => {
@@ -1591,7 +1772,7 @@ export function FabricInventory({
                               `Remove ${item.name || item.sku} from this transaction?`
                             );
                             if (!confirmed) return;
-                            setTransactionItems(prev => prev.filter(i => i.sku !== item.sku));
+                            setTransactionItems(prev => prev.filter(i => i.id !== item.id));
                           }}
                         >
                           Remove
@@ -1717,6 +1898,11 @@ export function FabricInventory({
                         setSellError(null);
                         setPaymentOpen(false);
                         setSelectedPayment(null);
+                        setCustomItemOpen(false);
+                        setCustomItemName('');
+                        setCustomItemYards('1');
+                        setCustomItemUnitPrice('');
+                        setCustomItemCounter(1);
                         setTimeout(() => scanInputRef.current?.focus(), 0);
                       }}
                       disabled={selling}

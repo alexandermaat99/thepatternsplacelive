@@ -32,8 +32,9 @@ export interface InPersonPurchaseRow {
     line_total?: number;
     buy_price_per_yard?: number | null;
     line_cost?: number | null;
-    inventory_before?: number;
-    inventory_after?: number;
+    inventory_before?: number | null;
+    inventory_after?: number | null;
+    custom?: boolean;
   }> | null;
 }
 
@@ -41,8 +42,9 @@ type DisplayLine = {
   sku: string;
   name: string | null;
   yards: number;
-  inventoryBefore: number;
-  inventoryAfter: number;
+  inventoryBefore: number | null;
+  inventoryAfter: number | null;
+  custom: boolean;
 };
 
 type PurchaseComputed = {
@@ -124,10 +126,11 @@ function purchaseSummary(lines: DisplayLine[]) {
   if (lines.length === 1) {
     const line = lines[0];
     const label = line.name || line.sku;
-    return { title: label, subtitle: `${line.yards} yd · ${line.sku}` };
+    const skuLabel = line.custom ? 'Custom item' : line.sku;
+    return { title: label, subtitle: `${line.yards} yd · ${skuLabel}` };
   }
   return {
-    title: `${lines.length} fabrics`,
+    title: `${lines.length} items`,
     subtitle: `${totalYards} yd total`,
   };
 }
@@ -203,12 +206,16 @@ function LineItemsList({
             <>
               <div className="min-w-0">
                 <div className="font-medium text-sm leading-snug">{line.name || line.sku}</div>
-                <div className="text-xs font-mono text-muted-foreground mt-0.5">{line.sku}</div>
+                <div className="text-xs font-mono text-muted-foreground mt-0.5">
+                  {line.custom ? 'Custom item' : line.sku}
+                </div>
               </div>
               <div className="text-right text-sm shrink-0">
                 <div className="font-medium tabular-nums">{line.yards} yd</div>
                 <div className="text-xs font-mono text-muted-foreground mt-0.5">
-                  {line.inventoryBefore} → {line.inventoryAfter}
+                  {line.custom
+                    ? 'No inventory'
+                    : `${line.inventoryBefore} → ${line.inventoryAfter}`}
                 </div>
               </div>
             </>
@@ -216,11 +223,15 @@ function LineItemsList({
             <>
               <div className="font-medium text-sm leading-snug">{line.name || line.sku}</div>
               <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                <span className="font-mono">{line.sku}</span>
+                <span className="font-mono">{line.custom ? 'Custom item' : line.sku}</span>
                 <span>{line.yards} yd</span>
-                <span className="font-mono">
-                  Inv {line.inventoryBefore} → {line.inventoryAfter}
-                </span>
+                {line.custom ? (
+                  <span>No inventory</span>
+                ) : (
+                  <span className="font-mono">
+                    Inv {line.inventoryBefore} → {line.inventoryAfter}
+                  </span>
+                )}
               </div>
             </>
           )}
@@ -283,14 +294,23 @@ export function InPersonPurchasesTable({
   const getDisplayLines = (purchase: InPersonPurchaseRow): DisplayLine[] => {
     const raw = Array.isArray(purchase.sale_lines) ? purchase.sale_lines : [];
     const lines = raw
-      .map(line => ({
-        sku: String(line?.sku ?? '').trim(),
-        name: line?.name ?? null,
-        yards: Number(line?.yards),
-        inventoryBefore: Number(line?.inventory_before),
-        inventoryAfter: Number(line?.inventory_after),
-      }))
-      .filter(line => line.sku && Number.isFinite(line.yards) && line.yards > 0);
+      .map(line => {
+        const custom = Boolean(line?.custom) || String(line?.sku ?? '').startsWith('CUSTOM');
+        return {
+          sku: String(line?.sku ?? '').trim(),
+          name: line?.name ?? null,
+          yards: Number(line?.yards),
+          inventoryBefore:
+            line?.inventory_before == null ? null : Number(line.inventory_before),
+          inventoryAfter: line?.inventory_after == null ? null : Number(line.inventory_after),
+          custom,
+        };
+      })
+      .filter(line => {
+        if (!Number.isFinite(line.yards) || line.yards <= 0) return false;
+        if (line.custom) return Boolean(line.name || line.sku);
+        return Boolean(line.sku);
+      });
 
     if (lines.length > 0) return lines;
 
@@ -301,6 +321,7 @@ export function InPersonPurchasesTable({
         yards: Number(purchase.quantity),
         inventoryBefore: Number(purchase.inventory_before),
         inventoryAfter: Number(purchase.inventory_after),
+        custom: String(purchase.sku).startsWith('CUSTOM'),
       },
     ];
   };
@@ -575,7 +596,7 @@ export function InPersonPurchasesTable({
                     <div className="space-y-1">
                       {lines.map((line, idx) => (
                         <div key={`${p.id}-sku-${idx}`} className="font-mono">
-                          {line.sku}
+                          {line.custom ? 'Custom' : line.sku}
                         </div>
                       ))}
                     </div>
@@ -627,7 +648,9 @@ export function InPersonPurchasesTable({
                     <div className="space-y-1 whitespace-nowrap">
                       {lines.map((line, idx) => (
                         <div key={`${p.id}-inv-${idx}`} className="font-mono">
-                          {line.inventoryBefore} → {line.inventoryAfter}
+                          {line.custom
+                            ? '—'
+                            : `${line.inventoryBefore} → ${line.inventoryAfter}`}
                         </div>
                       ))}
                     </div>

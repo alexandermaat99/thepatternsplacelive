@@ -74,25 +74,42 @@ export async function POST(req: NextRequest) {
       lineTotal: number;
       buyPricePerYard: number | null;
       lineCost: number | null;
-      inventoryBefore: number;
-      inventoryAfter: number;
+      inventoryBefore: number | null;
+      inventoryAfter: number | null;
+      custom: boolean;
     };
 
-    const requestedItems: Array<{ sku: string; yards: number; unitPrice?: number }> = itemsRaw
+    const requestedItems: Array<{
+      sku: string;
+      name: string | null;
+      yards: number;
+      unitPrice?: number;
+      custom: boolean;
+    }> = itemsRaw
       ? itemsRaw
-          .map((it: any) => ({
-            sku: sanitizeString(String(it?.sku ?? ''), 64).trim(),
-            yards: Number(it?.yards ?? it?.quantity),
-            unitPrice:
-              it?.unitPrice != null || it?.unit_price != null
-                ? Number(it?.unitPrice ?? it?.unit_price)
-                : undefined,
-          }))
-          .filter(
-            (it: { sku: string; yards: number }) =>
-              it.sku && Number.isFinite(it.yards) && it.yards > 0
-          )
-      : [{ sku, yards }];
+          .map((it: any, index: number) => {
+            const custom = Boolean(it?.custom);
+            const rawName = sanitizeString(String(it?.name ?? ''), 200).trim();
+            const rawSku = sanitizeString(String(it?.sku ?? ''), 64).trim();
+            return {
+              sku: custom
+                ? rawSku || `CUSTOM-${index + 1}`
+                : rawSku,
+              name: rawName || null,
+              yards: Number(it?.yards ?? it?.quantity),
+              unitPrice:
+                it?.unitPrice != null || it?.unit_price != null
+                  ? Number(it?.unitPrice ?? it?.unit_price)
+                  : undefined,
+              custom,
+            };
+          })
+          .filter((it: { sku: string; yards: number; custom: boolean; name: string | null }) => {
+            if (!Number.isFinite(it.yards) || it.yards <= 0) return false;
+            if (it.custom) return Boolean(it.name);
+            return Boolean(it.sku);
+          })
+      : [{ sku, yards, name: null, custom: false }];
 
     if (requestedItems.length === 0) {
       return NextResponse.json(
@@ -101,16 +118,48 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const buyPriceLookupSkus = expandSkusForBuyPriceLookup(requestedItems.map(i => i.sku));
-    const { data: buyPriceRows, error: buyPriceError } = await supabase
-      .from('fabric')
-      .select('sku,buy_price')
-      .in('sku', buyPriceLookupSkus);
-    if (buyPriceError) throw buyPriceError;
-    const buyPriceBySku = buyPriceMapFromFabricRows(buyPriceRows || []);
+    const inventorySkus = requestedItems.filter(i => !i.custom).map(i => i.sku);
+    const buyPriceLookupSkus = expandSkusForBuyPriceLookup(inventorySkus);
+    let buyPriceBySku = new Map<string, number | null>();
+    if (buyPriceLookupSkus.length > 0) {
+      const { data: buyPriceRows, error: buyPriceError } = await supabase
+        .from('fabric')
+        .select('sku,buy_price')
+        .in('sku', buyPriceLookupSkus);
+      if (buyPriceError) throw buyPriceError;
+      buyPriceBySku = buyPriceMapFromFabricRows(buyPriceRows || []);
+    }
 
     const lines: SaleLine[] = [];
     for (const item of requestedItems) {
+      if (item.custom) {
+        const unitPriceFromClient = item.unitPrice;
+        if (
+          unitPriceFromClient == null ||
+          !Number.isFinite(unitPriceFromClient) ||
+          unitPriceFromClient < 0
+        ) {
+          return NextResponse.json(
+            { success: false, error: `Custom item "${item.name}" needs a valid price.` },
+            { status: 400 }
+          );
+        }
+        lines.push({
+          sku: item.sku,
+          name: item.name,
+          yards: item.yards,
+          unitPrice: unitPriceFromClient,
+          lineTotal: unitPriceFromClient * item.yards,
+          // No tracked buy price for one-off / unscanned cuts.
+          buyPricePerYard: 0,
+          lineCost: 0,
+          inventoryBefore: null,
+          inventoryAfter: null,
+          custom: true,
+        });
+        continue;
+      }
+
       const { data: fabric, error: fabricError } = await supabase
         .from('fabric')
         .select('sku,name,sell_price,buy_price,current_quantity')
@@ -183,6 +232,7 @@ export async function POST(req: NextRequest) {
         lineCost,
         inventoryBefore: Number(currentQty),
         inventoryAfter: Number.isFinite(inventoryAfterNumber) ? inventoryAfterNumber : newQty,
+        custom: false,
       });
     }
 
@@ -201,9 +251,16 @@ export async function POST(req: NextRequest) {
     const profitCalculationError =
       costAmount == null ? 'Unable to calculate, need buy price.' : null;
     const avgUnitPrice = totalYards > 0 ? totalAmount / totalYards : 0;
-    const inventoryBeforeSum = lines.reduce((sum, line) => sum + line.inventoryBefore, 0);
-    const inventoryAfterSum = lines.reduce((sum, line) => sum + line.inventoryAfter, 0);
-    const summarySku = lines[0].sku;
+    const inventoryLines = lines.filter(line => !line.custom);
+    const inventoryBeforeSum = inventoryLines.reduce(
+      (sum, line) => sum + Number(line.inventoryBefore ?? 0),
+      0
+    );
+    const inventoryAfterSum = inventoryLines.reduce(
+      (sum, line) => sum + Number(line.inventoryAfter ?? 0),
+      0
+    );
+    const summarySku = lines.find(l => !l.custom)?.sku ?? lines[0].sku;
     const summaryName =
       lines.length === 1
         ? lines[0].name
@@ -227,15 +284,18 @@ export async function POST(req: NextRequest) {
             : `Fabric sale (${lines.length} items)`;
         const subject = `Receipt: ${title}`;
         const lineRowsHtml = lines
-          .map(
-            line => `
+          .map(line => {
+            const label = line.custom
+              ? `${line.name || 'Custom item'} <span style="color:#777;">(custom)</span>`
+              : `${line.name || line.sku} <span style="color:#777;">(${line.sku})</span>`;
+            return `
             <tr>
-              <td style="padding:6px 0; color:#444;">${line.name || line.sku} <span style="color:#777;">(${line.sku})</span></td>
+              <td style="padding:6px 0; color:#444;">${label}</td>
               <td style="padding:6px 0; text-align:right;">${line.yards}</td>
               <td style="padding:6px 0; text-align:right;">${formatMoney(line.unitPrice)}</td>
               <td style="padding:6px 0; text-align:right;">${formatMoney(line.lineTotal)}</td>
-            </tr>`
-          )
+            </tr>`;
+          })
           .join('');
 
         const html = `
@@ -277,10 +337,12 @@ export async function POST(req: NextRequest) {
 </html>`;
 
         const lineRowsText = lines
-          .map(
-            line =>
-              `- ${line.name || line.sku} (${line.sku}): ${line.yards} yd x ${formatMoney(line.unitPrice)} = ${formatMoney(line.lineTotal)}`
-          )
+          .map(line => {
+            const label = line.custom
+              ? `${line.name || 'Custom item'} (custom)`
+              : `${line.name || line.sku} (${line.sku})`;
+            return `- ${label}: ${line.yards} yd x ${formatMoney(line.unitPrice)} = ${formatMoney(line.lineTotal)}`;
+          })
           .join('\n');
         const text =
           `${COMPANY_INFO.name} - Fabric sale receipt\n\n` +
@@ -331,6 +393,7 @@ export async function POST(req: NextRequest) {
             line_cost: line.lineCost,
             inventory_before: line.inventoryBefore,
             inventory_after: line.inventoryAfter,
+            custom: line.custom,
           })),
           receipt_email: receiptEmail,
           payment_method: paymentMethod,
@@ -352,13 +415,17 @@ export async function POST(req: NextRequest) {
       console.error('Failed to insert in-person purchase (exception):', e);
     }
 
+    const inventoryUpdates = lines
+      .filter(line => !line.custom && line.inventoryAfter != null)
+      .map(line => ({ sku: line.sku, newYards: line.inventoryAfter }));
+
     return NextResponse.json({
       success: true,
-      items: lines.map(line => ({ sku: line.sku, newYards: line.inventoryAfter })),
-      sku: lines[0].sku,
-      newYards: lines[0].inventoryAfter,
+      items: inventoryUpdates,
+      sku: summarySku,
+      newYards: inventoryUpdates[0]?.newYards ?? null,
       // Backward compatible keys
-      newQuantity: lines[0].inventoryAfter,
+      newQuantity: inventoryUpdates[0]?.newYards ?? null,
       emailSent,
       emailError,
       purchaseId,

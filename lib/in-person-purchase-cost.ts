@@ -5,6 +5,7 @@ export type SaleLineSnapshot = {
   yards?: number;
   line_cost?: number | null;
   buy_price_per_yard?: number | null;
+  custom?: boolean;
 };
 
 export type PurchaseCostProfit = {
@@ -75,10 +76,15 @@ export function computeCostProfitFromSaleLines(
   for (const line of saleLines) {
     const sku = String(line?.sku ?? '').trim();
     const yards = Number(line?.yards);
-    if (!sku || !Number.isFinite(yards) || yards <= 0) continue;
+    if (!Number.isFinite(yards) || yards <= 0) continue;
 
     if (line?.line_cost != null && Number.isFinite(Number(line.line_cost))) {
       cost += Number(line.line_cost);
+      continue;
+    }
+
+    // Custom / one-off lines have no inventory buy price.
+    if (!sku || sku.startsWith('CUSTOM') || line?.custom) {
       continue;
     }
 
