@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
               return [];
             }
             // Synthetic custom-only sales have no inventory to restore.
-            if (String(purchase.sku).startsWith('CUSTOM')) {
+            if (String(purchase.sku) === 'CUSTOM' || String(purchase.sku).startsWith('CUSTOM')) {
               return [];
             }
             return [

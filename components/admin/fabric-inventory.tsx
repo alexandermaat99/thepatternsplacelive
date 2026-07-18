@@ -756,6 +756,13 @@ export function FabricInventory({
         return;
       }
 
+      if (!data.purchaseId && data.purchaseError) {
+        setSellError(
+          `Sale completed but was not saved to In-person purchases: ${data.purchaseError}`
+        );
+        return;
+      }
+
       // Ready for next scan quickly
       setScanValue('');
       setScannedFabric(null);

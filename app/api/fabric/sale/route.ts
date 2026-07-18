@@ -297,11 +297,85 @@ export async function POST(req: NextRequest) {
       (sum, line) => sum + Number(line.inventoryAfter ?? 0),
       0
     );
-    const summarySku = lines.find(l => !l.custom)?.sku ?? lines[0].sku;
+    const summarySku =
+      lines.every(l => l.custom) ? 'CUSTOM' : (lines.find(l => !l.custom)?.sku ?? lines[0].sku);
     const summaryName =
       lines.length === 1
         ? lines[0].name
         : `${lines[0].name || lines[0].sku} + ${lines.length - 1} more`;
+
+    // Record the in-person purchase for auditing BEFORE email so custom-only
+    // sales don't look "successful" when the DB insert fails (e.g. leftover SKU FK).
+    let purchaseId: string | null = null;
+    let purchaseErrorMessage: string | null = null;
+    try {
+      const { data: purchase, error: purchaseError } = await supabase
+        .from('in_person_purchases')
+        .insert({
+          sku: summarySku,
+          name: summaryName,
+          quantity: totalYards,
+          unit_price: avgUnitPrice,
+          total_amount: totalAmount,
+          cost_amount: costAmount,
+          profit_amount: profitAmount,
+          profit_calculation_error: profitCalculationError,
+          sale_lines: lines.map(line => ({
+            sku: line.sku,
+            name: line.name,
+            yards: line.yards,
+            unit_price: line.unitPrice,
+            line_total: line.lineTotal,
+            buy_price_per_yard: line.buyPricePerYard,
+            line_cost: line.lineCost,
+            inventory_before: line.inventoryBefore,
+            inventory_after: line.inventoryAfter,
+            custom: line.custom,
+          })),
+          receipt_email: receiptEmail,
+          payment_method: paymentMethod,
+          processed_by: user.id,
+          inventory_before: inventoryBeforeSum,
+          inventory_after: inventoryAfterSum,
+          email_sent: false,
+          email_error: null,
+        })
+        .select('id')
+        .maybeSingle();
+
+      if (purchaseError) {
+        console.error('Failed to insert in-person purchase:', purchaseError);
+        purchaseErrorMessage =
+          purchaseError.message ||
+          purchaseError.details ||
+          'Failed to record in-person purchase';
+      } else if (purchase?.id) {
+        purchaseId = purchase.id;
+      } else {
+        purchaseErrorMessage = 'Purchase insert returned no id';
+      }
+    } catch (e) {
+      console.error('Failed to insert in-person purchase (exception):', e);
+      purchaseErrorMessage =
+        e instanceof Error ? e.message : 'Failed to record in-person purchase';
+    }
+
+    const inventoryTouched = lines.some(line => !line.custom);
+    if (!purchaseId) {
+      // Custom-only sales never touch inventory — fail clearly instead of silent success.
+      if (!inventoryTouched) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              purchaseErrorMessage ||
+              'Failed to record purchase. If this was a custom item, run sql/extend-in-person-purchases-table-for-custom-items.sql in Supabase (drops fabric SKU foreign key).',
+            purchaseError: purchaseErrorMessage,
+          },
+          { status: 500 }
+        );
+      }
+    }
 
     // Send receipt email (non-fatal if email fails)
     let emailSent = false;
@@ -405,51 +479,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Record the in-person purchase for auditing.
-    // This should never block inventory changes / email sending if insert fails.
-    let purchaseId: string | null = null;
-    try {
-      const { data: purchase, error: purchaseError } = await supabase
-        .from('in_person_purchases')
-        .insert({
-          sku: summarySku,
-          name: summaryName,
-          quantity: totalYards,
-          unit_price: avgUnitPrice,
-          total_amount: totalAmount,
-          cost_amount: costAmount,
-          profit_amount: profitAmount,
-          profit_calculation_error: profitCalculationError,
-          sale_lines: lines.map(line => ({
-            sku: line.sku,
-            name: line.name,
-            yards: line.yards,
-            unit_price: line.unitPrice,
-            line_total: line.lineTotal,
-            buy_price_per_yard: line.buyPricePerYard,
-            line_cost: line.lineCost,
-            inventory_before: line.inventoryBefore,
-            inventory_after: line.inventoryAfter,
-            custom: line.custom,
-          })),
-          receipt_email: receiptEmail,
-          payment_method: paymentMethod,
-          processed_by: user.id,
-          inventory_before: inventoryBeforeSum,
-          inventory_after: inventoryAfterSum,
-          email_sent: emailSent,
-          email_error: emailError,
-        })
-        .select('id')
-        .maybeSingle();
-
-      if (purchaseError) {
-        console.error('Failed to insert in-person purchase:', purchaseError);
-      } else if (purchase?.id) {
-        purchaseId = purchase.id;
+    if (purchaseId) {
+      try {
+        await supabase
+          .from('in_person_purchases')
+          .update({
+            email_sent: emailSent,
+            email_error: emailError,
+          })
+          .eq('id', purchaseId);
+      } catch (e) {
+        console.error('Failed to update purchase email status:', e);
       }
-    } catch (e) {
-      console.error('Failed to insert in-person purchase (exception):', e);
     }
 
     const inventoryUpdates = lines
@@ -466,6 +507,7 @@ export async function POST(req: NextRequest) {
       emailSent,
       emailError,
       purchaseId,
+      purchaseError: purchaseErrorMessage,
     });
   } catch (error) {
     console.error('Fabric sale error:', error);
