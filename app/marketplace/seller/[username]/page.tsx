@@ -12,28 +12,29 @@ interface SellerPageProps {
   }>;
 }
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function generateMetadata({ params }: SellerPageProps): Promise<Metadata> {
   const { username } = await params;
   const supabase = await createClient();
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('full_name, username, avatar_url')
-    .ilike('username', username)
-    .single();
+  // Same lookup as the page: by ID for users without a username, else by username.
+  const query = supabase.from('profiles').select('id, full_name, username, avatar_url');
+  const { data: profile } = UUID_PATTERN.test(username)
+    ? await query.eq('id', username).single()
+    : await query.ilike('username', username).single();
 
+  // Calling notFound() here (not just in the page) makes missing sellers
+  // return a real 404 status instead of a 200 "soft 404".
   if (!profile) {
-    return {
-      title: 'Seller Not Found',
-      robots: {
-        index: false,
-        follow: false,
-      },
-    };
+    notFound();
   }
 
   const sellerName = profile.full_name || `@${profile.username}`;
-  const profileUrl = `${COMPANY_INFO.urls.website}/marketplace/seller/${username}`;
+  // Canonicalize to the username URL when there is one (not the ID or a different casing).
+  const profileUrl = `${COMPANY_INFO.urls.website}/marketplace/seller/${encodeURIComponent(
+    profile.username || profile.id
+  )}`;
   
   // Use seller's avatar if available, otherwise fall back to default OG image
   const ogImage = profile.avatar_url 
@@ -82,9 +83,7 @@ export default async function SellerPage({ params }: SellerPageProps) {
   let profileError = null;
 
   // Check if the param is a UUID (for users without username)
-  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-    username
-  );
+  const isUUID = UUID_PATTERN.test(username);
 
   if (isUUID) {
     // Look up by ID

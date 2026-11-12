@@ -59,12 +59,10 @@ export function ProductStructuredData({ product }: ProductStructuredDataProps) {
       },
     },
     category: categories,
-    aggregateRating: {
-      '@type': 'AggregateRating',
-      // These would be populated from reviews if available
-      ratingValue: '4.5',
-      reviewCount: '0',
-    },
+    url: `${baseUrl}/marketplace/product/${product.id}`,
+    productID: product.id,
+    // Don't add aggregateRating until there are real reviews: Google treats
+    // made-up ratings as spammy markup and can issue a manual action.
   };
 
   // Sanitize JSON to prevent XSS - escape any HTML entities

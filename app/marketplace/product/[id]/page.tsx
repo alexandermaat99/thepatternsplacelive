@@ -31,14 +31,10 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
     .eq('is_active', true)
     .single();
 
+  // Calling notFound() here (not just in the page) makes missing products
+  // return a real 404 status instead of a 200 "soft 404".
   if (!product) {
-    return {
-      title: 'Product Not Found',
-      robots: {
-        index: false,
-        follow: false,
-      },
-    };
+    notFound();
   }
 
   const categories =
