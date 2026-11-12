@@ -4,12 +4,16 @@ import MarketplacePage from './marketplace/page';
 import { Navigation } from '@/components/navigation';
 import { PlatformBanner } from '@/components/platform-banner';
 
+// The homepage title is the most important one on the site. Lead with what
+// people search for, then the brand.
+const HOME_TITLE = `Indie Sewing & Knitting Patterns | ${COMPANY_INFO.name}`;
+
 export const metadata: Metadata = {
-  title: COMPANY_INFO.name,
+  title: { absolute: HOME_TITLE },
   description:
     'Discover modern sewing and crafting patterns from independent designers. Browse featured patterns, filter by category, and start your next project.',
   openGraph: {
-    title: COMPANY_INFO.name,
+    title: HOME_TITLE,
     description: 'Discover modern sewing and crafting patterns from independent designers.',
     url: `${COMPANY_INFO.urls.website}/`,
     type: 'website',
@@ -24,7 +28,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: COMPANY_INFO.name,
+    title: HOME_TITLE,
     description: 'Discover modern sewing and crafting patterns from independent designers.',
     images: [`${COMPANY_INFO.urls.website}/twitter-image.png`],
   },
@@ -147,7 +151,7 @@ export default function Home(props: any) {
       <section aria-label="Marketplace" data-embedded="true">
         {/* Reuse existing marketplace page/component so filters, pagination, and SEO logic stay consistent */}
         {/* Note: This is embedded content. The canonical marketplace page is at /marketplace */}
-        <MarketplacePage {...props} />
+        <MarketplacePage {...props} embedded />
       </section>
     </div>
   );

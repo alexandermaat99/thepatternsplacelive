@@ -50,7 +50,7 @@ export function FabricDetailCarousel({ urls, alt }: { urls: string[]; alt: strin
           <Image
             key={urls[i]}
             src={urls[i]}
-            alt={isActive ? (n > 1 ? `${alt} — photo ${i + 1} of ${n}` : alt) : ''}
+            alt={n > 1 ? `${alt} — photo ${i + 1} of ${n}` : alt}
             fill
             className={cn(
               'object-cover transition-opacity duration-200 absolute inset-0',

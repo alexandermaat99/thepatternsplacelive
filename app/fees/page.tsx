@@ -5,11 +5,19 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
 export const metadata: Metadata = {
-  title: 'Seller Fees | The Patterns Place',
+  title: 'Seller Fees',
   description:
     "Learn about our transparent fee structure for sellers. See how fees are calculated and what you'll receive from each sale.",
   alternates: {
     canonical: `${COMPANY_INFO.urls.website}/fees`,
+  },
+  openGraph: {
+    title: `Seller Fees | ${COMPANY_INFO.name}`,
+    description:
+      "Learn about our transparent fee structure for sellers. See how fees are calculated and what you'll receive from each sale.",
+    url: `${COMPANY_INFO.urls.website}/fees`,
+    type: 'website',
+    images: ['/opengraph-image.png'],
   },
   robots: {
     index: true,
@@ -37,7 +45,9 @@ export default function FeesPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl">Seller Fee Breakdown</CardTitle>
+          <CardTitle className="text-2xl">
+            <h1>Seller Fee Breakdown</h1>
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Fee Breakdown */}

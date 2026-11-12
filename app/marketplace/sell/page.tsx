@@ -14,9 +14,17 @@ export const metadata: Metadata = {
   alternates: {
     canonical: `${COMPANY_INFO.urls.website}/marketplace/sell`,
   },
+  openGraph: {
+    title: `Sell Your Sewing Patterns | ${COMPANY_INFO.name}`,
+    description:
+      'Sell your original sewing, knitting, and crochet patterns as digital downloads. Free to list, no platform fees on your first 5 sales.',
+    url: `${COMPANY_INFO.urls.website}/marketplace/sell`,
+    type: 'website',
+    images: ['/opengraph-image.png'],
+  },
   robots: {
-    // Allow indexing so the sell page can appear in search results.
-    // The actual selling flow still requires authentication.
+    // Logged-out visitors (and search engines) see the sell landing page;
+    // logged-in users get the listing form.
     index: true,
     follow: true,
   },

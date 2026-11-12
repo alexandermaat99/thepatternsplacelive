@@ -72,6 +72,7 @@ export async function generateMetadata({
         'Browse and discover unique sewing and crafting patterns from independent creators.',
       url: baseUrl,
       type: 'website',
+      images: ['/opengraph-image.png'],
     },
     alternates: {
       canonical: baseUrl,
@@ -90,6 +91,8 @@ interface MarketplacePageProps {
     page?: string;
     free?: string;
   }>;
+  /** Rendered inside the home page rather than as its own page. */
+  embedded?: boolean;
 }
 
 const PRODUCTS_PER_PAGE = 24;
@@ -110,7 +113,7 @@ function productMatchesSearchWords(product: any, searchWords: string[]): boolean
   return searchWords.every(word => searchableText.includes(word.toLowerCase()));
 }
 
-async function MarketplaceContent({ searchParams }: MarketplacePageProps) {
+async function MarketplaceContent({ searchParams, embedded }: MarketplacePageProps) {
   const params = await searchParams;
   const supabase = await createClient();
 
@@ -614,7 +617,12 @@ async function MarketplaceContent({ searchParams }: MarketplacePageProps) {
     <div className="container mx-auto px-4 py-8 max-w-7xl">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
         <div>
-          <h1 className="text-3xl sm:text-4xl font-bold mb-2">Marketplace</h1>
+          {/* On the home page this section sits under the hero's <h1>, so use <h2> there. */}
+          {embedded ? (
+            <h2 className="text-3xl sm:text-4xl font-bold mb-2">Marketplace</h2>
+          ) : (
+            <h1 className="text-3xl sm:text-4xl font-bold mb-2">Marketplace</h1>
+          )}
           <p className="text-muted-foreground">
             Discover and shop beautiful patterns from talented creators
           </p>
