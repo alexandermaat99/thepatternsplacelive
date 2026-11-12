@@ -6,7 +6,7 @@ import { Navigation } from '@/components/navigation';
 import { COMPANY_INFO } from '@/lib/company-info';
 
 export const metadata: Metadata = {
-  title: `Privacy Policy - ${COMPANY_INFO.name}`,
+  title: 'Privacy Policy',
   description: `Privacy Policy for ${COMPANY_INFO.name} marketplace.`,
   alternates: {
     canonical: `${COMPANY_INFO.urls.website}/privacy`,

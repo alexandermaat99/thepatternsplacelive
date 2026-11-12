@@ -1,11 +1,17 @@
+import type { Metadata } from 'next';
+import { COMPANY_INFO } from '@/lib/company-info';
 import { DIFFICULTY_LEVELS } from '@/lib/constants';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
-export const metadata = {
-  title: "Difficulty Levels - The Pattern's Place",
-  description: 'Learn about the different difficulty levels for sewing and crafting patterns.',
+export const metadata: Metadata = {
+  title: 'Pattern Difficulty Levels',
+  description:
+    'What beginner, intermediate, and advanced mean for sewing and crafting patterns on our marketplace, so you can pick the right project for your skill level.',
+  alternates: {
+    canonical: `${COMPANY_INFO.urls.website}/marketplace/difficulty-levels`,
+  },
 };
 
 export default function DifficultyLevelsPage() {

@@ -3,13 +3,14 @@ import {
   getStripeAccountStatusServer,
 } from '@/lib/auth-helpers-server';
 import { SellForm } from '@/components/marketplace/sell-form';
+import { SellLanding } from '@/components/marketplace/sell-landing';
 import { Metadata } from 'next';
 import { COMPANY_INFO } from '@/lib/company-info';
 
 export const metadata: Metadata = {
-  title: `Sell Your Patterns - ${COMPANY_INFO.name}`,
+  title: 'Sell Your Sewing Patterns',
   description:
-    'List your sewing and crafting patterns on our marketplace. Reach thousands of crafters and start selling today.',
+    'Sell your original sewing, knitting, and crochet patterns as digital downloads. Free to list, no platform fees on your first 5 sales, and payouts straight to your bank.',
   alternates: {
     canonical: `${COMPANY_INFO.urls.website}/marketplace/sell`,
   },
@@ -22,13 +23,11 @@ export const metadata: Metadata = {
 };
 
 export default async function SellPage() {
-  // Fetch user and profile on the server (faster)
-  // Auth is handled by the layout, so user should exist
   const authData = await getCurrentUserWithProfileServer();
 
-  // If no auth data (shouldn't happen due to layout protection), return null
+  // Logged-out visitors (and search engines) get the "sell with us" landing page.
   if (!authData || !authData.user) {
-    return null;
+    return <SellLanding />;
   }
 
   const { user, profile } = authData;
