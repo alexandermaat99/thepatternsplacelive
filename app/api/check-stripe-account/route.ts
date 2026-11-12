@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStripe } from '@/lib/stripe';
+import { summarizeConnectedAccount } from '@/lib/stripe-connect';
 import { createClient } from '@/lib/supabase/server';
 import { rateLimit, getClientIdentifier, RATE_LIMITS } from '@/lib/security/rate-limit';
-import { validateUUID } from '@/lib/security/input-validation';
 
 export async function POST(request: NextRequest) {
   // accountId is used in error-handling; keep it in outer scope
@@ -88,56 +88,15 @@ export async function POST(request: NextRequest) {
     // Get the account details from Stripe
     const account = await stripe.accounts.retrieve(accountId);
 
-    const detailsSubmitted = account.details_submitted ?? false;
-    const chargesEnabled = account.charges_enabled ?? false;
-    const payoutsEnabled = account.payouts_enabled ?? false;
-    const isOnboarded = detailsSubmitted && chargesEnabled;
-
-    // Check if there are pending requirements
-    const currentlyDue = account.requirements?.currently_due || [];
-    const pendingVerification = account.requirements?.pending_verification || [];
-    const requiresMoreInfo = currentlyDue.length > 0;
-    const isPendingVerification = pendingVerification.length > 0;
-
-    // Determine status
-    let status: 'pending' | 'onboarded' | 'pending_verification' | 'requires_info';
-    if (isOnboarded) {
-      status = 'onboarded';
-    } else if (isPendingVerification) {
-      status = 'pending_verification';
-    } else if (requiresMoreInfo) {
-      status = 'requires_info';
-    } else if (detailsSubmitted) {
-      status = 'pending';
-    } else {
-      status = 'pending';
-    }
-
-    console.log('Stripe account details:', {
-      id: account.id,
-      details_submitted: detailsSubmitted,
-      charges_enabled: chargesEnabled,
-      payouts_enabled: payoutsEnabled,
-      isOnboarded,
-      status,
-      currentlyDue,
-      pendingVerification,
-    });
+    const summary = summarizeConnectedAccount(account);
 
     return NextResponse.json({
-      status,
-      isOnboarded,
-      detailsSubmitted,
-      chargesEnabled,
-      payoutsEnabled,
-      requiresMoreInfo,
-      pendingVerification: isPendingVerification,
-      requirementsDue: currentlyDue,
+      ...summary,
       account: {
         id: account.id,
-        details_submitted: detailsSubmitted,
-        charges_enabled: chargesEnabled,
-        payouts_enabled: payoutsEnabled,
+        details_submitted: summary.detailsSubmitted,
+        charges_enabled: summary.chargesEnabled,
+        payouts_enabled: summary.payoutsEnabled,
       },
     });
   } catch (error: any) {

@@ -3,6 +3,7 @@ import { getStripe } from '@/lib/stripe';
 import { createClient } from '@/lib/supabase/server';
 import { formatAmountForStripe } from '@/lib/stripe';
 import { COMPANY_INFO, calculateEtsyFees } from '@/lib/company-info';
+import { canReceiveSales } from '@/lib/stripe-connect';
 
 export async function POST(request: NextRequest) {
   try {
@@ -89,7 +90,7 @@ export async function POST(request: NextRequest) {
     for (const accountId of uniqueSellerAccounts) {
       try {
         const account = await stripe.accounts.retrieve(accountId);
-        if (!account.charges_enabled || !account.details_submitted) {
+        if (!canReceiveSales(account)) {
           return NextResponse.json(
             { error: 'One or more seller accounts are not fully set up' },
             { status: 400 }

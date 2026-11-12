@@ -326,37 +326,18 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
             )}
             {!canSell && !formData.is_free ? (
               <div className="space-y-4">
-                {!stripeStatus.isConnected ? (
-                  <p className="text-rose-300 font-medium">
-                    You must connect your Stripe account before listing a paid product. Free
-                    patterns don't require Stripe.
-                  </p>
-                ) : (
-                  <p className="text-orange-500 font-medium">
-                    Your Stripe account is not fully set up yet. Please complete the onboarding
-                    process. Free patterns don't require Stripe.
-                  </p>
-                )}
-                <StripeConnectButton userId={user.id} />
-                {profile?.stripe_account_id && (
-                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
-                    <p className="text-sm text-blue-800">
-                      <strong>Debug Info:</strong>
-                      <br />
-                      Account ID: {profile.stripe_account_id}
-                      <br />
-                      Status: {stripeStatus.status}
-                      <br />
-                      Fully Onboarded: {stripeStatus.isOnboarded ? 'Yes' : 'No'}
-                    </p>
-                  </div>
-                )}
+                <p className="text-sm text-muted-foreground">
+                  {!stripeStatus.isConnected
+                    ? 'Set up payouts to sell paid patterns. It takes about 5 minutes. Free patterns can be listed right away.'
+                    : 'Finish setting up payouts to sell paid patterns. Free patterns can be listed right away.'}
+                </p>
+                <StripeConnectButton label={stripeStatus.isConnected ? 'Finish payout setup' : 'Set up payouts'} />
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-6" noValidate>
                 {!canSell && formData.is_free && (
                   <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 p-3 text-sm text-green-800 dark:text-green-200">
-                    <strong>List a free pattern</strong> — no Stripe account needed. Buyers can download without payment. To list paid patterns later, connect Stripe from your dashboard.
+                    <strong>List a free pattern</strong> — no Stripe account needed. Buyers can download without payment. To list paid patterns later, set up payouts from your dashboard.
                   </div>
                 )}
                 <div>
