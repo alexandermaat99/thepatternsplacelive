@@ -2,6 +2,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import Image from 'next/image';
+import type { Metadata } from 'next';
+import { COMPANY_INFO } from '@/lib/company-info';
+
+export const metadata: Metadata = {
+  title: 'Digital File Delivery & Watermarking',
+  description:
+    'How pattern files are delivered to buyers by email after purchase, and how watermarking helps protect sellers\' designs.',
+  alternates: {
+    canonical: `${COMPANY_INFO.urls.website}/marketplace/watermarking-info`,
+  },
+};
 
 export default function WatermarkingInfoPage() {
   return (

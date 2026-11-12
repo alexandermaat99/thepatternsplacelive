@@ -41,7 +41,7 @@ export async function generateMetadata({ params }: SellerPageProps): Promise<Met
     : `${COMPANY_INFO.urls.website}/opengraph-image.png`;
 
   return {
-    title: `${sellerName} - Seller Profile | ${COMPANY_INFO.name}`,
+    title: `${sellerName} - Seller Profile`,
     description: `Browse patterns by ${sellerName} on ${COMPANY_INFO.name}. Discover unique sewing and crafting patterns from this independent creator.`,
     alternates: {
       canonical: profileUrl,

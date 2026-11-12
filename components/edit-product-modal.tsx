@@ -344,10 +344,10 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
         const data = await res.json();
         if (!data.canSell) {
           setError(
-            'You need an approved Stripe account to list paid patterns. Connect or complete Stripe setup in your dashboard, or keep this as a free pattern.'
+            'Set up payouts in your dashboard to list paid patterns, or keep this as a free pattern.'
           );
           setIsLoading(false);
-          showToast('Stripe account required for paid patterns', 'error');
+          showToast('Payout setup required for paid patterns', 'error');
           return;
         }
       }
@@ -867,11 +867,11 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
                     </p>
                     {!effectiveCanSell ? (
                       <p className="mt-1 text-muted-foreground">
-                        Connect and complete Stripe in your dashboard to switch to a paid pattern.
+                        Set up payouts in your dashboard to switch to a paid pattern.
                       </p>
                     ) : (
                       <p className="mt-1 text-muted-foreground">
-                        Your Stripe account is approved — you can switch this to a paid pattern anytime.
+                        Payouts are set up — you can switch this to a paid pattern anytime.
                       </p>
                     )}
                   </div>

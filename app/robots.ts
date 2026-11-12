@@ -9,14 +9,16 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: '/',
+        // No trailing slashes: '/dashboard/' would not block '/dashboard' itself.
         disallow: [
           '/api/',
-          '/dashboard/',
-          '/cart/',
-          '/checkout/',
+          '/dashboard',
+          '/cart',
+          '/checkout',
           '/auth/',
-          '/protected/',
-          '/test-*/',
+          '/protected',
+          '/test-',
+          '/marketplace/success',
         ],
       },
     ],

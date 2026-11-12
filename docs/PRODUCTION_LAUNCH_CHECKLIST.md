@@ -148,7 +148,7 @@
 
 ```
 [ ] Remove /test-email route or protect it
-[ ] Remove /test-db route or protect it
+[x] Remove /test-db route or protect it
 [ ] Remove any console.log with sensitive data
 [ ] Verify no API keys in client-side code
 [ ] Review all RLS policies one more time

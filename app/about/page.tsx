@@ -7,7 +7,7 @@ import { Navigation } from '@/components/navigation';
 import { COMPANY_INFO } from '@/lib/company-info';
 
 export const metadata: Metadata = {
-  title: `About Us - ${COMPANY_INFO.name}`,
+  title: 'About Us',
   description: `Learn about ${COMPANY_INFO.name}, a community marketplace built specifically for the sewing and knitting community. Discover our story, mission, and commitment to crafters.`,
   keywords: [
     'about patterns place',

@@ -1,32 +1,19 @@
-"use client";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
 interface StripeConnectButtonProps {
-  userId: string;
-  forceMigrate?: boolean;
-  variant?: "default" | "outline" | "secondary";
+  variant?: 'default' | 'outline' | 'secondary';
   label?: string;
 }
 
-export function StripeConnectButton({ 
-  userId, 
-  forceMigrate = false,
-  variant = "default",
-  label
+/** Sends the seller to payout setup (embedded Stripe onboarding). */
+export function StripeConnectButton({
+  variant = 'default',
+  label = 'Set up payouts',
 }: StripeConnectButtonProps) {
-  const router = useRouter();
-
-  const handleConnectStripe = () => {
-    // Navigate to the embedded onboarding page
-    router.push("/dashboard/stripe-setup");
-  };
-
-  const buttonLabel = label || (forceMigrate ? "Upgrade to Express" : "Connect with Stripe");
-
   return (
-    <Button onClick={handleConnectStripe} variant={variant} className="w-full">
-      {buttonLabel}
+    <Button asChild variant={variant} className="w-full">
+      <Link href="/dashboard/stripe-setup">{label}</Link>
     </Button>
   );
-} 
+}

@@ -6,7 +6,7 @@ import { Navigation } from '@/components/navigation';
 import { COMPANY_INFO } from '@/lib/company-info';
 
 export const metadata: Metadata = {
-  title: `Terms of Service - ${COMPANY_INFO.name}`,
+  title: 'Terms of Service',
   description: `Terms of Service for ${COMPANY_INFO.name} marketplace.`,
   alternates: {
     canonical: `${COMPANY_INFO.urls.website}/terms`,
@@ -97,8 +97,32 @@ export default function TermsOfServicePage() {
               <li>Comply with all applicable laws and regulations</li>
               <li>Connect a valid Stripe account for payment processing</li>
             </ul>
-            <p className="text-muted-foreground leading-relaxed mt-4">
-              We reserve the right to remove any listings that violate these terms or our policies.
+
+            <h3 className="text-lg font-semibold mt-6 mb-3">What may not be listed</h3>
+            <p className="text-muted-foreground leading-relaxed mb-4">
+              {COMPANY_INFO.name} is a marketplace for original, human-made digital patterns. The
+              following are not allowed:
+            </p>
+            <ul className="list-disc list-inside text-muted-foreground space-y-1">
+              <li>
+                <strong>AI-generated patterns:</strong> patterns created in whole or in part using
+                generative artificial intelligence, including AI-generated instructions, charts,
+                designs, or images of the finished item
+              </li>
+              <li>
+                <strong>Services:</strong> services of any kind, such as custom or commissioned
+                pattern design, sewing, knitting, or crocheting for hire, alterations, lessons, or
+                consultations. Only digital pattern files may be listed for sale
+              </li>
+            </ul>
+
+            <h3 className="text-lg font-semibold mt-6 mb-3">Listing review and removal</h3>
+            <p className="text-muted-foreground leading-relaxed">
+              We reserve the right, at our sole discretion and without prior notice, to review,
+              hide, or remove any listing, or to restrict or suspend a seller&apos;s account, for any
+              reason, including if we believe a listing violates these terms or our policies. We are
+              not liable for any loss of sales or other damages resulting from a listing being
+              hidden or removed.
             </p>
           </section>
 

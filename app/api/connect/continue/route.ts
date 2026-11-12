@@ -1,80 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getStripe } from '@/lib/stripe';
 import { createClient } from '@/lib/supabase/server';
+import {
+  canReceiveSales,
+  createHostedOnboardingLink,
+  getOrCreateConnectedAccount,
+} from '@/lib/stripe-connect';
 
-export async function POST(request: NextRequest) {
+/**
+ * GET /api/connect/continue
+ * Sends the seller to Stripe-hosted onboarding. Used as the fallback when the
+ * embedded form can't load, and as the account link's refresh_url.
+ */
+export async function GET(request: NextRequest) {
+  const origin = request.nextUrl.origin;
+
   try {
-    const { accountId } = await request.json();
-
-    if (!accountId) {
-      return NextResponse.json(
-        { error: 'Account ID is required' },
-        { status: 400 }
-      );
-    }
-
-    // Verify the user is authenticated and owns this account
     const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.redirect(`${origin}/auth/login`, 303);
     }
 
-    // Verify the account belongs to this user
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('stripe_account_id')
-      .eq('id', user.id)
-      .single();
+    const account = await getOrCreateConnectedAccount(supabase, user);
 
-    if (!profile || profile.stripe_account_id !== accountId) {
-      return NextResponse.json(
-        { error: 'Account not found or does not belong to user' },
-        { status: 403 }
-      );
+    if (canReceiveSales(account) && !account.requirements?.currently_due?.length) {
+      return NextResponse.redirect(`${origin}/dashboard/stripe-setup`, 303);
     }
 
-    const stripe = getStripe();
-
-    // Check if account is already fully onboarded
-    const account = await stripe.accounts.retrieve(accountId);
-    
-    if (account.details_submitted && account.charges_enabled) {
-      return NextResponse.json(
-        { error: 'Account is already fully set up', alreadyOnboarded: true },
-        { status: 400 }
-      );
-    }
-
-    // Create a new onboarding link for the existing account
-    const origin = request.nextUrl.origin;
-    const accountLink = await stripe.accountLinks.create({
-      account: accountId,
-      refresh_url: `${origin}/dashboard?stripe_refresh=true`,
-      return_url: `${origin}/dashboard?stripe_return=true`,
-      type: 'account_onboarding',
-    });
-
-    return NextResponse.json({ url: accountLink.url });
-  } catch (error: any) {
+    const url = await createHostedOnboardingLink(account.id, origin);
+    return NextResponse.redirect(url, 303);
+  } catch (error) {
     console.error('Stripe continue setup error:', error);
-    
-    // Handle specific Stripe errors
-    if (error.type === 'StripeInvalidRequestError') {
-      return NextResponse.json(
-        { error: error.message || 'Invalid account' },
-        { status: 400 }
-      );
-    }
-    
-    return NextResponse.json(
-      { error: 'Failed to continue Stripe setup' },
-      { status: 500 }
-    );
+    return NextResponse.redirect(`${origin}/dashboard/stripe-setup?error=1`, 303);
   }
 }
-
