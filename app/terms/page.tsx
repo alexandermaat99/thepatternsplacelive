@@ -100,7 +100,8 @@ export default function TermsOfServicePage() {
 
             <h3 className="text-lg font-semibold mt-6 mb-3">What may not be listed</h3>
             <p className="text-muted-foreground leading-relaxed mb-4">
-              {COMPANY_INFO.name} is a marketplace for original, human-made digital patterns. The
+              {COMPANY_INFO.name} is a marketplace for human-made digital patterns. Patterns must be
+              your own original work, or public domain or openly licensed as described below. The
               following are not allowed:
             </p>
             <ul className="list-disc list-inside text-muted-foreground space-y-1">
@@ -115,6 +116,35 @@ export default function TermsOfServicePage() {
                 consultations. Only digital pattern files may be listed for sale
               </li>
             </ul>
+
+            <h3 className="text-lg font-semibold mt-6 mb-3">
+              Public domain and openly licensed patterns
+            </h3>
+            <p className="text-muted-foreground leading-relaxed mb-4">
+              You may list a pattern you didn&apos;t create if it is in the public domain or released
+              under a license that allows redistribution and commercial use (for example, CC BY or
+              CC BY-SA). Patterns under &quot;non-commercial&quot; (NC) or &quot;no
+              derivatives&quot; (ND) licenses, and free patterns that are still under copyright, may
+              not be listed without the copyright holder&apos;s written permission. If you list one,
+              you must:
+            </p>
+            <ul className="list-disc list-inside text-muted-foreground space-y-1">
+              <li>
+                Credit the original designer or publisher, the source, and the license (or
+                public-domain status) in the listing, with a link to the original where available
+              </li>
+              <li>Not present the pattern as your own original design</li>
+              <li>
+                Offer it for free, unless you have substantially adapted it (for example, redrafted
+                or regraded it, or rewritten the instructions) and its license allows you to sell
+                your adaptation
+              </li>
+              <li>Follow any other conditions of the license, such as share-alike requirements</li>
+            </ul>
+            <p className="text-muted-foreground leading-relaxed mt-4">
+              You are responsible for confirming a pattern&apos;s copyright and license status
+              before listing it.
+            </p>
 
             <h3 className="text-lg font-semibold mt-6 mb-3">Listing review and removal</h3>
             <p className="text-muted-foreground leading-relaxed">
