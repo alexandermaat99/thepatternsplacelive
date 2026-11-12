@@ -72,7 +72,8 @@ export function SellLanding() {
       <section className="space-y-3">
         <h2 className="text-2xl font-semibold">What you can sell</h2>
         <p className="text-muted-foreground">
-          Original, human-made digital patterns that you have the right to sell. AI-generated
+          Human-made digital patterns that you have the right to sell: your own designs, or public
+          domain and openly licensed patterns with the original designer credited. AI-generated
           patterns and services, such as commissions or sewing for hire, aren&apos;t allowed. Read
           our{' '}
           <Link href="/terms" className="underline underline-offset-4">
