@@ -134,3 +134,32 @@ export async function awardPointsForReview(buyerId: string): Promise<void> {
     // Don't throw - points are non-critical
   }
 }
+
+/**
+ * Award points at most once per (user, reason, ref), e.g. once per listed
+ * product. Returns the new total, or null if already awarded / on error.
+ */
+export async function awardPatternPointsOnce(
+  userId: string,
+  points: number,
+  reason: string,
+  refId: string
+): Promise<number | null> {
+  try {
+    const supabase = createServiceRoleClient();
+    const { data, error } = await supabase.rpc('award_pattern_points_once', {
+      p_user_id: userId,
+      p_points: points,
+      p_reason: reason,
+      p_ref_id: refId,
+    });
+    if (error) {
+      console.error('Error awarding one-time pattern points:', error);
+      return null;
+    }
+    return (data as number | null) ?? null;
+  } catch (error) {
+    console.error('Error awarding one-time pattern points:', error);
+    return null;
+  }
+}

@@ -6,6 +6,7 @@ import { sendPurchaseEmail } from '@/lib/send-purchase-email';
 import { sendSellerSaleNotificationEmail } from '@/lib/email';
 import { COMPANY_INFO, calculateEtsyFees, sellerHasFeeWaiver } from '@/lib/company-info';
 import { awardPointsForPurchase, awardPointsForSale } from '@/lib/pattern-points';
+import { handleFabricCheckoutCompleted, handleFabricCheckoutExpired } from '@/lib/fabric-order-server';
 
 // Calculate fees for an order using Etsy-style structure
 // When tax is included, we maintain the seller's net amount by scaling the fee proportionally
@@ -106,6 +107,12 @@ export async function POST(request: NextRequest) {
       case 'checkout.session.completed': {
         const session = event.data.object;
         console.log('✅ Processing checkout.session.completed:', session.id);
+
+        // Fabric orders are our own inventory, handled separately from pattern orders.
+        if (session.metadata?.type === 'fabric_order') {
+          await handleFabricCheckoutCompleted(session);
+          break;
+        }
 
         // Check if orders already exist for this session (prevent duplicates)
         const { data: existingSessionOrders } = await supabase
@@ -638,6 +645,11 @@ export async function POST(request: NextRequest) {
 
       case 'checkout.session.expired': {
         const session = event.data.object;
+
+        if (session.metadata?.type === 'fabric_order') {
+          await handleFabricCheckoutExpired(session);
+          break;
+        }
 
         // Update order status to expired
         const { error } = await supabase

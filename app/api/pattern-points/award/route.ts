@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { awardPatternPoints, PATTERN_POINTS } from '@/lib/pattern-points';
+import { awardPatternPointsOnce, PATTERN_POINTS } from '@/lib/pattern-points';
 import { rateLimit, getClientIdentifier, RATE_LIMITS } from '@/lib/security/rate-limit';
 
 export async function POST(request: NextRequest) {
@@ -33,42 +33,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { action } = body;
-
-    // Validate action
-    const validActions = ['list', 'purchase', 'sale', 'review'] as const;
-    if (!action || !validActions.includes(action as any)) {
-      return NextResponse.json(
-        { error: 'Invalid action. Must be one of: list, purchase, sale, review' },
-        { status: 400 }
-      );
+    // Only "listed a product" can be claimed from the browser. Purchase, sale
+    // and review points are awarded server-side when those things happen.
+    // The product must belong to the caller and be newly created, and each
+    // product can only earn points once (enforced by the ledger).
+    const body = await request.json().catch(() => ({}));
+    const { action, productId } = body ?? {};
+    if (action !== 'list' || typeof productId !== 'string') {
+      return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
     }
 
-    // Award points based on action
-    let points: number;
-    switch (action) {
-      case 'list':
-        points = PATTERN_POINTS.LIST_PRODUCT;
-        break;
-      case 'purchase':
-        points = PATTERN_POINTS.BUY_PRODUCT;
-        break;
-      case 'sale':
-        points = PATTERN_POINTS.SELL_PRODUCT;
-        break;
-      case 'review':
-        points = PATTERN_POINTS.LEAVE_REVIEW;
-        break;
-      default:
-        return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+    const { data: product } = await supabase
+      .from('products')
+      .select('id, user_id, created_at')
+      .eq('id', productId)
+      .single();
+    const isRecent =
+      product && Date.now() - new Date(product.created_at).getTime() < 30 * 60 * 1000;
+    if (!product || product.user_id !== user.id || !isRecent) {
+      return NextResponse.json({ error: 'Not eligible' }, { status: 403 });
     }
 
-    // Award points (server-side, can access service role key)
-    const newTotal = await awardPatternPoints(user.id, points);
-
+    const points = PATTERN_POINTS.LIST_PRODUCT;
+    const newTotal = await awardPatternPointsOnce(user.id, points, 'list_product', productId);
     if (newTotal === null) {
-      return NextResponse.json({ error: 'Failed to award points' }, { status: 500 });
+      return NextResponse.json({ success: true, pointsAwarded: 0, alreadyAwarded: true });
     }
 
     return NextResponse.json({
