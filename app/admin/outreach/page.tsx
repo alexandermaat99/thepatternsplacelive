@@ -22,7 +22,12 @@ export default async function AdminOutreachPage() {
           <code>sql/add-admin-planning-items.sql</code> in Supabase.
         </p>
       ) : (
-        <PlanningList initialItems={items} statuses={DESIGNER_STATUSES} />
+        <PlanningList
+          initialItems={items}
+          statuses={DESIGNER_STATUSES}
+          storageKey="designers"
+          showChannelFilter
+        />
       )}
     </div>
   );

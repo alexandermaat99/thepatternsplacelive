@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Check, Copy, ExternalLink, Star } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/contexts/toast-context';
@@ -61,6 +61,40 @@ function DraftMessage({ initial, onSave }: { initial: string; onSave: (value: st
   );
 }
 
+/** Where a designer sells, judged from their main link. */
+function sellChannel(url: string | null): string {
+  if (!url) return 'No link';
+  let host: string;
+  try {
+    host = new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return 'Other';
+  }
+  if (host.endsWith('etsy.com')) return 'Etsy';
+  if (host.endsWith('ravelry.com')) return 'Ravelry';
+  if (host.endsWith('payhip.com')) return 'Payhip';
+  if (/(^|\.)(sewmodernbags|modernquiltco|threadloop)\./.test(host)) return 'Via a retailer';
+  return 'Own site';
+}
+
+type Filters = {
+  query: string;
+  statuses: string[];
+  section: string;
+  channel: string;
+  priorityOnly: boolean;
+};
+
+const DEFAULT_FILTERS: Filters = {
+  query: '',
+  statuses: [],
+  section: 'all',
+  channel: 'all',
+  priorityOnly: false,
+};
+
+const selectClass = 'rounded-md border bg-background px-2 py-1.5 text-sm';
+
 function handleUrl(handle: string): string | null {
   const h = handle.trim();
   if (/^https?:\/\//.test(h)) return h;
@@ -71,20 +105,56 @@ function handleUrl(handle: string): string | null {
 export function PlanningList({
   initialItems,
   statuses,
+  storageKey,
+  showChannelFilter = false,
 }: {
   initialItems: PlanningItem[];
   statuses: StatusOption[];
+  /** Filters are remembered in this browser under this key. */
+  storageKey: string;
+  /** Show the "where they sell" filter (designer list). */
+  showChannelFilter?: boolean;
 }) {
   const { showToast } = useToast();
   const [items, setItems] = useState(initialItems);
-  const [query, setQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [priorityOnly, setPriorityOnly] = useState(false);
+  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
+  const [restored, setRestored] = useState(false);
+  const { query, statuses: statusFilter, section: sectionFilter, channel, priorityOnly } = filters;
+  const update = (patch: Partial<Filters>) => setFilters(current => ({ ...current, ...patch }));
 
   const statusByValue = useMemo(
     () => Object.fromEntries(statuses.map(s => [s.value, s])),
     [statuses]
   );
+  const allSections = useMemo(() => [...new Set(items.map(item => item.section))], [items]);
+  const allChannels = useMemo(
+    () => [...new Set(items.map(item => sellChannel(item.url)))].sort(),
+    [items]
+  );
+
+  // Restore saved filters after mount (localStorage isn't available during server render).
+  const filtersKey = `admin-planning-filters:${storageKey}`;
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(
+        localStorage.getItem(filtersKey) ?? 'null'
+      ) as Partial<Filters> | null;
+      if (saved) {
+        setFilters({
+          ...DEFAULT_FILTERS,
+          ...saved,
+          statuses: (saved.statuses ?? []).filter(v => statuses.some(s => s.value === v)),
+        });
+      }
+    } catch {
+      // Ignore unreadable saved filters
+    }
+    setRestored(true);
+  }, [filtersKey, statuses]);
+
+  useEffect(() => {
+    if (restored) localStorage.setItem(filtersKey, JSON.stringify(filters));
+  }, [restored, filtersKey, filters]);
 
   const save = async (id: string, patch: Partial<PlanningItem>) => {
     const previous = items;
@@ -96,32 +166,62 @@ export function PlanningList({
     }
   };
 
+  const toggleStatus = (value: string) =>
+    update({
+      statuses: statusFilter.includes(value)
+        ? statusFilter.filter(v => v !== value)
+        : [...statusFilter, value],
+    });
+
+  const filtersActive =
+    query !== '' ||
+    statusFilter.length > 0 ||
+    sectionFilter !== 'all' ||
+    channel !== 'all' ||
+    priorityOnly;
+
   const visible = items.filter(item => {
     if (priorityOnly && !item.is_priority) return false;
-    if (statusFilter !== 'all' && item.status !== statusFilter) return false;
+    if (statusFilter.length > 0 && !statusFilter.includes(item.status)) return false;
+    if (sectionFilter !== 'all' && item.section !== sectionFilter) return false;
+    if (showChannelFilter && channel !== 'all' && sellChannel(item.url) !== channel) return false;
     if (!query) return true;
-    const haystack = [item.title, item.subtitle, item.handle, item.detail, item.notes, item.admin_notes]
+    const haystack = [
+      item.title,
+      item.subtitle,
+      item.handle,
+      item.detail,
+      item.notes,
+      item.admin_notes,
+    ]
       .join(' ')
       .toLowerCase();
     return haystack.includes(query.toLowerCase());
   });
 
+  // Avoid flashing the unfiltered list before saved filters are restored
+  if (!restored) return null;
+
   const sections = [...new Set(visible.map(item => item.section))];
-  const counts = statuses.map(s => ({ ...s, count: items.filter(i => i.status === s.value).length }));
+  const counts = statuses.map(s => ({
+    ...s,
+    count: items.filter(i => i.status === s.value).length,
+  }));
 
   return (
     <div className="space-y-6">
-      {/* Progress summary */}
+      {/* Progress summary; click to filter (pick several) */}
       <div className="flex flex-wrap gap-2">
         {counts.map(s => (
           <button
             key={s.value}
             type="button"
-            onClick={() => setStatusFilter(statusFilter === s.value ? 'all' : s.value)}
+            onClick={() => toggleStatus(s.value)}
+            aria-pressed={statusFilter.includes(s.value)}
             className={cn(
               'rounded-full px-3 py-1 text-xs font-medium border',
               s.className,
-              statusFilter === s.value && 'ring-2 ring-primary ring-offset-1'
+              statusFilter.includes(s.value) && 'ring-2 ring-primary ring-offset-1'
             )}
           >
             {s.label}: {s.count}
@@ -130,21 +230,58 @@ export function PlanningList({
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+      <div className="flex flex-wrap gap-3 items-center">
         <Input
           placeholder="Search names, notes, handles…"
           value={query}
-          onChange={e => setQuery(e.target.value)}
-          className="sm:max-w-sm"
+          onChange={e => update({ query: e.target.value })}
+          className="sm:max-w-xs"
         />
+        <select
+          value={sectionFilter}
+          onChange={e => update({ section: e.target.value })}
+          className={selectClass}
+          aria-label="Section"
+        >
+          <option value="all">All sections</option>
+          {allSections.map(section => (
+            <option key={section} value={section}>
+              {section}
+            </option>
+          ))}
+        </select>
+        {showChannelFilter && (
+          <select
+            value={channel}
+            onChange={e => update({ channel: e.target.value })}
+            className={selectClass}
+            aria-label="Where they sell"
+          >
+            <option value="all">Sells anywhere</option>
+            {allChannels.map(c => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        )}
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
             checked={priorityOnly}
-            onChange={e => setPriorityOnly(e.target.checked)}
+            onChange={e => update({ priorityOnly: e.target.checked })}
           />
           Priority only
         </label>
+        {filtersActive && (
+          <button
+            type="button"
+            onClick={() => setFilters(DEFAULT_FILTERS)}
+            className="text-sm text-muted-foreground underline underline-offset-2 hover:text-foreground"
+          >
+            Clear filters
+          </button>
+        )}
         <span className="text-sm text-muted-foreground sm:ml-auto">
           Showing {visible.length} of {items.length}
         </span>
@@ -168,7 +305,10 @@ export function PlanningList({
                     <div className="space-y-1 min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         {item.is_priority && (
-                          <Star className="h-4 w-4 fill-amber-400 text-amber-500" aria-label="Priority" />
+                          <Star
+                            className="h-4 w-4 fill-amber-400 text-amber-500"
+                            aria-label="Priority"
+                          />
                         )}
                         <span className="font-semibold">{item.title}</span>
                         {item.url && (
@@ -196,7 +336,9 @@ export function PlanningList({
                           ))}
                       </div>
                       {item.subtitle && <p className="text-sm">{item.subtitle}</p>}
-                      {item.detail && <p className="text-xs text-muted-foreground">{item.detail}</p>}
+                      {item.detail && (
+                        <p className="text-xs text-muted-foreground">{item.detail}</p>
+                      )}
                       {item.notes && <p className="text-sm text-muted-foreground">{item.notes}</p>}
                       {item.draft_message && (
                         <DraftMessage
@@ -228,7 +370,8 @@ export function PlanningList({
                         className="text-sm"
                         onBlur={e => {
                           const value = e.target.value.trim() || null;
-                          if (value !== (item.admin_notes ?? null)) save(item.id, { admin_notes: value });
+                          if (value !== (item.admin_notes ?? null))
+                            save(item.id, { admin_notes: value });
                         }}
                       />
                       <button

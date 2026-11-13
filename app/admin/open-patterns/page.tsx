@@ -22,7 +22,11 @@ export default async function AdminOpenPatternsPage() {
           <code>sql/add-admin-planning-items.sql</code> in Supabase.
         </p>
       ) : (
-        <PlanningList initialItems={items} statuses={OPEN_PATTERN_STATUSES} />
+        <PlanningList
+          initialItems={items}
+          statuses={OPEN_PATTERN_STATUSES}
+          storageKey="open_patterns"
+        />
       )}
     </div>
   );
