@@ -19,7 +19,7 @@ import { CategoryInput, linkCategoriesToProduct } from '@/components/marketplace
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import { DIFFICULTY_LEVELS } from '@/lib/constants';
-import { COMPANY_INFO, calculateEtsyFees } from '@/lib/company-info';
+import { COMPANY_INFO, calculateEtsyFees, sellerHasFeeWaiver } from '@/lib/company-info';
 import { Info } from 'lucide-react';
 import Link from 'next/link';
 import { FeesInfoModal } from '@/components/marketplace/fees-info-modal';
@@ -65,7 +65,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  const [completedSalesCount, setCompletedSalesCount] = useState<number | null>(null);
+  const [hasFeeWaiver, setHasFeeWaiver] = useState(false);
   const [canSellInModal, setCanSellInModal] = useState<boolean | null>(null);
   const shouldScrollRef = useRef<string | null>(null);
 
@@ -200,7 +200,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
     }
   }, [product]);
 
-  // Fetch seller's completed sales count for fee calculation
+  // Fetch whether the seller's platform fees are currently waived (for the fee preview)
   useEffect(() => {
     const fetchSalesCount = async () => {
       if (!user?.id) return;
@@ -209,12 +209,12 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
         const supabase = createClient();
         const { data: profile, error } = await supabase
           .from('profiles')
-          .select('completed_sales_count')
+          .select('completed_sales_count, platform_fee_waived_until')
           .eq('id', user.id)
           .single();
-        
+
         if (!error && profile) {
-          setCompletedSalesCount(profile.completed_sales_count || 0);
+          setHasFeeWaiver(sellerHasFeeWaiver(profile));
         }
       } catch (error) {
         console.error('Error fetching sales count:', error);
@@ -889,7 +889,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
                       <div className="flex justify-between items-center">
                         <span className="flex items-center gap-1">
                           {(() => {
-                            const waivePlatformFees = completedSalesCount !== null && completedSalesCount < 5;
+                            const waivePlatformFees = hasFeeWaiver;
                             return waivePlatformFees 
                               ? 'Payment Processing Fee (platform fee waived)'
                               : 'Fees (processing + platform fees)';
@@ -906,7 +906,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
                           -$
                           {formData.price && !isNaN(parseFloat(formData.price))
                             ? (() => {
-                                const waivePlatformFees = completedSalesCount !== null && completedSalesCount < 5;
+                                const waivePlatformFees = hasFeeWaiver;
                                 return (
                                   calculateEtsyFees(
                                     Math.round(parseFloat(formData.price) * 100),
@@ -923,7 +923,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
                           $
                           {formData.price && !isNaN(parseFloat(formData.price))
                             ? (() => {
-                                const waivePlatformFees = completedSalesCount !== null && completedSalesCount < 5;
+                                const waivePlatformFees = hasFeeWaiver;
                                 return (
                                   parseFloat(formData.price) -
                                   calculateEtsyFees(

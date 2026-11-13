@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getStripe } from '@/lib/stripe';
 import { createClient } from '@/lib/supabase/server';
 import { formatAmountForStripe } from '@/lib/stripe';
-import { COMPANY_INFO, calculateEtsyFees } from '@/lib/company-info';
+import { COMPANY_INFO, calculateEtsyFees, sellerHasFeeWaiver } from '@/lib/company-info';
 import { canReceiveSales } from '@/lib/stripe-connect';
 
 export async function POST(request: NextRequest) {
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     // Get seller's profile with Stripe account ID and sales count
     const { data: sellerProfile, error: sellerError } = await supabase
       .from('profiles')
-      .select('stripe_account_id, completed_sales_count')
+      .select('stripe_account_id, completed_sales_count, platform_fee_waived_until')
       .eq('id', product.user_id)
       .single();
 
@@ -89,10 +89,9 @@ export async function POST(request: NextRequest) {
     // - Seller receives: $10.00 - $1.40 = $8.60
     const priceInCents = Math.round(product.price * 100);
 
-    // Check if seller qualifies for first 5 sales fee waiver
-    const waivePlatformFees = (sellerProfile.completed_sales_count || 0) < 5;
+    // First free sales or an active waiver (e.g. Founding Designers)
+    const waivePlatformFees = sellerHasFeeWaiver(sellerProfile);
 
-    // Calculate Etsy-style fees (waive platform fees for first 5 sales)
     const fees = calculateEtsyFees(priceInCents, waivePlatformFees);
     const platformFeeAmount = fees.totalFee;
 

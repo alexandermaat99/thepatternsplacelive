@@ -1,15 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStripe } from '@/lib/stripe';
 import { createServiceRoleClient } from '@/lib/supabase/service-role';
-import { calculateEtsyFees } from '@/lib/company-info';
+import { calculateEtsyFees, sellerHasFeeWaiver } from '@/lib/company-info';
 import { deliverProductsForOrders } from '@/lib/product-delivery';
 import { sendSellerSaleNotificationEmail } from '@/lib/email';
 import { awardPointsForPurchase, awardPointsForSale } from '@/lib/pattern-points';
 
-// Calculate fees for an order using Etsy-style structure
-function calculateFees(amount: number) {
+// Whether each seller's platform fees are waived (same rule as checkout and the webhook)
+async function getFeeWaivers(supabase: any, sellerIds: string[]): Promise<Map<string, boolean>> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, completed_sales_count, platform_fee_waived_until')
+    .in('id', sellerIds);
+  if (error) console.error('Error fetching seller fee waivers:', error);
+  return new Map((data ?? []).map((p: any) => [p.id, sellerHasFeeWaiver(p)]));
+}
+
+// Calculate fees for an order
+function calculateFees(amount: number, waivePlatformFees = false) {
   const amountInCents = Math.round(amount * 100);
-  const fees = calculateEtsyFees(amountInCents);
+  const fees = calculateEtsyFees(amountInCents, waivePlatformFees);
 
   // Convert back to dollars for return value
   const platformFee = fees.totalFee / 100;
@@ -75,13 +85,17 @@ export async function POST(request: NextRequest) {
           .in('id', productIds);
 
         if (products) {
+          const feeWaivers = await getFeeWaivers(
+            supabase,
+            [...new Set(products.map(p => p.user_id as string))]
+          );
           const orders = items
             .map((item: { productId: string; quantity: number }) => {
               const product = products.find(p => p.id === item.productId);
               if (!product) return null;
 
               const orderAmount = product.price * item.quantity;
-              const fees = calculateFees(orderAmount);
+              const fees = calculateFees(orderAmount, feeWaivers.get(product.user_id) ?? false);
 
               return {
                 product_id: item.productId,
@@ -330,7 +344,8 @@ export async function POST(request: NextRequest) {
 
       if (product) {
         const orderAmount = session.amount_total ? session.amount_total / 100 : 0;
-        const fees = calculateFees(orderAmount);
+        const feeWaivers = await getFeeWaivers(supabase, [product.user_id]);
+        const fees = calculateFees(orderAmount, feeWaivers.get(product.user_id) ?? false);
 
         const { error: orderError, data: insertedOrders } = await supabase
           .from('orders')

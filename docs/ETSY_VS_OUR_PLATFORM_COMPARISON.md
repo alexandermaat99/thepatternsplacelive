@@ -1,79 +1,32 @@
-# Etsy vs Our Platform Fee Comparison
+# Etsy vs The Pattern's Place: Seller Fees
 
-## Etsy's Fees on a $10 Sale
+Rates live in `lib/company-info.ts` (`COMPANY_INFO.fees`), and `calculateEtsyFees()` computes them. If you change the rates, update this doc too.
 
-### Fee Breakdown
+## Current rates
 
-- **Listing Fee**: $0.20 (charged each time item sells)
-- **Transaction Fee**: 6.5% of sale price = $10.00 × 6.5% = **$0.65**
-- **Payment Processing**: 3% + $0.25 = ($10.00 × 3%) + $0.25 = **$0.55**
-- **Total Etsy Fees**: $0.20 + $0.65 + $0.55 = **$1.40**
+| | Etsy | The Pattern's Place |
+|---|---|---|
+| Listing fee | $0.20 per sale | **None** |
+| Transaction / platform fee | 6.5% | **5%** |
+| Payment processing | 3% + $0.25 | 3% + $0.25 |
+| Ad fees | 15% on Offsite Ads sales (12% over $10k/yr) | **None** |
+| Minimum fee | n/a | None |
+| Waivers | none | Platform fee waived on each seller's **first 5 sales**, and for **Founding Designers** until `profiles.platform_fee_waived_until` |
 
-### Money Flow
+## On a $10 pattern
 
-- **Customer Pays**: $10.00
-- **Etsy Keeps**: $1.40
-- **Seller Receives**: $10.00 - $1.40 = **$8.60**
+| | Fees | Seller receives |
+|---|---|---|
+| Etsy (organic sale) | $1.40 | $8.60 |
+| Etsy (Offsite Ads sale) | $2.90 | $7.10 |
+| **TPP (standard)** | **$1.05** | **$8.95** |
+| **TPP (first 5 sales / Founding Designer)** | **$0.55** | **$9.45** |
 
-## Our Platform Fees on a $10 Sale (No Tax)
+TPP's standard fee breaks down as $0.50 platform (5%) + $0.30 processing (3%) + $0.25 processing flat.
 
-### Fee Breakdown
+## Platform economics (destination charges)
 
-- **Platform Fee**: 5.6% of sale price = $10.00 × 5.6% = **$0.56**
-- **Stripe Percentage (2.9%)**: Platform absorbs = $10.00 × 2.9% = **$0.29** (platform pays)
-- **Stripe Flat Fee**: Seller pays = **$0.30**
-- **Total Fees Deducted from Seller**: $0.56 + $0.30 = **$0.86**
+The platform pays Stripe about 2.9% + $0.30 per card charge (US cards; international cards cost more). Stripe Connect Express also bills per active connected account and per payout. Check current Connect pricing, because daily payouts mean a payout fee every day a seller has a balance.
 
-### Money Flow
-
-- **Customer Pays**: $10.00
-- **Platform Keeps (Gross)**: $0.56
-- **Platform Pays Stripe**: -$0.29
-- **Platform Net Revenue**: $0.56 - $0.29 = **$0.27**
-- **Seller Receives**: $10.00 - $0.56 - $0.30 = **$9.14**
-
-## Comparison Summary
-
-| Platform         | Customer Pays | Platform Keeps | Seller Receives | Platform Net |
-| ---------------- | ------------- | -------------- | --------------- | ------------ |
-| **Etsy**         | $10.00        | $1.40          | $8.60           | $1.40        |
-| **Our Platform** | $10.00        | $0.56 (gross)  | $9.14           | $0.27 (net)  |
-
-## Key Differences
-
-### Etsy
-
-- ✅ **Higher fees**: $1.40 total (14% of sale)
-- ✅ **Seller gets less**: $8.60 (86% of sale)
-- ✅ **Etsy keeps more**: $1.40 (14% of sale)
-
-### Our Platform
-
-- ✅ **Lower fees**: $0.86 total (8.6% of sale)
-- ✅ **Seller gets more**: $9.14 (91.4% of sale)
-- ✅ **Platform keeps less**: $0.27 net (2.7% of sale)
-
-## With Tax Example ($10 + 7.45% Tax)
-
-### Etsy (if they collect tax)
-
-- Customer pays: $10.75
-- Etsy fees: $1.40 (on $10 sale price)
-- Seller receives: $8.60
-- Tax: $0.75 (Etsy would handle separately)
-
-### Our Platform
-
-- Customer pays: $10.75
-- Platform fees: $0.86 (on $10 sale price)
-- Seller receives: $9.14
-- Tax: $0.75 (platform withholds for remittance)
-- Platform net: $0.27 (after Stripe fees)
-
-## Competitive Advantage
-
-**Our platform is significantly more seller-friendly:**
-
-- Sellers keep **$0.54 more** per $10 sale ($9.14 vs $8.60)
-- **38% lower fees** than Etsy (8.6% vs 14%)
-- Platform is more competitive for sellers while still being profitable
+- **Standard sale ($10):** the platform collects $1.05 and pays Stripe about $0.59, netting about $0.46 before Connect account and payout fees.
+- **Waived sale ($10):** the platform collects $0.55 and pays Stripe about $0.59, a small loss (about -$0.04) per sale. That's the cost of the free-sales and Founding Designer programs.

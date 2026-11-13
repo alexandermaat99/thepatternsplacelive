@@ -64,17 +64,21 @@ export const COMPANY_INFO = {
   },
 
   // Platform Fees & Revenue
-  // Etsy-style fee structure
+  // Sellers pay a flat platform fee plus payment processing. No listing fee,
+  // no minimum fee, no ad fees. Designed to beat Etsy (6.5% + $0.20 + ad fees).
   fees: {
-    // Listing Fee: $0.20 per sale (charged each time item sells)
-    listingFeeCents: 20, // $0.20
+    // Listing fee per sale. Set to 0: we don't charge listing fees.
+    listingFeeCents: 0,
 
-    // Transaction Fee: 6.5% of sale price (like Etsy)
-    transactionFeePercent: 0.065, // 6.5%
+    // Platform (transaction) fee: 5% of sale price
+    transactionFeePercent: 0.05, // 5%
 
-    // Payment Processing: 3% + $0.25 (like Etsy)
+    // Payment Processing: 3% + $0.25 (passed through to the seller)
     paymentProcessingPercent: 0.03, // 3%
     paymentProcessingFlatCents: 25, // $0.25
+
+    // Every seller's first N sales have platform fees waived (processing still applies)
+    freeSalesCount: 5,
 
     // Legacy fields (kept for backward compatibility, but not used)
     // These are replaced by the Etsy-style structure above
@@ -83,9 +87,8 @@ export const COMPANY_INFO = {
     stripePercentFee: 0.03, // 3% (payment processing percentage)
     stripeFlatFeeCents: 25, // $0.25 (payment processing flat fee)
 
-    // Minimum platform fee in cents (optional floor)
-    // e.g., 50 = $0.50 minimum fee per transaction
-    minimumFeeCents: 50,
+    // Minimum total fee in cents (optional floor). 0 = no minimum.
+    minimumFeeCents: 0,
 
     // Minimum product price in dollars
     // Products must be priced at least this amount
@@ -98,15 +101,40 @@ export function getCopyrightText() {
   return `© ${COMPANY_INFO.legal.copyrightYear} ${COMPANY_INFO.name}. All rights reserved.`;
 }
 
+/** Fee-relevant fields from a seller's profile row. */
+export type SellerFeeProfile = {
+  completed_sales_count?: number | null;
+  platform_fee_waived_until?: string | null;
+} | null | undefined;
+
 /**
- * Calculate Etsy-style platform fees for a sale
+ * Whether a seller's platform fees are waived for their next sale:
+ * during their first `freeSalesCount` sales, or while they have an active
+ * waiver (e.g. Founding Designers). Payment processing always applies.
+ * This is the single source of truth: checkout, the webhook, and the fee
+ * previews must all use it so sellers see exactly what they'll be charged.
+ */
+export function sellerHasFeeWaiver(profile: SellerFeeProfile, now: Date = new Date()): boolean {
+  if (!profile) return false;
+  if ((profile.completed_sales_count ?? 0) < COMPANY_INFO.fees.freeSalesCount) return true;
+  if (profile.platform_fee_waived_until) {
+    const waivedUntil = new Date(profile.platform_fee_waived_until);
+    if (!Number.isNaN(waivedUntil.getTime()) && waivedUntil > now) return true;
+  }
+  return false;
+}
+
+/**
+ * Calculate platform fees for a sale
  * @param salePriceInCents - The sale price in cents
- * @param waivePlatformFees - If true, waive platform fees (listing + transaction) but keep payment processing fees. Used for first 5 sales.
+ * @param waivePlatformFees - If true, waive platform fees (listing + transaction) but keep payment processing fees. See sellerHasFeeWaiver().
  * @returns Object with fee breakdown in cents
  */
 export function calculateEtsyFees(salePriceInCents: number, waivePlatformFees: boolean = false) {
-  const listingFee = waivePlatformFees ? 0 : COMPANY_INFO.fees.listingFeeCents; // $0.20
-  const transactionFee = waivePlatformFees ? 0 : Math.round(salePriceInCents * COMPANY_INFO.fees.transactionFeePercent); // 6.5%
+  const listingFee = waivePlatformFees ? 0 : COMPANY_INFO.fees.listingFeeCents;
+  const transactionFee = waivePlatformFees
+    ? 0
+    : Math.round(salePriceInCents * COMPANY_INFO.fees.transactionFeePercent);
   const paymentProcessingPercent = Math.round(
     salePriceInCents * COMPANY_INFO.fees.paymentProcessingPercent
   ); // 3%

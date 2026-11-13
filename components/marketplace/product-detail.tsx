@@ -1,5 +1,6 @@
 'use client';
 
+import { FoundingDesignerBadge } from '@/components/marketplace/founding-designer-badge';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -45,6 +46,7 @@ interface Product {
     full_name?: string;
     username?: string;
     avatar_url?: string;
+    founding_designer?: boolean | null;
   };
   product_categories?: Array<{
     category: Category;
@@ -294,6 +296,9 @@ export function ProductDetail({ product }: ProductDetailProps) {
                       </Link>
                     ) : (
                       <>Sold by {product.profiles.full_name || 'Unknown'}</>
+                    )}
+                    {product.profiles.founding_designer && (
+                      <FoundingDesignerBadge className="ml-2" />
                     )}
                   </p>
                 )}

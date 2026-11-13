@@ -274,7 +274,7 @@ async function MarketplaceContent({ searchParams, embedded }: MarketplacePagePro
     .select(
       `
       *,
-      profiles:user_id (full_name, username, avatar_url),
+      profiles:user_id (full_name, username, avatar_url, founding_designer),
       product_categories (category:categories (id, name, slug))
     `
     )
@@ -356,7 +356,7 @@ async function MarketplaceContent({ searchParams, embedded }: MarketplacePagePro
       .select(
         `
         *,
-        profiles:user_id (full_name, username, avatar_url),
+        profiles:user_id (full_name, username, avatar_url, founding_designer),
         product_categories (category:categories (id, name, slug))
       `
       )
@@ -420,7 +420,7 @@ async function MarketplaceContent({ searchParams, embedded }: MarketplacePagePro
       .select(
         `
         *,
-        profiles:user_id (full_name, username, avatar_url),
+        profiles:user_id (full_name, username, avatar_url, founding_designer),
         product_categories (category:categories (id, name, slug))
       `
       )

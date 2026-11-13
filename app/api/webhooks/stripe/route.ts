@@ -4,7 +4,7 @@ import { createServiceRoleClient } from '@/lib/supabase/service-role';
 import { headers } from 'next/headers';
 import { sendPurchaseEmail } from '@/lib/send-purchase-email';
 import { sendSellerSaleNotificationEmail } from '@/lib/email';
-import { COMPANY_INFO, calculateEtsyFees } from '@/lib/company-info';
+import { COMPANY_INFO, calculateEtsyFees, sellerHasFeeWaiver } from '@/lib/company-info';
 import { awardPointsForPurchase, awardPointsForSale } from '@/lib/pattern-points';
 
 // Calculate fees for an order using Etsy-style structure
@@ -19,19 +19,17 @@ async function calculateFees(
   // Convert to cents for calculation
   const amountInCents = Math.round(amount * 100);
 
-  // Check if seller qualifies for first 5 sales fee waiver
+  // First free sales or an active waiver (e.g. Founding Designers)
   let waivePlatformFees = false;
   if (sellerId && supabase) {
     try {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('completed_sales_count')
+        .select('completed_sales_count, platform_fee_waived_until')
         .eq('id', sellerId)
         .single();
-      
-      if (profile) {
-        waivePlatformFees = (profile.completed_sales_count || 0) < 5;
-      }
+
+      waivePlatformFees = sellerHasFeeWaiver(profile);
     } catch (error) {
       console.error('Error fetching seller sales count:', error);
     }

@@ -1,5 +1,6 @@
 'use client';
 
+import { FoundingDesignerBadge } from '@/components/marketplace/founding-designer-badge';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,6 +34,7 @@ interface Product {
     full_name?: string;
     username?: string;
     avatar_url?: string;
+    founding_designer?: boolean | null;
   };
   product_categories?: Array<{
     category: Category;
@@ -211,6 +213,9 @@ export function ProductCard({ product, hideFavorite = false }: ProductCardProps)
                 </button>
               ) : (
                 <>by {product.profiles.full_name || 'Unknown'}</>
+              )}
+              {product.profiles.founding_designer && (
+                <FoundingDesignerBadge className="ml-1.5" />
               )}
             </p>
           )}

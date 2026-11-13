@@ -19,6 +19,7 @@ import {
   getStripeAccountStatusServer,
 } from '@/lib/auth-helpers-server';
 import { createClient } from '@/lib/supabase/server';
+import { COMPANY_INFO } from '@/lib/company-info';
 
 // Format currency helper
 function formatCurrency(amount: number, currency: string = 'USD') {
@@ -61,6 +62,19 @@ export default async function DashboardPage() {
   const stripeStatus = (await Promise.race([stripeStatusPromise, stripeStatusTimeout])) as any;
 
   const canSell = stripeStatus.isOnboarded;
+
+  // Platform fee waiver status for the banner
+  const freeSalesLeft = Math.max(
+    0,
+    COMPANY_INFO.fees.freeSalesCount - (profile?.completed_sales_count ?? 0)
+  );
+  const waivedUntil = profile?.platform_fee_waived_until
+    ? new Date(profile.platform_fee_waived_until)
+    : null;
+  const activeWaiverUntil = waivedUntil && waivedUntil > new Date() ? waivedUntil : null;
+  const processingFeeText = `${COMPANY_INFO.fees.paymentProcessingPercent * 100}% + $${(
+    COMPANY_INFO.fees.paymentProcessingFlatCents / 100
+  ).toFixed(2)}`;
   const hasSellerIntent = !!profile?.stripe_account_id; // User has started seller onboarding
 
   // Fetch product count so we can show "My Products" to free-only sellers who have listed items
@@ -131,20 +145,21 @@ export default async function DashboardPage() {
         <SignOutButton />
       </div>
 
-      {/* First 5 Sales Fee Waiver Banner - Only show for sellers with Stripe connected and < 5 sales */}
-      {hasSellerIntent && profile && (profile.completed_sales_count || 0) < 5 && (
+      {/* Platform fee waiver banner: Founding Designer waiver or first free sales */}
+      {hasSellerIntent && (activeWaiverUntil || freeSalesLeft > 0) && (
         <Card className="mb-6 border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950">
           <CardContent className="pt-6">
             <div className="flex items-start gap-3">
               <Gift className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
               <div className="flex-1">
                 <h3 className="font-semibold text-green-900 dark:text-green-100 mb-1">
-                  Platform Fee Waiver Active
+                  {activeWaiverUntil ? 'Founding Designer: no platform fees' : 'Platform Fee Waiver Active'}
                 </h3>
                 <p className="text-sm text-green-800 dark:text-green-200">
-                  Your next {5 - (profile.completed_sales_count || 0)} sale
-                  {5 - (profile.completed_sales_count || 0) !== 1 ? 's' : ''} have platform fees
-                  waived! Only the Stripe processing fees (3% + $0.25) will apply on these sales.
+                  {activeWaiverUntil
+                    ? `You pay no platform fees on sales until ${activeWaiverUntil.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}.`
+                    : `Your next ${freeSalesLeft} sale${freeSalesLeft !== 1 ? 's have' : ' has'} platform fees waived.`}{' '}
+                  Only payment processing ({processingFeeText}) applies.
                 </p>
               </div>
             </div>

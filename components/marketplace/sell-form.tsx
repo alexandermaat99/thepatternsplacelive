@@ -16,7 +16,7 @@ import { ArrowLeft, Info, Award } from 'lucide-react';
 import Link from 'next/link';
 import type { UserProfile, StripeAccountStatus } from '@/lib/auth-helpers';
 import { DIFFICULTY_LEVELS } from '@/lib/constants';
-import { COMPANY_INFO, calculateEtsyFees } from '@/lib/company-info';
+import { COMPANY_INFO, calculateEtsyFees, sellerHasFeeWaiver } from '@/lib/company-info';
 import { FeesInfoModal } from '@/components/marketplace/fees-info-modal';
 import { PATTERN_POINTS } from '@/lib/pattern-points';
 import { Badge } from '@/components/ui/badge';
@@ -542,9 +542,7 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                         <div className="flex justify-between items-center">
                           <span className="flex items-center gap-1">
                             {(() => {
-                              const waivePlatformFees = profile 
-                                ? (profile.completed_sales_count || 0) < 5
-                                : false;
+                              const waivePlatformFees = sellerHasFeeWaiver(profile);
                               return waivePlatformFees 
                                 ? 'Payment Processing Fee (platform fee waived)'
                                 : 'Fees (processing + platform fees)';
@@ -561,9 +559,7 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                             -$
                             {formData.price && !isNaN(parseFloat(formData.price))
                               ? (() => {
-                                  const waivePlatformFees = profile 
-                                    ? (profile.completed_sales_count || 0) < 5
-                                    : false;
+                                  const waivePlatformFees = sellerHasFeeWaiver(profile);
                                   return (
                                     calculateEtsyFees(
                                       Math.round(parseFloat(formData.price) * 100),
@@ -580,9 +576,7 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                             $
                             {formData.price && !isNaN(parseFloat(formData.price))
                               ? (() => {
-                                  const waivePlatformFees = profile 
-                                    ? (profile.completed_sales_count || 0) < 5
-                                    : false;
+                                  const waivePlatformFees = sellerHasFeeWaiver(profile);
                                   return (
                                     parseFloat(formData.price) -
                                     calculateEtsyFees(

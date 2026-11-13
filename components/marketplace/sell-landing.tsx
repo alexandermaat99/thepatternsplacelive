@@ -60,8 +60,11 @@ export function SellLanding() {
       <section className="space-y-3">
         <h2 className="text-2xl font-semibold">Fees</h2>
         <p className="text-muted-foreground">
-          Listing is free. Platform fees are waived on your first 5 sales, so you only pay Stripe&apos;s
-          payment processing fee. Free patterns don&apos;t need payout setup at all.{' '}
+          Listing is free, and there are never ad fees. Your first{' '}
+          {COMPANY_INFO.fees.freeSalesCount} sales have no platform fee, so you only pay payment
+          processing. After that it&apos;s a flat{' '}
+          {COMPANY_INFO.fees.transactionFeePercent * 100}% platform fee plus processing. Free
+          patterns don&apos;t need payout setup at all.{' '}
           <Link href="/fees" className="underline underline-offset-4">
             See the full fee breakdown
           </Link>

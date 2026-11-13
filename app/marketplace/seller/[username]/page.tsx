@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { BackButton } from '@/components/back-button';
 import { Metadata } from 'next';
 import { COMPANY_INFO } from '@/lib/company-info';
+import { FoundingDesignerBadge } from '@/components/marketplace/founding-designer-badge';
 
 interface SellerPageProps {
   params: Promise<{
@@ -89,7 +90,7 @@ export default async function SellerPage({ params }: SellerPageProps) {
     // Look up by ID
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, full_name, username, avatar_url, bio')
+      .select('id, full_name, username, avatar_url, bio, founding_designer')
       .eq('id', username)
       .single();
     profile = data;
@@ -98,7 +99,7 @@ export default async function SellerPage({ params }: SellerPageProps) {
     // Look up by username
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, full_name, username, avatar_url, bio')
+      .select('id, full_name, username, avatar_url, bio, founding_designer')
       .ilike('username', username)
       .single();
     profile = data;
@@ -161,6 +162,7 @@ export default async function SellerPage({ params }: SellerPageProps) {
               <h1 className="text-3xl sm:text-4xl font-bold mb-2">
                 {profile.username ? `@${profile.username}` : sellerName}
               </h1>
+              {profile.founding_designer && <FoundingDesignerBadge size="md" className="mb-2" />}
               {profile.full_name && profile.username && (
                 <p className="text-muted-foreground text-lg">{profile.full_name}</p>
               )}
