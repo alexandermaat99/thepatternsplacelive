@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation';
 import type { UserProfile as UserProfileType, StripeAccountStatus } from '@/lib/auth-helpers';
 import { UsernameEditor } from '@/components/username-editor';
 import { BioEditor } from '@/components/bio-editor';
+import { FoundingDesignerBadge } from '@/components/marketplace/founding-designer-badge';
 import { useToast } from '@/contexts/toast-context';
 
 interface UserProfileProps {
@@ -263,6 +264,9 @@ export function UserProfile({
           )}
 
           <div className="space-y-4">
+            {(currentProfile?.founding_designer ?? profile?.founding_designer) && (
+              <FoundingDesignerBadge size="md" />
+            )}
             <UsernameEditor
               currentUsername={currentProfile?.username || profile?.username || null}
               onUpdate={handleUsernameUpdate}
