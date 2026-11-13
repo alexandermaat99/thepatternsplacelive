@@ -32,7 +32,8 @@ export async function getPlanningItems(list: 'designers' | 'open_patterns') {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('admin_planning_items')
-    .select('id, section, sort_order, title, subtitle, url, handle, detail, notes, is_priority, status, admin_notes')
+    // '*' so newer optional columns (e.g. draft_message) never break the page
+    .select('*')
     .eq('list', list)
     .order('sort_order', { ascending: true });
   return { items: (data ?? []) as PlanningItem[], error };

@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS public.admin_planning_items (
   is_priority boolean NOT NULL DEFAULT false,
   status text NOT NULL DEFAULT 'todo',
   admin_notes text,         -- your own notes (outreach replies, etc.)
+  draft_message text,       -- editable outreach message draft
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (list, title)
@@ -51,3 +52,6 @@ CREATE TRIGGER touch_admin_planning_item
   BEFORE UPDATE ON public.admin_planning_items
   FOR EACH ROW
   EXECUTE FUNCTION public.touch_admin_planning_item();
+
+-- Added later: outreach message drafts (no-op on fresh installs)
+ALTER TABLE public.admin_planning_items ADD COLUMN IF NOT EXISTS draft_message text;

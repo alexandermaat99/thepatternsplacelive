@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ExternalLink, Star } from 'lucide-react';
+import { Check, Copy, ExternalLink, Star } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/contexts/toast-context';
 import { Input } from '@/components/ui/input';
@@ -21,9 +21,45 @@ export type PlanningItem = {
   is_priority: boolean;
   status: string;
   admin_notes: string | null;
+  draft_message?: string | null;
 };
 
 export type StatusOption = { value: string; label: string; className: string };
+
+/** Editable outreach draft with a copy button. Edits save when you click away. */
+function DraftMessage({ initial, onSave }: { initial: string; onSave: (value: string) => void }) {
+  const [value, setValue] = useState(initial);
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    await navigator.clipboard.writeText(value);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+  return (
+    <details className="mt-2 rounded-md border bg-muted/30">
+      <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium">
+        Draft message
+      </summary>
+      <div className="space-y-2 px-3 pb-3">
+        <Textarea
+          value={value}
+          onChange={e => setValue(e.target.value)}
+          onBlur={() => value !== initial && onSave(value)}
+          rows={14}
+          className="text-sm leading-relaxed"
+        />
+        <button
+          type="button"
+          onClick={copy}
+          className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted"
+        >
+          {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+          {copied ? 'Copied' : 'Copy message'}
+        </button>
+      </div>
+    </details>
+  );
+}
 
 function handleUrl(handle: string): string | null {
   const h = handle.trim();
@@ -162,6 +198,12 @@ export function PlanningList({
                       {item.subtitle && <p className="text-sm">{item.subtitle}</p>}
                       {item.detail && <p className="text-xs text-muted-foreground">{item.detail}</p>}
                       {item.notes && <p className="text-sm text-muted-foreground">{item.notes}</p>}
+                      {item.draft_message && (
+                        <DraftMessage
+                          initial={item.draft_message}
+                          onSave={value => save(item.id, { draft_message: value })}
+                        />
+                      )}
                     </div>
                     <div className="space-y-2">
                       <select
