@@ -72,3 +72,18 @@ export function applyConsentChoice(choice: ConsentChoice) {
 export function openCookieSettings() {
   window.dispatchEvent(new Event(OPEN_COOKIE_SETTINGS_EVENT));
 }
+
+/**
+ * Whether the cookie banner is currently on screen. Other fixed-position UI
+ * (like the feedback bubble) uses this to get out of its way on small screens.
+ */
+export const COOKIE_BANNER_VISIBILITY_EVENT = 'cookie-banner-visibility';
+
+export function setCookieBannerVisible(visible: boolean) {
+  document.documentElement.dataset.cookieBanner = visible ? 'open' : 'closed';
+  window.dispatchEvent(new CustomEvent(COOKIE_BANNER_VISIBILITY_EVENT, { detail: visible }));
+}
+
+export function isCookieBannerVisible(): boolean {
+  return typeof document !== 'undefined' && document.documentElement.dataset.cookieBanner === 'open';
+}
