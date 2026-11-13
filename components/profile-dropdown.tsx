@@ -12,7 +12,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
-import { User, LogOut, ShoppingBag, Package, Plus, Ruler, ReceiptText, Barcode, Megaphone, BookOpen } from 'lucide-react';
+import { User, LogOut, ShoppingBag, Package, Plus, Ruler, ReceiptText, Barcode, Megaphone, BookOpen, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 
 export function ProfileDropdown() {
@@ -171,6 +171,18 @@ export function ProfileDropdown() {
               >
                 <BookOpen className="mr-2 h-4 w-4" />
                 <span>Open patterns</span>
+              </Link>
+            </DropdownMenuItem>
+          )}
+          {isAdmin && (
+            <DropdownMenuItem asChild>
+              <Link
+                href="/admin/hidden-listings"
+                className="flex items-center w-full"
+                onClick={() => setIsOpen(false)}
+              >
+                <EyeOff className="mr-2 h-4 w-4" />
+                <span>Hidden listings</span>
               </Link>
             </DropdownMenuItem>
           )}
