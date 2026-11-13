@@ -5,6 +5,7 @@ import { ThemeProvider } from 'next-themes';
 import { Providers } from '@/components/providers';
 import { Footer } from '@/components/footer';
 import { CookieConsent } from '@/components/cookie-consent';
+import { CONSENT_DEFAULTS_SCRIPT } from '@/lib/cookie-consent';
 import { FeedbackBubbleConditional } from '@/components/feedback-bubble-conditional';
 import './globals.css';
 
@@ -122,6 +123,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        {/* Consent defaults must run before Google Tag Manager / Analytics load. */}
+        <script dangerouslySetInnerHTML={{ __html: CONSENT_DEFAULTS_SCRIPT }} />
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml" />
         <link rel="icon" href="/icons/favicon-96x96.png" type="image/png" sizes="96x96" />
