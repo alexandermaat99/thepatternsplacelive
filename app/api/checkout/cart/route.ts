@@ -112,11 +112,17 @@ export async function POST(request: NextRequest) {
     const sellerAccountIds = Array.from(uniqueSellerAccounts);
     const primarySellerAccountId = sellerAccountIds[0];
 
-    // If multiple sellers, warn but proceed with first seller
-    // TODO: Consider splitting into multiple checkout sessions for better UX
+    // This checkout can only pay ONE seller (a single Connect destination), and
+    // the payout is computed on the whole cart total. With patterns from two
+    // designers, the first would be paid for both and the second nothing.
+    // Until multi-seller checkout ships, require one designer per checkout.
     if (sellerAccountIds.length > 1) {
-      console.warn(
-        `Cart contains products from ${sellerAccountIds.length} different sellers. Using first seller for transfer.`
+      return NextResponse.json(
+        {
+          error:
+            'Your cart has patterns from more than one designer. For now, please check out one designer at a time: remove the others, check out, then add them back. Sorry for the hassle!',
+        },
+        { status: 400 }
       );
     }
 
