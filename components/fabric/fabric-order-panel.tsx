@@ -7,9 +7,11 @@ import { Button } from '@/components/ui/button';
 import { useFabricCart } from '@/hooks/useFabricCart';
 import {
   FABRIC_ORDER_SETTINGS,
+  describeShipping,
   formatCents,
   formatYardsLabel,
   roundYards,
+  type FabricShippingSettings,
 } from '@/lib/fabric-orders';
 
 const FRACTIONS: Record<number, string> = { 0.125: '⅛', 0.25: '¼', 0.5: '½', 0.75: '¾', 1: '1' };
@@ -22,7 +24,9 @@ export function FabricOrderPanel({
   pricePerYard,
   photoUrl,
   maxYards,
+  shippingSettings,
 }: {
+  shippingSettings: FabricShippingSettings;
   baseSku: string;
   name: string;
   pricePerYard: number;
@@ -30,7 +34,8 @@ export function FabricOrderPanel({
   /** Largest single cut available (largest bolt). */
   maxYards: number;
 }) {
-  const { minYards, stepYards, shipping, pickup } = FABRIC_ORDER_SETTINGS;
+  const { minYards, stepYards } = FABRIC_ORDER_SETTINGS;
+  const { shipping, pickup } = shippingSettings;
   const { add, items } = useFabricCart();
   const [yards, setYards] = useState(Math.min(1, maxYards) >= minYards ? Math.min(1, maxYards) : minYards);
   const [added, setAdded] = useState(false);
@@ -119,9 +124,7 @@ export function FabricOrderPanel({
         </li>
         {shipping.enabled && (
           <li>
-            US shipping {formatCents(shipping.flatRateCents)} flat
-            {shipping.freeOverCents != null && `, free over ${formatCents(shipping.freeOverCents)}`}
-            . {shipping.estimate}.
+            {describeShipping(shippingSettings)}. {shipping.estimate}.
           </li>
         )}
         {pickup.enabled && <li>Free local pickup in {pickup.area}.</li>}

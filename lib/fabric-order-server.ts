@@ -2,7 +2,8 @@ import type Stripe from 'stripe';
 import { Resend } from 'resend';
 import { createServiceRoleClient } from '@/lib/supabase/service-role';
 import { COMPANY_INFO } from '@/lib/company-info';
-import { FABRIC_ORDER_SETTINGS, formatCents, formatYardsLabel } from '@/lib/fabric-orders';
+import { formatCents, formatYardsLabel } from '@/lib/fabric-orders';
+import { getFabricShippingSettings } from '@/lib/fabric-settings-server';
 import { awardPatternPointsOnce, PATTERN_POINTS } from '@/lib/pattern-points';
 
 type OrderWithItems = {
@@ -65,6 +66,7 @@ function siteUrl() {
 
 /** Customer confirmation + admin "new order" notification. */
 export async function sendFabricOrderPlacedEmails(order: OrderWithItems) {
+  const shippingSettings = await getFabricShippingSettings();
   const totals = [
     `Subtotal: ${formatCents(order.subtotal_cents)}`,
     order.fulfillment === 'ship' ? `Shipping: ${formatCents(order.shipping_cents)}` : 'Pickup: free',
@@ -75,8 +77,8 @@ export async function sendFabricOrderPlacedEmails(order: OrderWithItems) {
     .join('\n');
   const fulfillmentText =
     order.fulfillment === 'ship'
-      ? `Shipping to:\n${order.shipping_name ?? ''}\n${formatAddress(order.shipping_address)}\n\n${FABRIC_ORDER_SETTINGS.shipping.estimate}. We'll email your tracking number when it ships.`
-      : `Local pickup in ${FABRIC_ORDER_SETTINGS.pickup.area}. ${FABRIC_ORDER_SETTINGS.pickup.instructions}`;
+      ? `Shipping to:\n${order.shipping_name ?? ''}\n${formatAddress(order.shipping_address)}\n\n${shippingSettings.shipping.estimate}. We'll email your tracking number when it ships.`
+      : `Local pickup in ${shippingSettings.pickup.area}. ${shippingSettings.pickup.instructions}`;
 
   if (order.email) {
     await sendEmail(

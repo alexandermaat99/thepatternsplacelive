@@ -44,7 +44,10 @@ export default async function AdminFabricOrdersPage() {
     <div className="max-w-5xl mx-auto space-y-8">
       <div>
         <h1 className="text-3xl font-bold">Fabric orders</h1>
-        <p className="text-muted-foreground mt-1">Online fabric orders. In-person sales are under In-person purchases.</p>
+        <p className="text-muted-foreground mt-1">
+          Online fabric orders. In-person sales are under In-person purchases. Shipping prices and
+          pickup details are in <Link href="/admin/fabric-settings" className="underline">Fabric settings</Link>.
+        </p>
       </div>
       {error && (
         <p className="text-sm text-destructive">

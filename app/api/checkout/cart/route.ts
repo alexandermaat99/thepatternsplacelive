@@ -7,6 +7,7 @@ import { createServiceRoleClient } from '@/lib/supabase/service-role';
 import { calculateEtsyFees, sellerHasFeeWaiver } from '@/lib/company-info';
 import { canReceiveSales } from '@/lib/stripe-connect';
 import { FABRIC_ORDER_SETTINGS, formatYardsLabel, shippingCentsFor, type Fulfillment } from '@/lib/fabric-orders';
+import { getFabricShippingSettings } from '@/lib/fabric-settings-server';
 import { createAndReserveFabricOrder, prepareFabricLines, type FabricLine } from '@/lib/cart-checkout-server';
 import { rateLimit, getClientIdentifier, RATE_LIMITS } from '@/lib/security/rate-limit';
 
@@ -52,11 +53,12 @@ export async function POST(request: NextRequest) {
 
   const hasFabric = fabricRequested.size > 0;
   const fulfillment = body.fulfillment as Fulfillment;
+  const shippingSettings = await getFabricShippingSettings();
   if (
     hasFabric &&
     ((fulfillment !== 'ship' && fulfillment !== 'pickup') ||
-      (fulfillment === 'ship' && !FABRIC_ORDER_SETTINGS.shipping.enabled) ||
-      (fulfillment === 'pickup' && !FABRIC_ORDER_SETTINGS.pickup.enabled))
+      (fulfillment === 'ship' && !shippingSettings.shipping.enabled) ||
+      (fulfillment === 'pickup' && !shippingSettings.pickup.enabled))
   ) {
     return NextResponse.json({ error: 'Choose shipping or pickup for your fabric.' }, { status: 400 });
   }
@@ -130,7 +132,12 @@ export async function POST(request: NextRequest) {
     const prepared = await prepareFabricLines(fabricRequested);
     if ('error' in prepared) return NextResponse.json(prepared, { status: prepared.status });
     fabricLines = prepared.lines;
-    shippingCents = shippingCentsFor(fulfillment, fabricLines.reduce((s, l) => s + l.lineCents, 0));
+    shippingCents = shippingCentsFor(
+      shippingSettings,
+      fulfillment,
+      fabricLines.reduce((s, l) => s + l.lineCents, 0),
+      fabricLines.reduce((s, l) => s + l.yards, 0)
+    );
     const reserved = await createAndReserveFabricOrder({
       lines: fabricLines,
       fulfillment,
@@ -217,7 +224,7 @@ export async function POST(request: NextRequest) {
       } else {
         params.custom_text = {
           submit: {
-            message: `Fabric: local pickup in ${FABRIC_ORDER_SETTINGS.pickup.area}. ${FABRIC_ORDER_SETTINGS.pickup.instructions}`,
+            message: `Fabric: local pickup in ${shippingSettings.pickup.area}. ${shippingSettings.pickup.instructions}`,
           },
         };
       }

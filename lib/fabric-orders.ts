@@ -14,19 +14,6 @@ export const FABRIC_ORDER_SETTINGS = {
   maxLines: 20,
   /** Stock is held this long while the customer is in Stripe checkout (Stripe minimum: 30). */
   holdMinutes: 30,
-  shipping: {
-    enabled: true,
-    /** Flat-rate US shipping. */
-    flatRateCents: 800,
-    /** Free shipping when the fabric subtotal reaches this (null = never). */
-    freeOverCents: 10000 as number | null,
-    estimate: 'Ships in 2–4 business days',
-  },
-  pickup: {
-    enabled: true,
-    area: 'Utah Valley',
-    instructions: "We'll email you within 1–2 business days to arrange pickup.",
-  },
   /** Stripe Tax code for general tangible goods. */
   stripeTaxCode: 'txcd_99999999',
 } as const;
@@ -66,11 +53,99 @@ export function maxOrderableYards(bolts: { current_quantity: number | null }[]):
   return Math.floor(max / step + 1e-9) * step;
 }
 
-export function shippingCentsFor(fulfillment: Fulfillment, subtotalCents: number): number {
+/**
+ * Shipping and pickup options. Editable by admins (Admin → Fabric settings,
+ * stored in site_settings under "fabric_shipping"); these are the defaults.
+ */
+export type ShippingTier = { upToYards: number | null; cents: number };
+export type FabricShippingSettings = {
+  shipping: {
+    enabled: boolean;
+    /** Price by total fabric yards in the order. Sorted ascending; the last tier (upToYards null) covers everything above. */
+    tiers: ShippingTier[];
+    /** Free shipping when the fabric subtotal reaches this (null = never). */
+    freeOverCents: number | null;
+    estimate: string;
+  };
+  pickup: { enabled: boolean; area: string; instructions: string };
+};
+
+export const DEFAULT_FABRIC_SHIPPING: FabricShippingSettings = {
+  shipping: {
+    enabled: true,
+    tiers: [{ upToYards: null, cents: 800 }],
+    freeOverCents: 10000,
+    estimate: 'Ships in 2–4 business days',
+  },
+  pickup: {
+    enabled: true,
+    area: 'Utah Valley',
+    instructions: "We'll email you within 1–2 business days to arrange pickup.",
+  },
+};
+
+/** Coerce stored/admin-submitted settings into a valid shape (falls back to defaults). */
+export function normalizeShippingSettings(raw: unknown): FabricShippingSettings {
+  const d = DEFAULT_FABRIC_SHIPPING;
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Partial<FabricShippingSettings>;
+  const cents = (v: unknown, fallback: number) =>
+    typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.round(v) : fallback;
+  const text = (v: unknown, fallback: string) =>
+    typeof v === 'string' && v.trim() ? v.trim().slice(0, 300) : fallback;
+
+  const rawTiers = Array.isArray(r.shipping?.tiers) ? r.shipping!.tiers : d.shipping.tiers;
+  let tiers = rawTiers
+    .map(t => ({
+      upToYards:
+        typeof t?.upToYards === 'number' && Number.isFinite(t.upToYards) && t.upToYards > 0 ? t.upToYards : null,
+      cents: cents(t?.cents, 0),
+    }))
+    .slice(0, 10);
+  // Bounded tiers ascending, then exactly one open-ended tier last.
+  const bounded = tiers.filter(t => t.upToYards != null).sort((a, b) => a.upToYards! - b.upToYards!);
+  const open = tiers.find(t => t.upToYards == null) ?? (bounded.length ? { upToYards: null, cents: bounded[bounded.length - 1].cents } : d.shipping.tiers[0]);
+  tiers = [...bounded, open];
+
+  const free = r.shipping?.freeOverCents;
+  return {
+    shipping: {
+      enabled: typeof r.shipping?.enabled === 'boolean' ? r.shipping.enabled : d.shipping.enabled,
+      tiers,
+      freeOverCents: free === null ? null : cents(free, d.shipping.freeOverCents ?? 0),
+      estimate: text(r.shipping?.estimate, d.shipping.estimate),
+    },
+    pickup: {
+      enabled: typeof r.pickup?.enabled === 'boolean' ? r.pickup.enabled : d.pickup.enabled,
+      area: text(r.pickup?.area, d.pickup.area),
+      instructions: text(r.pickup?.instructions, d.pickup.instructions),
+    },
+  };
+}
+
+export function shippingCentsFor(
+  settings: FabricShippingSettings,
+  fulfillment: Fulfillment,
+  subtotalCents: number,
+  totalYards: number
+): number {
   if (fulfillment === 'pickup') return 0;
-  const { flatRateCents, freeOverCents } = FABRIC_ORDER_SETTINGS.shipping;
+  const { tiers, freeOverCents } = settings.shipping;
   if (freeOverCents != null && subtotalCents >= freeOverCents) return 0;
-  return flatRateCents;
+  const tier = tiers.find(t => t.upToYards == null || totalYards <= t.upToYards + 1e-9) ?? tiers[tiers.length - 1];
+  return tier.cents;
+}
+
+/** One-line description, e.g. "US shipping $8 flat, free over $100" or "US shipping from $8 ($8 up to 3 yd, $12 over 3 yd)". */
+export function describeShipping(settings: FabricShippingSettings): string {
+  const { tiers, freeOverCents } = settings.shipping;
+  const free = freeOverCents != null ? `, free over ${formatCents(freeOverCents)}` : '';
+  if (tiers.length === 1) return `US shipping ${formatCents(tiers[0].cents)} flat${free}`;
+  const parts = tiers.map((t, i) =>
+    t.upToYards != null
+      ? `${formatCents(t.cents)} up to ${+t.upToYards.toFixed(2)} yd`
+      : `${formatCents(t.cents)} over ${+(tiers[i - 1]?.upToYards ?? 0).toFixed(2)} yd`
+  );
+  return `US shipping from ${formatCents(Math.min(...tiers.map(t => t.cents)))} (${parts.join(', ')})${free}`;
 }
 
 export function formatYardsLabel(yards: number): string {

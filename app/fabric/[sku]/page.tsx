@@ -5,6 +5,7 @@ import { Footer } from '@/components/footer';
 import { FabricDetailView } from '@/components/fabric/fabric-detail-view';
 import { getFabricPublicDetail, isFabricSoldOut } from '@/lib/fabric-catalog';
 import { getHeldYards } from '@/lib/fabric-order-server';
+import { getFabricShippingSettings } from '@/lib/fabric-settings-server';
 import { COMPANY_INFO } from '@/lib/company-info';
 
 // Always live: stock changes the moment someone starts or abandons a checkout.
@@ -77,13 +78,16 @@ export default async function FabricSkuPage({ params }: FabricSkuPageProps) {
   if (!fabric) {
     notFound();
   }
-  const heldYards = isFabricSoldOut(fabric.current_quantity) ? await getHeldYards(fabric.sku) : 0;
+  const [heldYards, shippingSettings] = await Promise.all([
+    isFabricSoldOut(fabric.current_quantity) ? getHeldYards(fabric.sku) : Promise.resolve(0),
+    getFabricShippingSettings(),
+  ]);
 
   return (
     <>
       <Navigation showMarketplaceLinks={true} />
       <div className="container mx-auto max-w-screen-xl px-4 py-8 sm:py-10">
-        <FabricDetailView fabric={fabric} heldYards={heldYards} />
+        <FabricDetailView fabric={fabric} heldYards={heldYards} shippingSettings={shippingSettings} />
       </div>
       <Footer />
     </>

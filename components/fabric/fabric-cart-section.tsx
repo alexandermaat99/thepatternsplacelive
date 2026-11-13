@@ -9,7 +9,9 @@ import {
   FABRIC_ORDER_SETTINGS,
   formatCents,
   formatYardsLabel,
+  describeShipping,
   shippingCentsFor,
+  type FabricShippingSettings,
   type Fulfillment,
 } from '@/lib/fabric-orders';
 import { cn } from '@/lib/utils';
@@ -19,14 +21,17 @@ export function FabricCartSection({
   fulfillment,
   onFulfillmentChange,
   onRemoveRequest,
+  shippingSettings,
 }: {
+  shippingSettings: FabricShippingSettings;
   fulfillment: Fulfillment;
   onFulfillmentChange: (f: Fulfillment) => void;
   /** Ask the shopper to confirm before removing (the cart shows a dialog). */
   onRemoveRequest: (baseSku: string, name: string) => void;
 }) {
-  const { items, setYards } = useFabricCart();
-  const { minYards, stepYards, maxYardsPerLine, shipping, pickup } = FABRIC_ORDER_SETTINGS;
+  const { items, setYards, totalYards } = useFabricCart();
+  const { minYards, stepYards, maxYardsPerLine } = FABRIC_ORDER_SETTINGS;
+  const { shipping, pickup } = shippingSettings;
   if (items.length === 0) return null;
   const subtotalCents = items.reduce((s, i) => s + Math.round(i.pricePerYard * i.yards * 100), 0);
 
@@ -35,7 +40,10 @@ export function FabricCartSection({
       value: 'ship' as const,
       icon: Truck,
       title: 'Ship my fabric',
-      detail: `${shippingCentsFor('ship', subtotalCents) === 0 ? 'Free' : formatCents(shipping.flatRateCents)} US shipping${shipping.freeOverCents != null ? ` (free over ${formatCents(shipping.freeOverCents)} of fabric)` : ''}. ${shipping.estimate}.`,
+      detail: (() => {
+        const cost = shippingCentsFor(shippingSettings, 'ship', subtotalCents, totalYards);
+        return `${cost === 0 ? 'Free' : formatCents(cost)} for this order. ${describeShipping(shippingSettings)}. ${shipping.estimate}.`;
+      })(),
     },
     pickup.enabled && {
       value: 'pickup' as const,
