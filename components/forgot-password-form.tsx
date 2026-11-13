@@ -13,7 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export function ForgotPasswordForm({
   className,
@@ -22,6 +22,13 @@ export function ForgotPasswordForm({
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  // Set when /auth/confirm couldn't use a reset link (expired, already used,
+  // or opened in a different browser than the one that requested it).
+  const [linkExpired, setLinkExpired] = useState(false);
+
+  useEffect(() => {
+    setLinkExpired(new URLSearchParams(window.location.search).get("expired") === "1");
+  }, []);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleForgotPassword = async (e: React.FormEvent) => {
@@ -31,9 +38,11 @@ export function ForgotPasswordForm({
     setError(null);
 
     try {
-      // The url which will be included in the email. This URL needs to be configured in your redirect URLs in the Supabase dashboard at https://supabase.com/dashboard/project/_/auth/url-configuration
+      // The reset link lands on /auth/confirm, which signs the user in and then
+      // sends them to the update-password page. /auth/confirm must be in the
+      // Supabase Redirect URLs allow-list (Auth > URL Configuration).
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/update-password`,
+        redirectTo: `${window.location.origin}/auth/confirm?next=/auth/update-password`,
       });
       if (error) throw error;
       setSuccess(true);
@@ -82,6 +91,13 @@ export function ForgotPasswordForm({
                     onChange={(e) => setEmail(e.target.value)}
                   />
                 </div>
+                {linkExpired && !error && (
+                  <p className="text-sm text-amber-600 dark:text-amber-400">
+                    That reset link has expired or was already used. Reset links
+                    only work once, in the same browser you requested them from.
+                    Enter your email to get a new one.
+                  </p>
+                )}
                 {error && <p className="text-sm text-red-500">{error}</p>}
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? "Sending..." : "Send reset email"}

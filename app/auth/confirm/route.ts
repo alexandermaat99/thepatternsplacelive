@@ -1,30 +1,60 @@
-import { createClient } from "@/lib/supabase/server";
-import { type EmailOtpType } from "@supabase/supabase-js";
-import { redirect } from "next/navigation";
-import { type NextRequest } from "next/server";
+import { createClient } from '@/lib/supabase/server';
+import { safeRedirectPath } from '@/lib/safe-redirect';
+import { type EmailOtpType } from '@supabase/supabase-js';
+import { redirect } from 'next/navigation';
+import { type NextRequest } from 'next/server';
 
+/**
+ * Landing route for links in Supabase auth emails (sign-up confirmation,
+ * password reset). Establishes the session, then sends the user to `next`.
+ *
+ * Handles both link styles:
+ * - `?token_hash=...&type=...` (custom email templates; works on any device)
+ * - `?code=...` (default `{{ .ConfirmationURL }}` templates, PKCE). This only
+ *   signs the user in if the link is opened in the same browser that started
+ *   the flow. In another browser the email is still confirmed, so we send
+ *   them to log in instead of showing an error.
+ */
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const token_hash = searchParams.get("token_hash");
-  const type = searchParams.get("type") as EmailOtpType | null;
-  const next = searchParams.get("next") ?? "/";
+  const params = request.nextUrl.searchParams;
+  const next = safeRedirectPath(params.get('next'), '/dashboard');
+  const tokenHash = params.get('token_hash');
+  const type = params.get('type') as EmailOtpType | null;
+  const code = params.get('code');
+  const isPasswordReset = type === 'recovery' || next.startsWith('/auth/update-password');
 
-  if (token_hash && type) {
-    const supabase = await createClient();
-
-    const { error } = await supabase.auth.verifyOtp({
-      type,
-      token_hash,
-    });
-    if (!error) {
-      // redirect user to specified redirect URL or root of app
-      redirect(next);
-    } else {
-      // redirect the user to an error page with some instructions
-      redirect(`/auth/error?error=${error?.message}`);
-    }
+  // Supabase reports problems such as an expired link via query params.
+  const linkError = params.get('error_description') || params.get('error');
+  if (linkError) {
+    redirect(
+      isPasswordReset
+        ? '/auth/forgot-password?expired=1'
+        : `/auth/error?error=${encodeURIComponent(linkError)}`
+    );
   }
 
-  // redirect the user to an error page with some instructions
-  redirect(`/auth/error?error=No token hash or type`);
+  const supabase = await createClient();
+
+  if (tokenHash && type) {
+    const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
+    if (!error) redirect(next);
+    redirect(
+      isPasswordReset
+        ? '/auth/forgot-password?expired=1'
+        : `/auth/error?error=${encodeURIComponent(error.message)}`
+    );
+  }
+
+  if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (!error) redirect(next);
+    // Usually: the link was opened in a different browser or device.
+    redirect(
+      isPasswordReset
+        ? '/auth/forgot-password?expired=1'
+        : `/auth/login?confirmed=1&redirect=${encodeURIComponent(next)}`
+    );
+  }
+
+  redirect(`/auth/error?error=${encodeURIComponent('This link is invalid or incomplete.')}`);
 }

@@ -247,10 +247,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, 500);
 
     // Listen for auth changes - CRITICAL for detecting login
+    //
+    // IMPORTANT: this callback must stay synchronous and must not await any
+    // Supabase call. Supabase runs it while holding its internal auth lock, so
+    // awaiting another auth call (getSession/getUser, or a query, which calls
+    // getSession) from here deadlocks every Supabase request on the page.
+    // Defer any Supabase work with setTimeout(..., 0).
     const supabase = createClient();
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('Auth state change event:', event, 'User ID:', session?.user?.id);
 
       if (event === 'SIGNED_IN' && session?.user) {
@@ -306,8 +312,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           });
           console.log('Auth state updated - user set');
 
-          // Fetch profile in background
-          fetchProfile();
+          // Fetch profile after the auth lock is released (see note above)
+          setTimeout(fetchProfile, 0);
         }
       } else if (event === 'SIGNED_OUT') {
         console.log('SIGNED_OUT detected');
@@ -325,10 +331,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             error: null,
           });
         }
-      } else if (event === 'TOKEN_REFRESHED') {
-        console.log('TOKEN_REFRESHED detected');
+      } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+        // Same user with a fresh token: update it from the session. No need to
+        // refetch anything (and doing so here would deadlock; see note above).
         isInitializing = false;
-        await initializeAuth();
+        if (timeoutId) clearTimeout(timeoutId);
+        if (mounted) {
+          setAuthState(prev => ({ ...prev, user: session.user, loading: false, error: null }));
+        }
       }
     });
 
