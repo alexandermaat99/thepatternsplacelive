@@ -1,255 +1,262 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getStripe } from '@/lib/stripe';
+import { randomUUID } from 'crypto';
+import type Stripe from 'stripe';
+import { getStripe, formatAmountForStripe } from '@/lib/stripe';
 import { createClient } from '@/lib/supabase/server';
-import { formatAmountForStripe } from '@/lib/stripe';
-import { COMPANY_INFO, calculateEtsyFees, sellerHasFeeWaiver } from '@/lib/company-info';
+import { createServiceRoleClient } from '@/lib/supabase/service-role';
+import { calculateEtsyFees, sellerHasFeeWaiver } from '@/lib/company-info';
 import { canReceiveSales } from '@/lib/stripe-connect';
+import { FABRIC_ORDER_SETTINGS, formatYardsLabel, shippingCentsFor, type Fulfillment } from '@/lib/fabric-orders';
+import { createAndReserveFabricOrder, prepareFabricLines, type FabricLine } from '@/lib/cart-checkout-server';
+import { rateLimit, getClientIdentifier, RATE_LIMITS } from '@/lib/security/rate-limit';
 
+type Body = {
+  patterns?: { productId?: unknown }[];
+  /** Legacy shape from older clients: [{ productId, quantity }] */
+  items?: { productId?: unknown }[];
+  fabric?: { baseSku?: unknown; yards?: unknown }[];
+  fulfillment?: unknown;
+};
+
+/**
+ * POST /api/checkout/cart
+ * One checkout for everything in the cart: paid patterns from any number of
+ * designers, plus fabric. The platform takes the payment ("separate charges
+ * and transfers"); after payment each designer is paid their share by
+ * transfer, and fabric revenue stays with the platform.
+ */
 export async function POST(request: NextRequest) {
-  try {
-    const { items } = await request.json(); // items: [{ productId, quantity }] - quantity always 1 for digital products
+  const limit = rateLimit(getClientIdentifier(request), RATE_LIMITS.STANDARD);
+  if (!limit.success) {
+    return NextResponse.json({ error: 'Too many requests. Please try again shortly.' }, { status: 429 });
+  }
 
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return NextResponse.json({ error: 'Cart is empty' }, { status: 400 });
+  const body = (await request.json().catch(() => ({}))) as Body;
+  const productIds = [
+    ...new Set(
+      [...(body.patterns ?? []), ...(body.items ?? [])]
+        .map(p => p.productId)
+        .filter((id): id is string => typeof id === 'string')
+    ),
+  ];
+  const fabricRequested = new Map<string, number>();
+  for (const f of body.fabric ?? []) {
+    if (typeof f.baseSku !== 'string' || typeof f.yards !== 'number') {
+      return NextResponse.json({ error: 'Invalid cart.' }, { status: 400 });
     }
+    fabricRequested.set(f.baseSku, (fabricRequested.get(f.baseSku) ?? 0) + f.yards);
+  }
+  if (productIds.length === 0 && fabricRequested.size === 0) {
+    return NextResponse.json({ error: 'Your cart is empty.' }, { status: 400 });
+  }
 
-    const supabase = await createClient();
+  const hasFabric = fabricRequested.size > 0;
+  const fulfillment = body.fulfillment as Fulfillment;
+  if (
+    hasFabric &&
+    ((fulfillment !== 'ship' && fulfillment !== 'pickup') ||
+      (fulfillment === 'ship' && !FABRIC_ORDER_SETTINGS.shipping.enabled) ||
+      (fulfillment === 'pickup' && !FABRIC_ORDER_SETTINGS.pickup.enabled))
+  ) {
+    return NextResponse.json({ error: 'Choose shipping or pickup for your fabric.' }, { status: 400 });
+  }
 
-    // Get the current user (optional for guest checkout)
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const stripe = getStripe();
 
-    // Get all product details
-    const productIds = items.map((item: { productId: string }) => item.productId);
-    const { data: products, error: productError } = await supabase
+  // ---- Patterns: validate, check each designer can be paid, compute fees ----
+  type PatternLine = {
+    product: { id: string; title: string; description: string | null; price: number; currency: string; image_url: string | null; user_id: string };
+    priceCents: number;
+    feeCents: number;
+  };
+  const patternLines: PatternLine[] = [];
+  if (productIds.length > 0) {
+    // User-scoped query: hidden or inactive listings are excluded by RLS.
+    const { data: products, error } = await supabase
       .from('products')
-      .select('*')
+      .select('id, title, description, price, currency, image_url, user_id, is_free')
       .in('id', productIds)
       .eq('is_active', true);
-
-    if (productError || !products || products.length === 0) {
-      return NextResponse.json({ error: 'Products not found' }, { status: 404 });
-    }
-
-    // Verify all requested products exist
-    if (products.length !== productIds.length) {
-      return NextResponse.json({ error: 'Some products are no longer available' }, { status: 400 });
-    }
-
-    // Filter out free products - they should be handled separately
-    const paidProducts = products.filter((p: any) => !p.is_free && p.price > 0);
-    const freeProducts = products.filter((p: any) => p.is_free || p.price === 0);
-
-    if (freeProducts.length > 0) {
+    if (error) return NextResponse.json({ error: 'Could not load your cart.' }, { status: 500 });
+    const paid = (products ?? []).filter(p => !p.is_free && Number(p.price) > 0);
+    if (paid.length !== productIds.length) {
       return NextResponse.json(
-        {
-          error:
-            'Free products cannot be purchased through Stripe checkout. Please use the free checkout endpoint.',
-        },
-        { status: 400 }
+        { error: 'Some patterns in your cart are no longer available. Please refresh your cart.' },
+        { status: 409 }
       );
     }
 
-    if (paidProducts.length === 0) {
-      return NextResponse.json({ error: 'No paid products to checkout' }, { status: 400 });
-    }
-
-    // Get all unique seller IDs (from paid products only)
-    const sellerIds = [...new Set(paidProducts.map((p: any) => p.user_id))];
-
-    // Get seller profiles with Stripe account IDs and sales counts
-    const { data: sellerProfiles, error: sellerError } = await supabase
+    const sellerIds = [...new Set(paid.map(p => p.user_id))];
+    const { data: sellers } = await createServiceRoleClient()
       .from('profiles')
-      .select('id, stripe_account_id, completed_sales_count, platform_fee_waived_until')
+      .select('id, username, stripe_account_id, completed_sales_count, platform_fee_waived_until')
       .in('id', sellerIds);
-
-    if (sellerError || !sellerProfiles) {
-      return NextResponse.json({ error: 'Error fetching seller information' }, { status: 500 });
-    }
-
-    // Create a map of seller ID to Stripe account ID
-    const sellerStripeMap = new Map(sellerProfiles.map((p: any) => [p.id, p.stripe_account_id]));
-
-    // Check that all products have sellers with connected Stripe accounts
-    const productsWithoutStripe = paidProducts.filter((p: any) => !sellerStripeMap.get(p.user_id));
-    if (productsWithoutStripe.length > 0) {
-      return NextResponse.json(
-        { error: 'Some sellers have not connected their Stripe accounts' },
-        { status: 400 }
-      );
-    }
-
-    // Verify all seller Stripe accounts are active
-    const stripe = getStripe();
-    const uniqueSellerAccounts = new Set(
-      products.map((p: any) => sellerStripeMap.get(p.user_id)).filter(Boolean)
-    );
-
-    // Check all seller accounts
-    for (const accountId of uniqueSellerAccounts) {
-      try {
-        const account = await stripe.accounts.retrieve(accountId);
-        if (!canReceiveSales(account)) {
-          return NextResponse.json(
-            { error: 'One or more seller accounts are not fully set up' },
-            { status: 400 }
-          );
+    for (const sellerId of sellerIds) {
+      const seller = sellers?.find(s => s.id === sellerId);
+      let ready = false;
+      if (seller?.stripe_account_id) {
+        try {
+          ready = canReceiveSales(await stripe.accounts.retrieve(seller.stripe_account_id));
+        } catch {
+          ready = false;
         }
-      } catch (error) {
-        console.error('Error retrieving seller account:', error);
-        return NextResponse.json({ error: 'Invalid seller Stripe account' }, { status: 400 });
+      }
+      if (!ready) {
+        const titles = paid.filter(p => p.user_id === sellerId).map(p => p.title).join(', ');
+        return NextResponse.json(
+          { error: `"${titles}" can't be purchased right now because the designer's payouts aren't set up. Please remove it and try again.` },
+          { status: 409 }
+        );
       }
     }
 
-    // For cart checkout with multiple sellers, we need to handle it differently
-    // Stripe Checkout doesn't support per-line-item transfers, so we have two options:
-    // 1. Only allow single-seller carts (simpler)
-    // 2. Create separate checkout sessions per seller (more complex)
-    // For now, we'll allow multi-seller carts but transfer to the first seller
-    // In production, you might want to split into multiple sessions or use Payment Intents
-
-    const sellerAccountIds = Array.from(uniqueSellerAccounts);
-    const primarySellerAccountId = sellerAccountIds[0];
-
-    // This checkout can only pay ONE seller (a single Connect destination), and
-    // the payout is computed on the whole cart total. With patterns from two
-    // designers, the first would be paid for both and the second nothing.
-    // Until multi-seller checkout ships, require one designer per checkout.
-    if (sellerAccountIds.length > 1) {
-      return NextResponse.json(
-        {
-          error:
-            'Your cart has patterns from more than one designer. For now, please check out one designer at a time: remove the others, check out, then add them back. Sorry for the hassle!',
-        },
-        { status: 400 }
-      );
+    for (const product of paid) {
+      const seller = sellers!.find(s => s.id === product.user_id)!;
+      const priceCents = formatAmountForStripe(Number(product.price), product.currency || 'USD');
+      const fees = calculateEtsyFees(priceCents, sellerHasFeeWaiver(seller));
+      patternLines.push({ product: { ...product, price: Number(product.price) }, priceCents, feeCents: fees.totalFee });
     }
+  }
 
-    // Build line items for Stripe (only paid products)
-    const lineItems = items
-      .filter((item: { productId: string; quantity: number }) => {
-        const product = paidProducts.find((p: any) => p.id === item.productId);
-        return product !== undefined;
-      })
-      .map((item: { productId: string; quantity: number }) => {
-        const product = paidProducts.find((p: any) => p.id === item.productId);
-        if (!product) {
-          throw new Error(`Product ${item.productId} not found`);
-        }
+  // ---- Fabric: reprice, then hold stock ----
+  let fabricLines: FabricLine[] = [];
+  let fabricOrder: { id: string; order_number: number } | null = null;
+  let shippingCents = 0;
+  if (hasFabric) {
+    const prepared = await prepareFabricLines(fabricRequested);
+    if ('error' in prepared) return NextResponse.json(prepared, { status: prepared.status });
+    fabricLines = prepared.lines;
+    shippingCents = shippingCentsFor(fulfillment, fabricLines.reduce((s, l) => s + l.lineCents, 0));
+    const reserved = await createAndReserveFabricOrder({
+      lines: fabricLines,
+      fulfillment,
+      shippingCents,
+      userId: user?.id ?? null,
+      email: user?.email ?? null,
+    });
+    if ('error' in reserved) return NextResponse.json(reserved, { status: reserved.status });
+    fabricOrder = reserved.order;
+  }
 
-        return {
-          price_data: {
-            currency: product.currency.toLowerCase(),
-            product_data: {
-              name: product.title,
-              description: product.description || undefined,
-              images: product.image_url ? [product.image_url] : [],
-              tax_code: 'txcd_10301000', // Digital products tax code (eBooks, digital files, etc.)
-            },
-            unit_amount: formatAmountForStripe(product.price, product.currency),
-          },
-          quantity: item.quantity,
-        };
-      });
+  const service = createServiceRoleClient();
+  const releaseFabric = async () => {
+    if (fabricOrder) {
+      await service.rpc('release_fabric_order', { p_order_id: fabricOrder.id, p_status: 'cancelled' });
+    }
+  };
 
-    // Calculate total amount for platform fee (only paid products)
-    const totalAmount = items.reduce(
-      (sum: number, item: { productId: string; quantity: number }) => {
-        const product = paidProducts.find((p: any) => p.id === item.productId);
-        return sum + (product?.price || 0) * item.quantity;
-      },
-      0
-    );
-
-    // Calculate Etsy-style platform fees from centralized config (lib/company-info.ts)
-    // TAX WITHHOLDING: As the tax-collecting entity, we must withhold tax from seller payouts
-    // Seller receives: Sale Price - Platform Fee (tax is NOT included in seller payout)
-    // Platform keeps: Platform Fee + Tax (for remittance)
-    //
-    // Etsy fee structure:
-    // Fees: platform fee (COMPANY_INFO.fees) + payment processing (3% + $0.25)
-    const totalInCents = Math.round(totalAmount * 100);
-
-    // Fee waiver (first free sales or an active waiver) is based on the primary seller.
-    // In the future, you may want to split fees per seller.
-    const primarySellerProfile = sellerProfiles.find((p: any) => p.id === paidProducts[0]?.user_id);
-    const waivePlatformFees = sellerHasFeeWaiver(primarySellerProfile);
-
-    const fees = calculateEtsyFees(totalInCents, waivePlatformFees);
-    const platformFeeAmount = fees.totalFee;
-
-    // Calculate seller payout: Total Sale Price - Platform Fee (tax excluded)
-    // This ensures seller only gets their net from the sale, not the tax portion
-    const sellerPayoutCents = totalInCents - platformFeeAmount;
-
-    // Create Stripe checkout session with Connect transfer
-    // Note: For multi-seller carts, consider splitting into separate sessions
-    //
-    // Tax handling (industry standard for marketplaces):
-    // - Platform-level tax: Tax is calculated and collected by Stripe on the platform account
-    // - Tax amount stays with platform for remittance to tax authorities
-    // - Transfer to seller = product amount - platform fees (tax is separate)
-    // - This is the standard model used by Etsy, Amazon, etc.
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: lineItems,
+  // ---- Stripe Checkout (platform charge; designers are paid after payment) ----
+  const transferGroup = `cart_${randomUUID()}`;
+  const origin = request.nextUrl.origin;
+  let session: Stripe.Checkout.Session;
+  try {
+    const params: Stripe.Checkout.SessionCreateParams = {
       mode: 'payment',
-      automatic_tax: {
-        enabled: true, // Platform-level tax calculation (industry standard)
-      },
-      payment_intent_data: {
-        // Transfer payment to primary seller's Stripe Connect account
-        // IMPORTANT: We set the transfer amount explicitly to exclude tax
-        // Seller receives: Sale Price - Platform Fee (tax is withheld by platform)
-        // For multi-seller carts, you may want to handle transfers in webhook
-        transfer_data: {
-          destination: primarySellerAccountId,
-          // Set explicit amount to seller: Sale Price - Platform Fee
-          // This ensures tax is NOT included in seller payout
-          amount: sellerPayoutCents,
-        },
-        // Platform fee - this will be calculated as: Total - Transfer Amount
-        // So if total is $0.81 and transfer is $0.25, fee = $0.56
-        // This includes both platform fee ($0.50) and tax ($0.06) for remittance
-        // Note: We don't set application_fee_amount when using transfer_data.amount
-        // Stripe automatically calculates: application_fee = total - transfer_amount
-        // Store metadata on PaymentIntent for webhook processing
-        metadata: {
-          ...(user?.id && { buyerId: user.id }),
-          ...(user?.email && { buyerEmail: user.email }),
-          cartItems: JSON.stringify(
-            items.map((item: { productId: string; quantity: number }) => ({
-              productId: item.productId,
-              quantity: item.quantity,
-            }))
-          ),
-          sellerAccountIds: JSON.stringify(sellerAccountIds),
-          primarySellerAccountId: primarySellerAccountId,
-        },
-      },
-      success_url: `${request.nextUrl.origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${request.nextUrl.origin}/cart`,
+      line_items: [
+        ...patternLines.map(l => ({
+          price_data: {
+            currency: (l.product.currency || 'USD').toLowerCase(),
+            unit_amount: l.priceCents,
+            product_data: {
+              name: l.product.title,
+              ...(l.product.description && { description: l.product.description.slice(0, 500) }),
+              ...(l.product.image_url?.startsWith('https://') && { images: [l.product.image_url] }),
+              tax_code: 'txcd_10301000', // digital goods
+            },
+          },
+          quantity: 1,
+        })),
+        ...fabricLines.map(l => ({
+          price_data: {
+            currency: 'usd',
+            unit_amount: l.lineCents,
+            product_data: {
+              name: `${l.name} (${formatYardsLabel(l.yards)} of fabric)`,
+              description: `Fabric, SKU ${l.baseSku}, cut as one continuous piece`,
+              ...(l.image && { images: [l.image] }),
+              tax_code: FABRIC_ORDER_SETTINGS.stripeTaxCode,
+            },
+          },
+          quantity: 1,
+        })),
+      ],
+      automatic_tax: { enabled: true },
       customer_email: user?.email || undefined,
+      expires_at: Math.floor(Date.now() / 1000) + FABRIC_ORDER_SETTINGS.holdMinutes * 60,
+      success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/cart${fabricOrder ? `?canceled=${fabricOrder.id}` : ''}`,
       metadata: {
+        type: 'cart',
+        transfer_group: transferGroup,
+        ...(fabricOrder && { fabric_order_id: fabricOrder.id }),
         ...(user?.id && { buyerId: user.id }),
         ...(user?.email && { buyerEmail: user.email }),
-        // Store cart items as JSON in metadata (we'll parse this in webhook)
-        cartItems: JSON.stringify(
-          items.map((item: { productId: string; quantity: number }) => ({
-            productId: item.productId,
-            quantity: item.quantity,
-          }))
-        ),
-        // Store seller account IDs for webhook processing
-        sellerAccountIds: JSON.stringify(sellerAccountIds),
-        primarySellerAccountId: primarySellerAccountId,
       },
-    });
-
-    return NextResponse.json({ sessionId: session.id, url: session.url });
+      payment_intent_data: {
+        transfer_group: transferGroup,
+        ...(fabricOrder && { description: `Includes fabric order #${fabricOrder.order_number}` }),
+      },
+    };
+    if (hasFabric) {
+      params.phone_number_collection = { enabled: true };
+      if (fulfillment === 'ship') {
+        params.shipping_address_collection = { allowed_countries: ['US'] };
+        params.shipping_options = [
+          {
+            shipping_rate_data: {
+              type: 'fixed_amount',
+              fixed_amount: { amount: shippingCents, currency: 'usd' },
+              display_name: shippingCents === 0 ? 'Free shipping' : 'Standard shipping (fabric)',
+            },
+          },
+        ];
+      } else {
+        params.custom_text = {
+          submit: {
+            message: `Fabric: local pickup in ${FABRIC_ORDER_SETTINGS.pickup.area}. ${FABRIC_ORDER_SETTINGS.pickup.instructions}`,
+          },
+        };
+      }
+    }
+    session = await stripe.checkout.sessions.create(params);
   } catch (error) {
-    console.error('Cart checkout error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Error creating cart checkout session:', error);
+    await releaseFabric();
+    return NextResponse.json({ error: 'Could not start checkout. Please try again.' }, { status: 500 });
   }
+
+  // ---- Record what was bought (pending until paid) ----
+  if (fabricOrder) {
+    await service.from('fabric_orders').update({ stripe_session_id: session.id }).eq('id', fabricOrder.id);
+  }
+  if (patternLines.length > 0) {
+    const { error } = await service.from('orders').insert(
+      patternLines.map(l => ({
+        product_id: l.product.id,
+        seller_id: l.product.user_id,
+        buyer_id: user?.id ?? null,
+        buyer_email: user?.email ?? null,
+        stripe_session_id: session.id,
+        status: 'pending',
+        amount: l.priceCents / 100,
+        total_amount: l.priceCents / 100,
+        currency: l.product.currency || 'USD',
+        platform_fee: l.feeCents / 100,
+        stripe_fee: 0,
+        net_amount: (l.priceCents - l.feeCents) / 100,
+      }))
+    );
+    if (error) {
+      console.error('Error recording cart orders:', error);
+      await stripe.checkout.sessions.expire(session.id).catch(() => {});
+      await releaseFabric();
+      return NextResponse.json({ error: 'Could not start checkout. Please try again.' }, { status: 500 });
+    }
+  }
+
+  return NextResponse.json({ url: session.url });
 }

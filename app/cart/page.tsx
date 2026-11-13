@@ -15,9 +15,40 @@ import { RemoveCartItemDialog } from '@/components/remove-cart-item-dialog';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { CheckoutAuthModal } from '@/components/checkout-auth-modal';
 import { PATTERN_POINTS } from '@/lib/pattern-points';
+import { useFabricCart } from '@/hooks/useFabricCart';
+import { FabricCartSection } from '@/components/fabric/fabric-cart-section';
+import { FABRIC_ORDER_SETTINGS, formatCents, shippingCentsFor, type Fulfillment } from '@/lib/fabric-orders';
 
 export default function CartPage() {
-  const { state, removeItem, clearCart } = useCart();
+  const { state, removeItem, clearCart: clearPatterns } = useCart();
+  const fabric = useFabricCart();
+  const [fulfillment, setFulfillment] = useState<Fulfillment>(
+    FABRIC_ORDER_SETTINGS.shipping.enabled ? 'ship' : 'pickup'
+  );
+  const clearCart = () => {
+    clearPatterns();
+    fabric.clear();
+  };
+  const fabricSubtotalCents = fabric.items.reduce(
+    (sum, i) => sum + Math.round(i.pricePerYard * i.yards * 100),
+    0
+  );
+  const fabricShippingCents =
+    fabric.items.length > 0 ? shippingCentsFor(fulfillment, fabricSubtotalCents) : 0;
+  const totalItemCount = state.items.length + fabric.items.length;
+  const paidPatterns = state.items.filter(item => !item.is_free && item.price > 0);
+  const paidPatternCount = paidPatterns.length;
+  const freePatternCount = state.items.length - paidPatternCount;
+  const patternSubtotalCents = paidPatterns.reduce((sum, item) => sum + Math.round(item.price * 100), 0);
+  const grandTotalCents = patternSubtotalCents + fabricSubtotalCents + fabricShippingCents;
+
+  // Back from Stripe without paying: release the held fabric right away.
+  useEffect(() => {
+    const canceled = new URLSearchParams(window.location.search).get('canceled');
+    if (!canceled) return;
+    fetch(`/api/fabric/orders/${encodeURIComponent(canceled)}/abandon`, { method: 'POST' }).catch(() => {});
+    window.history.replaceState(null, '', '/cart');
+  }, []);
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [itemToRemove, setItemToRemove] = useState<{ id: string; title: string } | null>(null);
@@ -26,7 +57,7 @@ export default function CartPage() {
   const [showCheckoutAuthModal, setShowCheckoutAuthModal] = useState(false);
 
   const proceedToStripeCheckout = async () => {
-    if (state.items.length === 0) return;
+    if (totalItemCount === 0) return;
 
     setIsProcessing(true);
 
@@ -60,20 +91,18 @@ export default function CartPage() {
         }
       }
 
-      // If there are paid products, proceed to Stripe checkout
-      if (paidProducts.length > 0) {
-        const cartItems = paidProducts.map(item => ({
-          productId: item.id,
-          quantity: 1,
-        }));
-
-        // Create Stripe checkout session
+      // Paid patterns (any designers) and fabric go through one checkout
+      if (paidProducts.length > 0 || fabric.items.length > 0) {
         const response = await fetch('/api/checkout/cart', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ items: cartItems }),
+          body: JSON.stringify({
+            patterns: paidProducts.map(item => ({ productId: item.id })),
+            fabric: fabric.items.map(i => ({ baseSku: i.baseSku, yards: i.yards })),
+            fulfillment,
+          }),
         });
 
         if (!response.ok) {
@@ -103,14 +132,15 @@ export default function CartPage() {
   };
 
   const handleCheckout = () => {
-    if (state.items.length === 0) return;
+    if (totalItemCount === 0) return;
 
     // Wait for auth to finish loading
     if (authLoading) return;
 
     // Check if there are free products
     const hasFreeProducts = state.items.some(item => item.is_free || item.price === 0);
-    const hasPaidProducts = state.items.some(item => !item.is_free && item.price > 0);
+    const hasPaidProducts =
+      state.items.some(item => !item.is_free && item.price > 0) || fabric.items.length > 0;
 
     // If there are free products and user is not authenticated, require login
     if (hasFreeProducts && !user) {
@@ -150,7 +180,7 @@ export default function CartPage() {
     }
   };
 
-  if (state.items.length === 0) {
+  if (totalItemCount === 0) {
     return (
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="mb-6">
@@ -164,10 +194,15 @@ export default function CartPage() {
           <CardContent className="text-center py-12">
             <ShoppingCart className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-medium text-muted-foreground mb-2">Your cart is empty</h3>
-            <p className="text-muted-foreground mb-4">Add some products to get started!</p>
-            <Link href="/marketplace">
-              <Button>Browse Marketplace</Button>
-            </Link>
+            <p className="text-muted-foreground mb-4">Add some patterns or fabric to get started!</p>
+            <div className="flex justify-center gap-3">
+              <Link href="/marketplace">
+                <Button>Browse patterns</Button>
+              </Link>
+              <Link href="/fabric">
+                <Button variant="outline">Shop fabric</Button>
+              </Link>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -183,7 +218,7 @@ export default function CartPage() {
             Shopping Cart
           </h1>
           <p className="text-muted-foreground">
-            {state.items.length} {state.items.length === 1 ? 'item' : 'items'} in your cart
+            {totalItemCount} {totalItemCount === 1 ? 'item' : 'items'} in your cart
           </p>
         </div>
         <Button
@@ -257,6 +292,7 @@ export default function CartPage() {
               </CardContent>
             </Card>
           ))}
+          <FabricCartSection fulfillment={fulfillment} onFulfillmentChange={setFulfillment} />
         </div>
 
         {/* Order Summary */}
@@ -267,35 +303,38 @@ export default function CartPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                {state.items.filter(item => !item.is_free && item.price > 0).length > 0 && (
+                {paidPatternCount > 0 && (
                   <div className="flex justify-between">
                     <span>
-                      Subtotal ({state.items.filter(item => !item.is_free && item.price > 0).length}{' '}
-                      {state.items.filter(item => !item.is_free && item.price > 0).length === 1
-                        ? 'item'
-                        : 'items'}
-                      )
+                      Patterns ({paidPatternCount})
                     </span>
-                    <span className="font-medium">
-                      {formatAmountForDisplay(
-                        state.items
-                          .filter(item => !item.is_free && item.price > 0)
-                          .reduce((sum, item) => sum + item.price, 0),
-                        'USD'
-                      )}
-                    </span>
+                    <span className="font-medium">{formatCents(patternSubtotalCents)}</span>
                   </div>
                 )}
-                {state.items.filter(item => item.is_free || item.price === 0).length > 0 && (
+                {freePatternCount > 0 && (
                   <div className="flex justify-between text-green-600">
-                    <span>
-                      Free ({state.items.filter(item => item.is_free || item.price === 0).length}{' '}
-                      {state.items.filter(item => item.is_free || item.price === 0).length === 1
-                        ? 'item'
-                        : 'items'}
-                      )
-                    </span>
+                    <span>Free patterns ({freePatternCount})</span>
                     <span className="font-medium">Free</span>
+                  </div>
+                )}
+                {fabric.items.length > 0 && (
+                  <>
+                    <div className="flex justify-between">
+                      <span>Fabric ({fabric.items.length})</span>
+                      <span className="font-medium">{formatCents(fabricSubtotalCents)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>{fulfillment === 'ship' ? 'Fabric shipping' : 'Fabric pickup'}</span>
+                      <span className="font-medium">
+                        {fabricShippingCents === 0 ? 'Free' : formatCents(fabricShippingCents)}
+                      </span>
+                    </div>
+                  </>
+                )}
+                {(paidPatternCount > 0 || fabric.items.length > 0) && (
+                  <div className="flex justify-between text-muted-foreground text-sm">
+                    <span>Tax</span>
+                    <span>Calculated at checkout</span>
                   </div>
                 )}
               </div>
@@ -303,16 +342,7 @@ export default function CartPage() {
               <div className="border-t pt-4">
                 <div className="flex justify-between text-lg font-bold">
                   <span>Total</span>
-                  <span>
-                    {state.items.filter(item => !item.is_free && item.price > 0).length > 0
-                      ? formatAmountForDisplay(
-                          state.items
-                            .filter(item => !item.is_free && item.price > 0)
-                            .reduce((sum, item) => sum + item.price, 0),
-                          'USD'
-                        )
-                      : 'Free'}
-                  </span>
+                  <span>{grandTotalCents > 0 ? formatCents(grandTotalCents) : 'Free'}</span>
                 </div>
               </div>
 
@@ -322,9 +352,9 @@ export default function CartPage() {
                     <Award className="h-4 w-4 text-rose-600 dark:text-rose-400 shrink-0" />
                     <p className="text-sm text-rose-800 dark:text-rose-200">
                       <strong>
-                        Earn {PATTERN_POINTS.BUY_PRODUCT * state.items.length} Pattern Points
+                        Earn {PATTERN_POINTS.BUY_PRODUCT * (state.items.length + (fabric.items.length > 0 ? 1 : 0))} Pattern Points
                       </strong>{' '}
-                      ({PATTERN_POINTS.BUY_PRODUCT} per item) when you complete this purchase!
+                      ({PATTERN_POINTS.BUY_PRODUCT} per pattern{fabric.items.length > 0 ? ', plus the fabric order' : ''}) when you complete this purchase!
                     </p>
                   </div>
                 </div>

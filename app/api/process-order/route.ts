@@ -3,6 +3,7 @@ import { getStripe } from '@/lib/stripe';
 import { createServiceRoleClient } from '@/lib/supabase/service-role';
 import { calculateEtsyFees, sellerHasFeeWaiver } from '@/lib/company-info';
 import { deliverProductsForOrders } from '@/lib/product-delivery';
+import { handleCartCheckoutCompleted } from '@/lib/cart-checkout-server';
 import { sendSellerSaleNotificationEmail } from '@/lib/email';
 import { awardPointsForPurchase, awardPointsForSale } from '@/lib/pattern-points';
 
@@ -52,6 +53,13 @@ export async function POST(request: NextRequest) {
     // Check if payment was successful
     if (session.payment_status !== 'paid') {
       return NextResponse.json({ error: 'Payment not completed' }, { status: 400 });
+    }
+
+    // Unified cart checkout: same idempotent handler the webhook uses, so this
+    // works as a backup if the webhook is slow.
+    if (session.metadata?.type === 'cart') {
+      const { fabricOrderId } = await handleCartCheckoutCompleted(session);
+      return NextResponse.json({ success: true, fabricOrderId });
     }
 
     // Check if order already exists for this session

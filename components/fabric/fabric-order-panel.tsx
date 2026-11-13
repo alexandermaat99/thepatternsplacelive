@@ -94,21 +94,21 @@ export function FabricOrderPanel({
           }}
         >
           <ShoppingBag className="h-4 w-4 mr-2" />
-          Add to fabric order
+          Add to cart
         </Button>
       ) : (
         <p className="text-sm text-muted-foreground">
-          You have all available yardage of this fabric in your order.
+          You have all available yardage of this fabric in your cart.
         </p>
       )}
 
       {(added || inCart > 0) && (
         <Link
-          href="/fabric/cart"
+          href="/cart"
           className="flex items-center justify-center gap-1.5 text-sm font-medium text-primary underline underline-offset-4"
         >
           {added && <Check className="h-4 w-4 text-green-600" />}
-          {added ? 'Added. ' : ''}View fabric order ({formatYardsLabel(inCart)} of this fabric)
+          {added ? 'Added. ' : ''}View cart ({formatYardsLabel(inCart)} of this fabric)
         </Link>
       )}
 

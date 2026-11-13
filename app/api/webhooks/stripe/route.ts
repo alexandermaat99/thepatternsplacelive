@@ -7,6 +7,7 @@ import { sendSellerSaleNotificationEmail } from '@/lib/email';
 import { COMPANY_INFO, calculateEtsyFees, sellerHasFeeWaiver } from '@/lib/company-info';
 import { awardPointsForPurchase, awardPointsForSale } from '@/lib/pattern-points';
 import { handleFabricCheckoutCompleted, handleFabricCheckoutExpired } from '@/lib/fabric-order-server';
+import { handleCartCheckoutCompleted, handleCartCheckoutExpired } from '@/lib/cart-checkout-server';
 
 // Calculate fees for an order using Etsy-style structure
 // When tax is included, we maintain the seller's net amount by scaling the fee proportionally
@@ -111,6 +112,13 @@ export async function POST(request: NextRequest) {
         // Fabric orders are our own inventory, handled separately from pattern orders.
         if (session.metadata?.type === 'fabric_order') {
           await handleFabricCheckoutCompleted(session);
+          break;
+        }
+
+        // Unified cart (patterns from any designers + fabric): platform charge,
+        // then one transfer per designer.
+        if (session.metadata?.type === 'cart') {
+          await handleCartCheckoutCompleted(session);
           break;
         }
 
@@ -648,6 +656,10 @@ export async function POST(request: NextRequest) {
 
         if (session.metadata?.type === 'fabric_order') {
           await handleFabricCheckoutExpired(session);
+          break;
+        }
+        if (session.metadata?.type === 'cart') {
+          await handleCartCheckoutExpired(session);
           break;
         }
 
