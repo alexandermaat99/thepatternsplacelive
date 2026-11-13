@@ -98,27 +98,48 @@ export default function PrivacyPolicyPage() {
             </ul>
           </section>
 
-          <section>
+          <section id="cookies" className="scroll-mt-24">
             <h2 className="text-xl font-semibold mb-3">4. Cookies and Tracking</h2>
             <p className="text-muted-foreground leading-relaxed mb-4">
-              We use cookies and similar tracking technologies to collect and track information
-              about your browsing activities. Types of cookies we use:
+              We use cookies and similar browser storage for the following:
             </p>
-            <ul className="list-disc list-inside text-muted-foreground space-y-1">
+            <ul className="list-disc list-inside text-muted-foreground space-y-2">
               <li>
-                <strong>Essential Cookies:</strong> Required for the website to function
-                (authentication, security, cart)
+                <strong>Essential:</strong> keeping you signed in and securing your account
+                (Supabase authentication cookies), and fraud prevention on Stripe&apos;s checkout
+                and payout pages. These are needed for the site to work and can&apos;t be turned
+                off.
               </li>
               <li>
-                <strong>Functional Cookies:</strong> Remember your preferences (theme, language)
+                <strong>Preferences:</strong> your theme, your cookie choice, and dismissed notices,
+                stored in your browser.
               </li>
               <li>
-                <strong>Analytics Cookies:</strong> Help us understand how visitors use our site
+                <strong>Analytics:</strong> Google Analytics, loaded through Google Tag Manager,
+                helps us understand how visitors use the site. If you are in the European Economic
+                Area, the UK, or Switzerland, these cookies are only set after you click
+                &quot;Accept&quot;. Elsewhere they are on by default, and you can turn them off by
+                clicking &quot;Decline&quot;. When analytics cookies are off, Google tags set no
+                cookies.
+              </li>
+              <li>
+                <strong>Performance:</strong> Vercel Speed Insights measures page load speed without
+                using cookies.
               </li>
             </ul>
             <p className="text-muted-foreground leading-relaxed mt-4">
-              You can control cookies through your browser settings. Note that disabling certain
-              cookies may affect website functionality.
+              You can change your choice at any time using &quot;Cookie settings&quot; at the
+              bottom of any page. You can also block or delete cookies in your browser settings,
+              or use Google&apos;s{' '}
+              <a
+                href="https://tools.google.com/dlpage/gaoptout"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline"
+              >
+                Analytics opt-out add-on
+              </a>
+              . Blocking essential cookies will prevent you from signing in.
             </p>
           </section>
 

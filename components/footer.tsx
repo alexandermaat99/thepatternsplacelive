@@ -1,5 +1,6 @@
 'use client';
 
+import { openCookieSettings } from '@/lib/cookie-consent';
 import Link from 'next/link';
 import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
@@ -119,6 +120,15 @@ export function Footer() {
                 >
                   Terms of Service
                 </Link>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  onClick={openCookieSettings}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Cookie settings
+                </button>
               </li>
             </ul>
           </div>
