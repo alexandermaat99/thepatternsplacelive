@@ -185,3 +185,13 @@ export async function handleFabricCheckoutExpired(session: Stripe.Checkout.Sessi
   if (!orderId) return;
   await createServiceRoleClient().rpc('release_fabric_order', { p_order_id: orderId, p_status: 'expired' });
 }
+
+/** Yards of this fabric currently held in unpaid checkouts (released within 30 minutes if not bought). */
+export async function getHeldYards(baseSku: string): Promise<number> {
+  const { data } = await createServiceRoleClient()
+    .from('fabric_order_items')
+    .select('yards, fabric_orders!inner(status)')
+    .eq('base_sku', baseSku)
+    .eq('fabric_orders.status', 'awaiting_payment');
+  return (data ?? []).reduce((sum, row) => sum + Number(row.yards), 0);
+}

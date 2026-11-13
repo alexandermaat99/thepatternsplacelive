@@ -16,6 +16,13 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { CheckoutAuthModal } from '@/components/checkout-auth-modal';
 import { PATTERN_POINTS } from '@/lib/pattern-points';
 import { useFabricCart } from '@/hooks/useFabricCart';
+import {
+  cancelPendingCheckout,
+  clearPendingCheckout,
+  getPendingCheckout,
+  savePendingCheckout,
+  type PendingCheckout,
+} from '@/lib/pending-checkout';
 import { FabricCartSection } from '@/components/fabric/fabric-cart-section';
 import { FABRIC_ORDER_SETTINGS, formatCents, shippingCentsFor, type Fulfillment } from '@/lib/fabric-orders';
 
@@ -42,12 +49,19 @@ export default function CartPage() {
   const patternSubtotalCents = paidPatterns.reduce((sum, item) => sum + Math.round(item.price * 100), 0);
   const grandTotalCents = patternSubtotalCents + fabricSubtotalCents + fabricShippingCents;
 
-  // Back from Stripe without paying: release the held fabric right away.
+  // A checkout that is still holding fabric (shopper came back without paying).
+  const [pendingCheckout, setPendingCheckout] = useState<PendingCheckout | null>(null);
+
   useEffect(() => {
+    // Back via Stripe's "back" link: release the held fabric right away.
     const canceled = new URLSearchParams(window.location.search).get('canceled');
-    if (!canceled) return;
-    fetch(`/api/fabric/orders/${encodeURIComponent(canceled)}/abandon`, { method: 'POST' }).catch(() => {});
-    window.history.replaceState(null, '', '/cart');
+    if (canceled) {
+      cancelPendingCheckout({ fabricOrderId: canceled, url: '', expiresAt: 0 });
+      window.history.replaceState(null, '', '/cart');
+      return;
+    }
+    // Back via the browser's back button: offer to resume or cancel.
+    setPendingCheckout(getPendingCheckout());
   }, []);
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -93,6 +107,9 @@ export default function CartPage() {
 
       // Paid patterns (any designers) and fabric go through one checkout
       if (paidProducts.length > 0 || fabric.items.length > 0) {
+        // Starting over replaces any earlier checkout: release its fabric hold first.
+        await cancelPendingCheckout();
+        setPendingCheckout(null);
         const response = await fetch('/api/checkout/cart', {
           method: 'POST',
           headers: {
@@ -110,7 +127,8 @@ export default function CartPage() {
           throw new Error(error.error || 'Failed to create checkout session');
         }
 
-        const { url } = await response.json();
+        const { url, fabricOrderId, expiresAt } = await response.json();
+        if (url && fabricOrderId) savePendingCheckout({ fabricOrderId, url, expiresAt });
 
         if (url) {
           // Redirect to Stripe Checkout
@@ -229,6 +247,30 @@ export default function CartPage() {
           Clear Cart
         </Button>
       </div>
+
+      {pendingCheckout && (
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
+          <p className="flex-1">
+            <strong>You have a checkout in progress.</strong> Your fabric is held for you until{' '}
+            {new Date(pendingCheckout.expiresAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.
+          </p>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={() => (window.location.href = pendingCheckout.url)}>
+              Return to checkout
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={async () => {
+                await cancelPendingCheckout(pendingCheckout);
+                setPendingCheckout(null);
+              }}
+            >
+              Cancel it
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Cart Items */}

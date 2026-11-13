@@ -3,10 +3,12 @@ import { notFound } from 'next/navigation';
 import { Navigation } from '@/components/navigation';
 import { Footer } from '@/components/footer';
 import { FabricDetailView } from '@/components/fabric/fabric-detail-view';
-import { getFabricPublicDetail } from '@/lib/fabric-catalog';
+import { getFabricPublicDetail, isFabricSoldOut } from '@/lib/fabric-catalog';
+import { getHeldYards } from '@/lib/fabric-order-server';
 import { COMPANY_INFO } from '@/lib/company-info';
 
-export const revalidate = 120;
+// Always live: stock changes the moment someone starts or abandons a checkout.
+export const dynamic = 'force-dynamic';
 
 interface FabricSkuPageProps {
   params: Promise<{ sku: string }>;
@@ -75,12 +77,13 @@ export default async function FabricSkuPage({ params }: FabricSkuPageProps) {
   if (!fabric) {
     notFound();
   }
+  const heldYards = isFabricSoldOut(fabric.current_quantity) ? await getHeldYards(fabric.sku) : 0;
 
   return (
     <>
       <Navigation showMarketplaceLinks={true} />
       <div className="container mx-auto max-w-screen-xl px-4 py-8 sm:py-10">
-        <FabricDetailView fabric={fabric} />
+        <FabricDetailView fabric={fabric} heldYards={heldYards} />
       </div>
       <Footer />
     </>
