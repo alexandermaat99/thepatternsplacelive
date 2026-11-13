@@ -11,8 +11,9 @@ export default async function AdminOutreachPage() {
       <div>
         <h1 className="text-3xl font-bold">Designer outreach</h1>
         <p className="text-muted-foreground mt-1">
-          Founding Designer candidates. Starred designers are the best first contacts. Track each
-          one&apos;s status and keep notes as you reach out. Only admins can see this page.
+          Founding Designer candidates. Starred designers are smaller, active creators: the best
+          first contacts. Open &quot;Draft message&quot; on a row to edit and copy a personalized
+          message, then set the status as you go. Only admins can see this page.
         </p>
       </div>
       {error ? (
