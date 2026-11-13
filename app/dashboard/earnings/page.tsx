@@ -189,9 +189,7 @@ export default async function EarningsPage() {
   // Recent orders (last 10)
   const recentOrders = completedOrders.slice(0, 10);
 
-  // Fee info - Etsy-style structure
-  const listingFee = COMPANY_INFO.fees.listingFeeCents / 100;
-  const transactionFeePercent = Number((COMPANY_INFO.fees.transactionFeePercent * 100).toFixed(2));
+  // Fee info
   const paymentProcessingPercent = Number(
     (COMPANY_INFO.fees.paymentProcessingPercent * 100).toFixed(2)
   );

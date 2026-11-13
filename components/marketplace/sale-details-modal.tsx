@@ -59,14 +59,15 @@ export function SaleDetailsModal({ isOpen, onClose, sale }: SaleDetailsModalProp
   const buyerEmail = sale.buyer_email || 'No email available';
   const isAuthenticatedBuyer = !!sale.buyer_id;
 
-  // Recalculate fees from sale price (not total with tax) for accurate display
+  // Prefer the fees recorded when the sale happened: rates and waivers change
+  // over time, so recalculating at today's rates would misstate past sales.
+  // (orders.platform_fee holds the total fee, including payment processing.)
   const salePriceInCents = Math.round((sale.amount || 0) * 100);
   const calculatedFees = calculateEtsyFees(salePriceInCents);
-  // Platform fee = listing fee + transaction fee
-  const platformFee = (calculatedFees.listingFee + calculatedFees.transactionFee) / 100;
-  // Stripe processing fee = payment processing
   const stripeProcessingFee = calculatedFees.paymentProcessing / 100;
-  const totalFees = platformFee + stripeProcessingFee;
+  const totalFees =
+    sale.platform_fee != null ? sale.platform_fee : calculatedFees.totalFee / 100;
+  const platformFee = Math.max(0, totalFees - stripeProcessingFee);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

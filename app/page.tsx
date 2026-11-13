@@ -3,6 +3,7 @@ import { COMPANY_INFO } from '@/lib/company-info';
 import MarketplacePage from './marketplace/page';
 import { Navigation } from '@/components/navigation';
 import { PlatformBanner } from '@/components/platform-banner';
+import { FoundingDesignersSpotlight } from '@/components/marketplace/founding-designers-spotlight';
 
 // The homepage title is the most important one on the site. Lead with what
 // people search for, then the brand.
@@ -146,6 +147,9 @@ export default function Home(props: any) {
           </div>
         </div>
       </section>
+
+      {/* Founding Designers (renders nothing until there's at least one) */}
+      <FoundingDesignersSpotlight />
 
       {/* Embedded Marketplace Section */}
       <section aria-label="Marketplace" data-embedded="true">

@@ -9,6 +9,8 @@ export interface UserProfile {
   pattern_points: number | null;
   bio: string | null;
   completed_sales_count?: number | null;
+  founding_designer?: boolean | null;
+  platform_fee_waived_until?: string | null;
   admin?: boolean | null;
   created_at: string;
   updated_at: string;

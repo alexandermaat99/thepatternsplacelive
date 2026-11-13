@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getStripe } from '@/lib/stripe';
 import { createClient } from '@/lib/supabase/server';
 import { formatAmountForStripe } from '@/lib/stripe';
-import { COMPANY_INFO, calculateEtsyFees } from '@/lib/company-info';
+import { COMPANY_INFO, calculateEtsyFees, sellerHasFeeWaiver } from '@/lib/company-info';
 import { canReceiveSales } from '@/lib/stripe-connect';
 
 export async function POST(request: NextRequest) {
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     // Get seller profiles with Stripe account IDs and sales counts
     const { data: sellerProfiles, error: sellerError } = await supabase
       .from('profiles')
-      .select('id, stripe_account_id, completed_sales_count')
+      .select('id, stripe_account_id, completed_sales_count, platform_fee_waived_until')
       .in('id', sellerIds);
 
     if (sellerError || !sellerProfiles) {
@@ -162,21 +162,14 @@ export async function POST(request: NextRequest) {
     // Platform keeps: Platform Fee + Tax (for remittance)
     //
     // Etsy fee structure:
-    // - Listing Fee: $0.20 per sale
-    // - Transaction Fee: 6.5% of sale price
-    // - Payment Processing: 3% + $0.25
-    // Total: $0.20 + (sale_price * 0.065) + (sale_price * 0.03) + $0.25
+    // Fees: platform fee (COMPANY_INFO.fees) + payment processing (3% + $0.25)
     const totalInCents = Math.round(totalAmount * 100);
 
-    // Check if primary seller qualifies for first 5 sales fee waiver
-    // Note: For multi-seller carts, we use the primary seller's count
-    // In the future, you may want to split fees per seller
+    // Fee waiver (first free sales or an active waiver) is based on the primary seller.
+    // In the future, you may want to split fees per seller.
     const primarySellerProfile = sellerProfiles.find((p: any) => p.id === paidProducts[0]?.user_id);
-    const waivePlatformFees = primarySellerProfile 
-      ? (primarySellerProfile.completed_sales_count || 0) < 5
-      : false;
+    const waivePlatformFees = sellerHasFeeWaiver(primarySellerProfile);
 
-    // Calculate Etsy-style fees (waive platform fees for first 5 sales)
     const fees = calculateEtsyFees(totalInCents, waivePlatformFees);
     const platformFeeAmount = fees.totalFee;
 
