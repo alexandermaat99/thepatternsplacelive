@@ -18,6 +18,20 @@ export async function proxy(request: NextRequest) {
     }
   }
 
+  // Safety net for auth email links: if a redirect target isn't in Supabase's
+  // Redirect URLs allow-list, Supabase sends the user to the Site URL (our
+  // homepage) with the auth params attached. Forward those to /auth/confirm
+  // so the user still gets signed in instead of landing on a plain homepage.
+  if (
+    url.pathname === '/' &&
+    (url.searchParams.has('code') ||
+      url.searchParams.has('token_hash') ||
+      url.searchParams.has('error_description'))
+  ) {
+    url.pathname = '/auth/confirm';
+    return NextResponse.redirect(url);
+  }
+
   // Update Supabase session (this handles auth)
   const sessionResponse = await updateSession(request);
 
