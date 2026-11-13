@@ -12,7 +12,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
-import { User, LogOut, ShoppingBag, Package, Plus, Ruler, ReceiptText, Barcode } from 'lucide-react';
+import { User, LogOut, ShoppingBag, Package, Plus, Ruler, ReceiptText, Barcode, Megaphone, BookOpen } from 'lucide-react';
 import Link from 'next/link';
 
 export function ProfileDropdown() {
@@ -147,6 +147,30 @@ export function ProfileDropdown() {
               >
                 <Barcode className="mr-2 h-4 w-4" />
                 <span>Barcode generator</span>
+              </Link>
+            </DropdownMenuItem>
+          )}
+          {isAdmin && (
+            <DropdownMenuItem asChild>
+              <Link
+                href="/admin/outreach"
+                className="flex items-center w-full"
+                onClick={() => setIsOpen(false)}
+              >
+                <Megaphone className="mr-2 h-4 w-4" />
+                <span>Designer outreach</span>
+              </Link>
+            </DropdownMenuItem>
+          )}
+          {isAdmin && (
+            <DropdownMenuItem asChild>
+              <Link
+                href="/admin/open-patterns"
+                className="flex items-center w-full"
+                onClick={() => setIsOpen(false)}
+              >
+                <BookOpen className="mr-2 h-4 w-4" />
+                <span>Open patterns</span>
               </Link>
             </DropdownMenuItem>
           )}
