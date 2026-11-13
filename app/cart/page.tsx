@@ -65,7 +65,11 @@ export default function CartPage() {
   }, []);
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [itemToRemove, setItemToRemove] = useState<{ id: string; title: string } | null>(null);
+  const [itemToRemove, setItemToRemove] = useState<{
+    id: string;
+    title: string;
+    kind?: 'pattern' | 'fabric';
+  } | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showCheckoutAuthModal, setShowCheckoutAuthModal] = useState(false);
@@ -187,14 +191,15 @@ export default function CartPage() {
     proceedToStripeCheckout();
   };
 
-  const handleRemoveClick = (item: { id: string; title: string }) => {
+  const handleRemoveClick = (item: { id: string; title: string; kind?: 'pattern' | 'fabric' }) => {
     setItemToRemove(item);
     setIsDialogOpen(true);
   };
 
   const handleConfirmRemove = () => {
     if (itemToRemove) {
-      removeItem(itemToRemove.id);
+      if (itemToRemove.kind === 'fabric') fabric.remove(itemToRemove.id);
+      else removeItem(itemToRemove.id);
     }
   };
 
@@ -241,7 +246,9 @@ export default function CartPage() {
         </div>
         <Button
           variant="outline"
-          onClick={clearCart}
+          onClick={() => {
+            if (window.confirm('Remove everything from your cart?')) clearCart();
+          }}
           className="hidden sm:flex text-red-600 hover:text-red-700"
         >
           Clear Cart
@@ -334,7 +341,11 @@ export default function CartPage() {
               </CardContent>
             </Card>
           ))}
-          <FabricCartSection fulfillment={fulfillment} onFulfillmentChange={setFulfillment} />
+          <FabricCartSection
+            fulfillment={fulfillment}
+            onFulfillmentChange={setFulfillment}
+            onRemoveRequest={(baseSku, name) => handleRemoveClick({ id: baseSku, title: name, kind: 'fabric' })}
+          />
         </div>
 
         {/* Order Summary */}
