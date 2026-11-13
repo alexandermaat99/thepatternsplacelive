@@ -39,8 +39,13 @@ export function Navigation({ showMarketplaceLinks = false }: NavigationProps) {
   const logoSrc =
     mounted && resolvedTheme === 'dark' ? '/logos/back_logo_light.svg' : '/logos/back_logo.svg';
 
+  // Shopping pages (patterns and fabric share one cart).
   const showCart =
-    pathname?.startsWith('/marketplace') || pathname?.startsWith('/cart') || pathname?.startsWith('/checkout');
+    pathname === '/' ||
+    pathname?.startsWith('/marketplace') ||
+    pathname?.startsWith('/fabric') ||
+    pathname?.startsWith('/cart') ||
+    pathname?.startsWith('/checkout');
 
   // Handle hover menu for logo (desktop)
   const handleLogoMouseEnter = () => {
