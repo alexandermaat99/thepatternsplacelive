@@ -7,7 +7,8 @@ import { Footer } from '@/components/footer';
 import { Button } from '@/components/ui/button';
 import { ClearFabricCart } from '@/components/fabric/clear-fabric-cart';
 import { loadFabricOrder } from '@/lib/fabric-order-server';
-import { FABRIC_ORDER_SETTINGS, formatCents, formatYardsLabel } from '@/lib/fabric-orders';
+import { formatCents, formatYardsLabel } from '@/lib/fabric-orders';
+import { getFabricShippingSettings } from '@/lib/fabric-settings-server';
 
 export const metadata: Metadata = { title: 'Fabric order', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
@@ -26,7 +27,7 @@ export default async function FabricOrderPage({
   const { id } = await params;
   const { placed } = await searchParams;
   if (!UUID.test(id)) notFound();
-  const order = await loadFabricOrder(id);
+  const [order, shippingSettings] = await Promise.all([loadFabricOrder(id), getFabricShippingSettings()]);
   if (!order || order.status === 'pending') notFound();
 
   const statusInfo: Record<string, { icon: typeof CheckCircle; title: string; text: string }> = {
@@ -36,8 +37,8 @@ export default async function FabricOrderPage({
       title: 'Thanks! Your order is confirmed',
       text:
         order.fulfillment === 'ship'
-          ? `We're cutting your fabric now. ${FABRIC_ORDER_SETTINGS.shipping.estimate}, and we'll email tracking when it ships.`
-          : FABRIC_ORDER_SETTINGS.pickup.instructions,
+          ? `We're cutting your fabric now. ${shippingSettings.shipping.estimate}, and we'll email tracking when it ships.`
+          : shippingSettings.pickup.instructions,
     },
     shipped: { icon: Truck, title: 'Your order has shipped', text: order.tracking_number ? `Tracking number: ${order.tracking_number}` : 'It is on its way.' },
     picked_up: { icon: Package, title: 'Picked up. Happy sewing!', text: 'Thanks for shopping with us.' },
@@ -77,7 +78,7 @@ export default async function FabricOrderPage({
           <div className="flex justify-between">
             <span className="inline-flex items-center gap-1.5">
               {order.fulfillment === 'ship' ? <Truck className="h-4 w-4" /> : <Store className="h-4 w-4" />}
-              {order.fulfillment === 'ship' ? 'Shipping' : `Pickup in ${FABRIC_ORDER_SETTINGS.pickup.area}`}
+              {order.fulfillment === 'ship' ? 'Shipping' : `Pickup in ${shippingSettings.pickup.area}`}
             </span>
             <span>{order.shipping_cents ? formatCents(order.shipping_cents) : 'Free'}</span>
           </div>

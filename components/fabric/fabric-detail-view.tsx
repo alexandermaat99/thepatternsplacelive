@@ -5,7 +5,7 @@ import { isFabricSoldOut, type FabricPublicDetail } from '@/lib/fabric-catalog';
 import { cn } from '@/lib/utils';
 import { FabricDetailCarousel } from '@/components/fabric/fabric-detail-carousel';
 import { FabricOrderPanel } from '@/components/fabric/fabric-order-panel';
-import { FABRIC_ORDER_SETTINGS, maxOrderableYards } from '@/lib/fabric-orders';
+import { FABRIC_ORDER_SETTINGS, maxOrderableYards, type FabricShippingSettings } from '@/lib/fabric-orders';
 
 function formatPrice(value: number | null) {
   if (value == null || !Number.isFinite(value)) return '—';
@@ -41,8 +41,10 @@ function isPublicImageUrl(url: string | null): url is string {
 export function FabricDetailView({
   fabric,
   heldYards = 0,
+  shippingSettings,
 }: {
   fabric: FabricPublicDetail;
+  shippingSettings: FabricShippingSettings;
   /** Yards held in other shoppers' unpaid checkouts. */
   heldYards?: number;
 }) {
@@ -131,6 +133,7 @@ export function FabricDetailView({
               pricePerYard={fabric.sell_price}
               photoUrl={galleryUrls[0] ?? null}
               maxYards={maxOrderableYards(fabric.bolts)}
+              shippingSettings={shippingSettings}
             />
           )}
 

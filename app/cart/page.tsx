@@ -24,14 +24,19 @@ import {
   type PendingCheckout,
 } from '@/lib/pending-checkout';
 import { FabricCartSection } from '@/components/fabric/fabric-cart-section';
-import { FABRIC_ORDER_SETTINGS, formatCents, shippingCentsFor, type Fulfillment } from '@/lib/fabric-orders';
+import { formatCents, shippingCentsFor, type Fulfillment } from '@/lib/fabric-orders';
+import { useFabricShippingSettings } from '@/hooks/useFabricShippingSettings';
 
 export default function CartPage() {
   const { state, removeItem, clearCart: clearPatterns } = useCart();
   const fabric = useFabricCart();
-  const [fulfillment, setFulfillment] = useState<Fulfillment>(
-    FABRIC_ORDER_SETTINGS.shipping.enabled ? 'ship' : 'pickup'
-  );
+  const shippingSettings = useFabricShippingSettings();
+  const [fulfillment, setFulfillment] = useState<Fulfillment>('ship');
+  // If an admin turned shipping (or pickup) off, switch to the other option.
+  useEffect(() => {
+    if (fulfillment === 'ship' && !shippingSettings.shipping.enabled) setFulfillment('pickup');
+    if (fulfillment === 'pickup' && !shippingSettings.pickup.enabled) setFulfillment('ship');
+  }, [shippingSettings, fulfillment]);
   const clearCart = () => {
     clearPatterns();
     fabric.clear();
@@ -41,7 +46,9 @@ export default function CartPage() {
     0
   );
   const fabricShippingCents =
-    fabric.items.length > 0 ? shippingCentsFor(fulfillment, fabricSubtotalCents) : 0;
+    fabric.items.length > 0
+      ? shippingCentsFor(shippingSettings, fulfillment, fabricSubtotalCents, fabric.totalYards)
+      : 0;
   const totalItemCount = state.items.length + fabric.items.length;
   const paidPatterns = state.items.filter(item => !item.is_free && item.price > 0);
   const paidPatternCount = paidPatterns.length;
@@ -344,6 +351,7 @@ export default function CartPage() {
           <FabricCartSection
             fulfillment={fulfillment}
             onFulfillmentChange={setFulfillment}
+            shippingSettings={shippingSettings}
             onRemoveRequest={(baseSku, name) => handleRemoveClick({ id: baseSku, title: name, kind: 'fabric' })}
           />
         </div>
