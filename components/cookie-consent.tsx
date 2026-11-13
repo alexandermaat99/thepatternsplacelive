@@ -7,6 +7,7 @@ import {
   COOKIE_CONSENT_KEY,
   OPEN_COOKIE_SETTINGS_EVENT,
   applyConsentChoice,
+  setCookieBannerVisible,
   type ConsentChoice,
 } from '@/lib/cookie-consent';
 
@@ -35,6 +36,11 @@ export function CookieConsent() {
     };
   }, []);
 
+  // Let other fixed UI (the feedback bubble) know when the banner is showing.
+  useEffect(() => {
+    setCookieBannerVisible(showBanner);
+  }, [showBanner]);
+
   const choose = (choice: ConsentChoice) => {
     applyConsentChoice(choice);
     setShowBanner(false);
@@ -46,7 +52,7 @@ export function CookieConsent() {
     <div
       role="dialog"
       aria-label="Cookie preferences"
-      className="fixed bottom-0 left-0 right-0 z-50 p-4 sm:p-6 animate-in slide-in-from-bottom-5 duration-300"
+      className="fixed bottom-0 left-0 right-0 z-[60] p-4 sm:p-6 animate-in slide-in-from-bottom-5 duration-300"
     >
       <div className="max-w-4xl mx-auto bg-card border border-border rounded-xl shadow-lg p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
