@@ -106,11 +106,30 @@ export async function sendFabricOrderShippedEmail(order: OrderWithItems) {
   );
 }
 
-/** Webhook: checkout.session.completed for a fabric order. Idempotent. */
-export async function handleFabricCheckoutCompleted(session: Stripe.Checkout.Session) {
+/**
+ * Webhook: checkout.session.completed for a session that includes fabric.
+ * Idempotent. In a mixed cart (patterns + fabric), the session totals include
+ * the patterns too, so only shipping comes from Stripe and tax is allocated
+ * by the fabric's share of the subtotal.
+ */
+export async function handleFabricCheckoutCompleted(
+  session: Stripe.Checkout.Session,
+  options: { mixedCart?: boolean } = {}
+) {
   const orderId = session.metadata?.fabric_order_id;
   if (!orderId) return;
   const supabase = createServiceRoleClient();
+  const existingOrder = await loadFabricOrder(orderId);
+  if (!existingOrder) return;
+  const sessionSubtotal = session.amount_subtotal ?? 0;
+  const sessionTax = session.total_details?.amount_tax ?? 0;
+  const shippingCents = session.total_details?.amount_shipping ?? 0;
+  const fabricSubtotal = options.mixedCart ? existingOrder.subtotal_cents : sessionSubtotal;
+  const fabricTax = options.mixedCart
+    ? sessionSubtotal > 0
+      ? Math.round((sessionTax * fabricSubtotal) / sessionSubtotal)
+      : 0
+    : sessionTax;
   const shipping =
     (session as unknown as { collected_information?: { shipping_details?: { name?: string; address?: Stripe.Address } } })
       .collected_information?.shipping_details ??
@@ -122,10 +141,10 @@ export async function handleFabricCheckoutCompleted(session: Stripe.Checkout.Ses
     phone: session.customer_details?.phone ?? null,
     shipping_name: shipping?.name ?? null,
     shipping_address: shipping?.address ?? null,
-    subtotal_cents: session.amount_subtotal ?? 0,
-    shipping_cents: session.total_details?.amount_shipping ?? 0,
-    tax_cents: session.total_details?.amount_tax ?? 0,
-    total_cents: session.amount_total ?? 0,
+    subtotal_cents: fabricSubtotal,
+    shipping_cents: shippingCents,
+    tax_cents: fabricTax,
+    total_cents: options.mixedCart ? fabricSubtotal + shippingCents + fabricTax : (session.amount_total ?? 0),
     stripe_payment_intent: typeof session.payment_intent === 'string' ? session.payment_intent : null,
   };
 

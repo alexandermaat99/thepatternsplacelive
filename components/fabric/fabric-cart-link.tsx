@@ -11,11 +11,11 @@ export function FabricCartLink() {
   if (!ready || count === 0) return null;
   return (
     <Link
-      href="/fabric/cart"
+      href="/cart"
       className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted"
     >
       <ShoppingBag className="h-4 w-4" />
-      Your fabric order: {count} {count === 1 ? 'fabric' : 'fabrics'}, {formatYardsLabel(totalYards)}
+      In your cart: {count} {count === 1 ? 'fabric' : 'fabrics'}, {formatYardsLabel(totalYards)}
     </Link>
   );
 }

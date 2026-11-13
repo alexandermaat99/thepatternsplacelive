@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle, ShoppingBag, Home, Loader2, Award } from 'lucide-react';
 import { useCart } from '@/contexts/cart-context';
+import { useFabricCart } from '@/hooks/useFabricCart';
 import { useAuth } from '@/contexts/auth-context';
 import Link from 'next/link';
 import { PATTERN_POINTS } from '@/lib/pattern-points';
@@ -15,6 +16,8 @@ function CheckoutSuccessContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get('session_id');
   const { clearCart } = useCart();
+  const { clear: clearFabric } = useFabricCart();
+  const [fabricOrderId, setFabricOrderId] = useState<string | null>(null);
   const { user } = useAuth();
   const hasProcessed = useRef(false);
   const [isProcessing, setIsProcessing] = useState(true);
@@ -43,6 +46,7 @@ function CheckoutSuccessContent() {
         if (data.success) {
           console.log('Order processed:', data);
           setOrderCreated(true);
+          if (data.fabricOrderId) setFabricOrderId(data.fabricOrderId);
         } else {
           console.error('Order processing failed:', data.error);
         }
@@ -51,11 +55,12 @@ function CheckoutSuccessContent() {
       } finally {
         setIsProcessing(false);
         clearCart();
+        clearFabric();
       }
     }
 
     processOrder();
-  }, [sessionId, clearCart]);
+  }, [sessionId, clearCart, clearFabric]);
   if (isProcessing) {
     return (
       <div className="container mx-auto px-4 py-8 max-w-2xl">
@@ -100,6 +105,14 @@ function CheckoutSuccessContent() {
             <p className="text-sm text-muted-foreground">
               You will receive an email confirmation shortly with your order details.
             </p>
+            {fabricOrderId && (
+              <p className="text-sm">
+                Your fabric is being cut.{' '}
+                <Link href={`/fabric/order/${fabricOrderId}`} className="font-medium underline underline-offset-4">
+                  View your fabric order
+                </Link>
+              </p>
+            )}
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
