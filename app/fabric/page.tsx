@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft, Instagram } from 'lucide-react';
+import { FabricCartLink } from '@/components/fabric/fabric-cart-link';
 import { Navigation } from '@/components/navigation';
 import { Footer } from '@/components/footer';
 import { Button } from '@/components/ui/button';
@@ -12,7 +13,7 @@ export const revalidate = 120;
 
 export const metadata: Metadata = {
   title: 'In-stock fabric',
-  description: `Browse in-stock fabric at ${COMPANY_INFO.name}: photos, SKU, price per yard, and current yardage.`,
+  description: `Shop in-stock fabric by the yard at ${COMPANY_INFO.name}. US shipping or free local pickup in Utah Valley.`,
   openGraph: {
     title: `In-stock fabric | ${COMPANY_INFO.name}`,
     description: `Browse in-stock fabric: photos, SKU, price per yard, and current yardage.`,
@@ -41,8 +42,8 @@ export default async function FabricCatalogPage() {
           <header className="space-y-2 max-w-2xl">
             <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">In-stock fabric</h1>
             <p className="text-muted-foreground">
-              Current yardage and price per yard. Currently only selling in person in the Utah
-              Valley area. Follow us on Instagram{' '}
+              Order by the yard online. We ship in the US, or you can pick up for free in Utah
+              Valley. We also sell in person; follow us on Instagram{' '}
               <Link
                 href="https://www.instagram.com/thepatternsplace/"
                 target="_blank"
@@ -51,8 +52,9 @@ export default async function FabricCatalogPage() {
               >
                 @thepatternsplace
               </Link>{' '}
-              for updates on when we're selling in person!
+              for pop-up dates.
             </p>
+            <FabricCartLink />
           </header>
         </div>
 

@@ -267,7 +267,7 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ action: 'list' }),
+            body: JSON.stringify({ action: 'list', productId: product.id }),
           }).catch(error => {
             console.error('Error awarding pattern points for listing:', error);
             // Don't fail the operation if points fail

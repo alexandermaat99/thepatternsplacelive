@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { isFabricSoldOut, type FabricPublicDetail } from '@/lib/fabric-catalog';
 import { cn } from '@/lib/utils';
 import { FabricDetailCarousel } from '@/components/fabric/fabric-detail-carousel';
+import { FabricOrderPanel } from '@/components/fabric/fabric-order-panel';
+import { maxOrderableYards } from '@/lib/fabric-orders';
 
 function formatPrice(value: number | null) {
   if (value == null || !Number.isFinite(value)) return '—';
@@ -103,6 +105,16 @@ export function FabricDetailView({ fabric }: { fabric: FabricPublicDetail }) {
             <dt className="text-muted-foreground">Weave</dt>
             <dd>{fabric.weave?.trim() || '—'}</dd>
           </dl>
+
+          {!soldOut && fabric.sell_price != null && (
+            <FabricOrderPanel
+              baseSku={fabric.sku}
+              name={title}
+              pricePerYard={fabric.sell_price}
+              photoUrl={galleryUrls[0] ?? null}
+              maxYards={maxOrderableYards(fabric.bolts)}
+            />
+          )}
 
           {fabric.bolts.length > 1 ? (
             <section className="space-y-2">
