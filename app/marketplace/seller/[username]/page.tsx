@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { ProductCard } from '@/components/marketplace/product-card';
+import { getProductModeration } from '@/lib/product-moderation';
 import { notFound } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { BackButton } from '@/components/back-button';
@@ -133,6 +134,8 @@ export default async function SellerPage({ params }: SellerPageProps) {
 
   const sellerName = profile.full_name || `@${profile.username}`;
   const productCount = products?.length || 0;
+  // Admin-only "hidden" markers (empty for everyone else)
+  const moderation = await getProductModeration((products ?? []).map((p: any) => p.id));
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
@@ -190,7 +193,11 @@ export default async function SellerPage({ params }: SellerPageProps) {
       {products && products.length > 0 ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {products.map(product => (
-            <ProductCard key={product.id} product={product} />
+            <ProductCard
+              key={product.id}
+              product={product}
+              adminHidden={moderation.has(product.id)}
+            />
           ))}
         </div>
       ) : (

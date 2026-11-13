@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { ProductDetail } from '@/components/marketplace/product-detail';
+import { ProductModerationPanel } from '@/components/admin/product-moderation-panel';
+import { getProductModeration } from '@/lib/product-moderation';
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
 import { COMPANY_INFO } from '@/lib/company-info';
@@ -160,6 +162,15 @@ export default async function ProductPage({ params }: ProductPageProps) {
     });
   }
 
+  // Admins get the hide/unhide control. Everyone else, including the seller,
+  // sees the page exactly as normal.
+  let isAdmin = false;
+  if (userId) {
+    const { data: viewer } = await supabase.from('profiles').select('admin').eq('id', userId).single();
+    isAdmin = !!viewer?.admin;
+  }
+  const moderation = isAdmin ? ((await getProductModeration([id])).get(id) ?? null) : null;
+
   return (
     <>
       <ProductStructuredData product={product} />
@@ -171,6 +182,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
         ]}
       />
       <div className="container mx-auto px-4 py-4 sm:py-8">
+        {isAdmin && <ProductModerationPanel productId={id} hidden={moderation} />}
         <ProductDetail product={product} />
       </div>
     </>

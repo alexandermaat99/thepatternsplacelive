@@ -45,9 +45,11 @@ interface Product {
 interface ProductCardProps {
   product: Product;
   hideFavorite?: boolean;
+  /** Admin-only: listing is hidden by an admin (never passed for other viewers). */
+  adminHidden?: boolean;
 }
 
-export function ProductCard({ product, hideFavorite = false }: ProductCardProps) {
+export function ProductCard({ product, hideFavorite = false, adminHidden = false }: ProductCardProps) {
   const router = useRouter();
   const { isFavorite, toggleFavorite } = useFavorites();
   const { showToast } = useToast();
@@ -145,6 +147,11 @@ export function ProductCard({ product, hideFavorite = false }: ProductCardProps)
           ) : (
             <div className="w-full h-full bg-muted flex items-center justify-center">
               <span className="text-muted-foreground">No image</span>
+            </div>
+          )}
+          {adminHidden && (
+            <div className="absolute inset-x-0 bottom-0 bg-red-600/90 px-2 py-1 text-center text-xs font-semibold text-white">
+              Hidden by admin
             </div>
           )}
           {/* Difficulty badge - top left */}

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { ProductCard } from '@/components/marketplace/product-card';
+import { getProductModeration } from '@/lib/product-moderation';
 import { UserCard } from '@/components/marketplace/user-card';
 import { MarketplaceFilters } from '@/components/marketplace/marketplace-filters';
 import { ActiveFilters } from '@/components/marketplace/active-filters';
@@ -603,6 +604,8 @@ async function MarketplaceContent({ searchParams, embedded }: MarketplacePagePro
 
   // Apply pagination
   const paginatedProducts = products.slice(from, to + 1);
+  // Admin-only "hidden" markers (the moderation table returns nothing for non-admins)
+  const moderation = await getProductModeration(paginatedProducts.map((p: any) => p.id));
 
   const hasFilters = !!(
     params.q ||
@@ -668,7 +671,11 @@ async function MarketplaceContent({ searchParams, embedded }: MarketplacePagePro
             <>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {paginatedProducts.map(product => (
-                  <ProductCard key={product.id} product={product} />
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    adminHidden={moderation.has(product.id)}
+                  />
                 ))}
               </div>
               {/* Pagination */}
