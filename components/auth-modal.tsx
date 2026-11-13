@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Sparkles, Award } from 'lucide-react';
+import { safeRedirectPath } from '@/lib/safe-redirect';
 
 type AuthView = 'login' | 'signup' | 'forgot-password' | 'check-email' | 'signup-success';
 
@@ -87,16 +88,10 @@ export function AuthModal({
       // Refresh router to sync server-side state
       router.refresh();
 
-      // Navigate if there's a redirect URL
+      // Navigate if there's a redirect URL (same-site only)
       if (redirectUrl) {
-        const decodedRedirect = decodeURIComponent(redirectUrl);
-        if (
-          decodedRedirect.startsWith('/') &&
-          !decodedRedirect.startsWith('//') &&
-          !decodedRedirect.includes(':')
-        ) {
-          window.location.href = decodedRedirect;
-        }
+        const destination = safeRedirectPath(redirectUrl, '');
+        if (destination) window.location.href = destination;
       }
     } catch (err: unknown) {
       const message =
@@ -140,7 +135,10 @@ export function AuthModal({
         email: email.trim(),
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/protected`,
+          // After confirming, land signed in where they started (same-site only)
+          emailRedirectTo: `${window.location.origin}/auth/confirm?next=${encodeURIComponent(
+            safeRedirectPath(redirectUrl ?? window.location.pathname, '/dashboard')
+          )}`,
         },
       });
       if (error) {
@@ -158,6 +156,13 @@ export function AuthModal({
           setIsLoading(false);
           return;
         }
+      }
+
+      // If email confirmation is turned off, the account is already active.
+      if (data?.session) {
+        onClose();
+        window.location.href = safeRedirectPath(redirectUrl ?? window.location.pathname, '/dashboard');
+        return;
       }
 
       // Show success view
@@ -194,7 +199,7 @@ export function AuthModal({
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/update-password`,
+        redirectTo: `${window.location.origin}/auth/confirm?next=/auth/update-password`,
       });
       if (error) throw error;
       setView('check-email');

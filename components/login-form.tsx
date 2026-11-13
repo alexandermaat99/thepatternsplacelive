@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
+import { safeRedirectPath } from '@/lib/safe-redirect';
 
 export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRef<'div'>) {
   const [email, setEmail] = useState('');
@@ -23,6 +24,9 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
   const redirectUrlFromParams = searchParams.get('redirect');
   // Get action parameter (e.g., "heart" for favorite action)
   const action = searchParams.get('action');
+  // Set by /auth/confirm when the email was confirmed but the link was opened
+  // in a different browser, so the user still needs to log in.
+  const justConfirmed = searchParams.get('confirmed') === '1';
 
   // Get referrer from browser (for when user navigates from public pages)
   const [referrerUrl, setReferrerUrl] = useState<string | null>(null);
@@ -113,41 +117,17 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
       // We skip getUser() verification here to avoid hanging
       // The full page reload (window.location.href) will verify the session properly
 
-      // Determine redirect destination
-      // Note: We use window.location.href which does a full page reload,
-      // so router.refresh() is not needed and session will be verified on reload
-      // Validate redirect URL to prevent open redirect vulnerabilities
-      const getRedirectUrl = (): string => {
-        if (!redirectUrl) {
-          return '/dashboard'; // Default to dashboard
-        }
-
-        // Validate redirect URL - must be a relative path starting with /
-        // This prevents open redirect attacks (redirecting to external sites)
-        const decodedRedirect = decodeURIComponent(redirectUrl);
-
-        // Allow only relative paths (starting with /)
-        // Reject absolute URLs, protocol-relative URLs, or URLs with //
-        if (
-          decodedRedirect.startsWith('/') &&
-          !decodedRedirect.startsWith('//') &&
-          !decodedRedirect.includes(':') &&
-          !decodedRedirect.includes('<') &&
-          !decodedRedirect.includes('>')
-        ) {
-          return decodedRedirect;
-        }
-
-        // If invalid, default to dashboard
-        return '/dashboard';
-      };
-
-      const destination = getRedirectUrl();
+      // Only ever redirect within this site (prevents open-redirect phishing).
+      const destination = safeRedirectPath(redirectUrl, '/dashboard');
 
       // Set a flag to indicate we just logged in (prevents auth modal from opening immediately)
       if (typeof window !== 'undefined') {
         sessionStorage.setItem('just_logged_in', 'true');
       }
+
+      // The stored "return to" page has been used; clear it so a later login
+      // doesn't send the user back to a stale page.
+      sessionStorage.removeItem('auth_redirect_url');
 
       // Use window.location for a hard redirect to ensure cookies are sent
       // This is more reliable than router.push for authentication flows
@@ -159,12 +139,6 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
       );
       setIsLoading(false);
     }
-  };
-
-  // Check if a path requires authentication
-  const isProtectedRoute = (path: string): boolean => {
-    const protectedPaths = ['/dashboard', '/marketplace/sell', '/protected'];
-    return protectedPaths.some(p => path.startsWith(p));
   };
 
   const handleBack = () => {
@@ -211,6 +185,11 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
         <CardContent>
           <form onSubmit={handleLogin}>
             <div className="flex flex-col gap-6">
+              {justConfirmed && (
+                <p className="rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
+                  Your email is confirmed. Log in to continue.
+                </p>
+              )}
               <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>
                 <Input

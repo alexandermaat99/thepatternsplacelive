@@ -54,38 +54,10 @@ export async function updateSession(request: NextRequest) {
 
   // IMPORTANT: DO NOT REMOVE auth.getUser()
 
-  // Refresh the session - this is critical for maintaining auth state
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  // Only redirect if we're certain there's no user AND it's not a public route
-  // Don't redirect on auth errors - might be temporary (preserves session)
-  // Also don't redirect /protected - let the page component handle auth check
-  // This prevents redirect loops when cookies are being set
-  if (
-    !authError &&
-    request.nextUrl.pathname !== '/' &&
-    !user &&
-    !request.nextUrl.pathname.startsWith('/login') &&
-    !request.nextUrl.pathname.startsWith('/auth') &&
-    !request.nextUrl.pathname.startsWith('/api') &&
-    !request.nextUrl.pathname.startsWith('/marketplace') &&
-    !request.nextUrl.pathname.startsWith('/cart') &&
-    !request.nextUrl.pathname.startsWith('/checkout/success') &&
-    !request.nextUrl.pathname.startsWith('/protected') &&
-    !request.nextUrl.pathname.startsWith('/dashboard') &&
-    !request.nextUrl.pathname.startsWith('/fees')
-  ) {
-    // no user, potentially respond by redirecting the user to the login page
-    // Preserve the original URL so we can redirect back after login
-    const url = request.nextUrl.clone();
-    url.pathname = '/auth/login';
-    // Add the original path as a redirect parameter
-    url.searchParams.set('redirect', request.nextUrl.pathname + request.nextUrl.search);
-    return NextResponse.redirect(url);
-  }
+  // Refresh the session - this is critical for maintaining auth state.
+  // Route protection is handled by the pages/layouts themselves (dashboard,
+  // admin, etc.), so no redirect here: most of the site is public.
+  await supabase.auth.getUser();
 
   // IMPORTANT: You *must* return the supabaseResponse object as it is.
   // If you're creating a new response object with NextResponse.next() make sure to:

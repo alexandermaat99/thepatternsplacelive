@@ -13,7 +13,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 
 export function UpdatePasswordForm({
   className,
@@ -22,7 +23,16 @@ export function UpdatePasswordForm({
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  // null = checking; false = no session (reset link didn't sign them in)
+  const [hasSession, setHasSession] = useState<boolean | null>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    createClient()
+      .auth.getUser()
+      .then(({ data }) => setHasSession(!!data.user))
+      .catch(() => setHasSession(false));
+  }, []);
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,8 +43,7 @@ export function UpdatePasswordForm({
     try {
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
-      // Update this route to redirect to an authenticated route. The user already has an active session.
-      router.push("/protected");
+      router.push("/dashboard");
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
     } finally {
@@ -52,6 +61,17 @@ export function UpdatePasswordForm({
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {hasSession === false ? (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                This reset link has expired or was opened in a different browser
+                than the one you requested it from, so we can&apos;t verify it&apos;s you.
+              </p>
+              <Button asChild className="w-full">
+                <Link href="/auth/forgot-password">Send a new reset link</Link>
+              </Button>
+            </div>
+          ) : (
           <form onSubmit={handleForgotPassword}>
             <div className="flex flex-col gap-6">
               <div className="grid gap-2">
@@ -66,11 +86,12 @@ export function UpdatePasswordForm({
                 />
               </div>
               {error && <p className="text-sm text-red-500">{error}</p>}
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button type="submit" className="w-full" disabled={isLoading || hasSession === null}>
                 {isLoading ? "Saving..." : "Save new password"}
               </Button>
             </div>
           </form>
+          )}
         </CardContent>
       </Card>
     </div>

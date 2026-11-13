@@ -1,5 +1,6 @@
 'use client';
 
+import { safeRedirectPath } from '@/lib/safe-redirect';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -118,7 +119,10 @@ export function SignUpForm({ className, ...props }: React.ComponentPropsWithoutR
         email: email.trim(),
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/protected`,
+          // After confirming, land signed in where they started (same-site only)
+          emailRedirectTo: `${window.location.origin}/auth/confirm?next=${encodeURIComponent(
+            safeRedirectPath(redirectUrl, '/dashboard')
+          )}`,
         },
       });
       if (error) {
@@ -136,6 +140,13 @@ export function SignUpForm({ className, ...props }: React.ComponentPropsWithoutR
           setIsLoading(false);
           return;
         }
+      }
+
+      // If email confirmation is turned off, the account is already active.
+      if (data?.session) {
+        sessionStorage.removeItem('auth_redirect_url');
+        window.location.href = safeRedirectPath(redirectUrl, '/dashboard');
+        return;
       }
 
       // Always redirect to success page for conversion tracking
