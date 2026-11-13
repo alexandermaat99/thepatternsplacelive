@@ -366,7 +366,7 @@ export default function CartPage() {
                     <LoadingSpinner size="sm" text="" />
                     Processing...
                   </>
-                ) : state.items.filter(item => !item.is_free && item.price > 0).length > 0 ? (
+                ) : paidPatternCount > 0 || fabric.items.length > 0 ? (
                   <>
                     <Lock className="h-4 w-4 mr-2" />
                     Proceed to Checkout
