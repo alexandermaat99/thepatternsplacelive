@@ -5,7 +5,7 @@ import { isFabricSoldOut, type FabricPublicDetail } from '@/lib/fabric-catalog';
 import { cn } from '@/lib/utils';
 import { FabricDetailCarousel } from '@/components/fabric/fabric-detail-carousel';
 import { FabricOrderPanel } from '@/components/fabric/fabric-order-panel';
-import { maxOrderableYards } from '@/lib/fabric-orders';
+import { FABRIC_ORDER_SETTINGS, maxOrderableYards } from '@/lib/fabric-orders';
 
 function formatPrice(value: number | null) {
   if (value == null || !Number.isFinite(value)) return '—';
@@ -38,7 +38,14 @@ function isPublicImageUrl(url: string | null): url is string {
   }
 }
 
-export function FabricDetailView({ fabric }: { fabric: FabricPublicDetail }) {
+export function FabricDetailView({
+  fabric,
+  heldYards = 0,
+}: {
+  fabric: FabricPublicDetail;
+  /** Yards held in other shoppers' unpaid checkouts. */
+  heldYards?: number;
+}) {
   const title = fabric.name?.trim() || 'Unnamed fabric';
   const imageAlt = `${title} — SKU ${fabric.sku}`;
   const galleryUrls = fabric.photo_urls.filter((u): u is string => isPublicImageUrl(u));
@@ -67,11 +74,22 @@ export function FabricDetailView({ fabric }: { fabric: FabricPublicDetail }) {
 
         <div className="space-y-6 min-w-0">
           <header className="space-y-2">
-            {soldOut ? (
+            {soldOut && heldYards > 0 ? (
+              <p className="inline-flex items-center rounded-md border border-amber-400 bg-amber-100 px-2.5 py-1 text-sm font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-100">
+                Held in a checkout
+              </p>
+            ) : soldOut ? (
               <p className="inline-flex items-center rounded-md border border-rose-400/90 bg-rose-400 px-2.5 py-1 text-sm font-semibold text-white">
                 Sold out
               </p>
             ) : null}
+            {soldOut && heldYards > 0 && (
+              <p className="text-sm text-muted-foreground">
+                Someone is checking out with the last of this fabric. If they don&apos;t complete
+                their purchase within {FABRIC_ORDER_SETTINGS.holdMinutes} minutes, it will be
+                available again.
+              </p>
+            )}
             <h1
               className={cn(
                 'text-3xl sm:text-4xl font-bold tracking-tight',

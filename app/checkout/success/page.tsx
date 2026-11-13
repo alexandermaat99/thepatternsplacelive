@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { CheckCircle, ShoppingBag, Home, Loader2, Award } from 'lucide-react';
 import { useCart } from '@/contexts/cart-context';
 import { useFabricCart } from '@/hooks/useFabricCart';
+import { clearPendingCheckout } from '@/lib/pending-checkout';
 import { useAuth } from '@/contexts/auth-context';
 import Link from 'next/link';
 import { PATTERN_POINTS } from '@/lib/pattern-points';
@@ -56,6 +57,7 @@ function CheckoutSuccessContent() {
         setIsProcessing(false);
         clearCart();
         clearFabric();
+        clearPendingCheckout();
       }
     }
 

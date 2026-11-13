@@ -9,7 +9,8 @@ import { FabricCatalogGrid } from '@/components/fabric/fabric-catalog-grid';
 import { getFabricCatalogRows } from '@/lib/fabric-catalog';
 import { COMPANY_INFO } from '@/lib/company-info';
 
-export const revalidate = 120;
+// Always live: stock changes the moment someone starts or abandons a checkout.
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'In-stock fabric',

@@ -258,5 +258,8 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ url: session.url });
+  return NextResponse.json({
+    url: session.url,
+    ...(fabricOrder && { fabricOrderId: fabricOrder.id, expiresAt: (session.expires_at ?? 0) * 1000 }),
+  });
 }
