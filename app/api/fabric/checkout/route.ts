@@ -73,7 +73,9 @@ export async function POST(request: NextRequest) {
           error:
             max < FABRIC_ORDER_SETTINGS.minYards
               ? `${name} just sold out.`
-              : `${name}: we can cut up to ${formatYardsLabel(max)} in one piece right now. Please adjust your order.`,
+              : yards > max
+                ? `${name}: we can cut up to ${formatYardsLabel(max)} in one piece right now. Please adjust your order.`
+                : `${name}: cuts are sold in ${FABRIC_ORDER_SETTINGS.stepYards}-yard steps with a ${FABRIC_ORDER_SETTINGS.minYards}-yard minimum.`,
           baseSku,
           maxYards: max,
         },
