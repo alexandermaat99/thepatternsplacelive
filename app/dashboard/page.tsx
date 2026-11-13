@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { StripeConnectButton } from '@/components/marketplace/stripe-connect-button';
 import { PayoutsCard } from '@/components/marketplace/payouts-card';
+import { FoundingDesignerBadge } from '@/components/marketplace/founding-designer-badge';
 import { UserProfile } from '@/components/user-profile';
 import { SignOutButton } from '@/components/sign-out-button';
 import Link from 'next/link';
@@ -135,7 +136,10 @@ export default async function DashboardPage() {
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="mb-8 flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-3xl font-bold">Dashboard</h1>
+            {profile?.founding_designer && <FoundingDesignerBadge size="md" />}
+          </div>
           <p className="text-muted-foreground">
             {hasSellerIntent
               ? 'Manage your shop, payouts, and purchases'
@@ -146,7 +150,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Platform fee waiver banner: Founding Designer waiver or first free sales */}
-      {hasSellerIntent && (activeWaiverUntil || freeSalesLeft > 0) && (
+      {(activeWaiverUntil || (hasSellerIntent && freeSalesLeft > 0)) && (
         <Card className="mb-6 border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950">
           <CardContent className="pt-6">
             <div className="flex items-start gap-3">
@@ -161,6 +165,18 @@ export default async function DashboardPage() {
                     : `Your next ${freeSalesLeft} sale${freeSalesLeft !== 1 ? 's have' : ' has'} platform fees waived.`}{' '}
                   Only payment processing ({processingFeeText}) applies.
                 </p>
+                {activeWaiverUntil && !canSell && (
+                  <p className="text-sm text-green-800 dark:text-green-200 mt-2">
+                    <Link href="/dashboard/stripe-setup" className="font-medium underline underline-offset-4">
+                      Set up payouts
+                    </Link>{' '}
+                    to start selling paid patterns, or{' '}
+                    <Link href="/marketplace/sell" className="font-medium underline underline-offset-4">
+                      list a free pattern
+                    </Link>{' '}
+                    now.
+                  </p>
+                )}
               </div>
             </div>
           </CardContent>
