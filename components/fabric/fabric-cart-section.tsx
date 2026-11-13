@@ -18,11 +18,14 @@ import { cn } from '@/lib/utils';
 export function FabricCartSection({
   fulfillment,
   onFulfillmentChange,
+  onRemoveRequest,
 }: {
   fulfillment: Fulfillment;
   onFulfillmentChange: (f: Fulfillment) => void;
+  /** Ask the shopper to confirm before removing (the cart shows a dialog). */
+  onRemoveRequest: (baseSku: string, name: string) => void;
 }) {
-  const { items, setYards, remove } = useFabricCart();
+  const { items, setYards } = useFabricCart();
   const { minYards, stepYards, maxYardsPerLine, shipping, pickup } = FABRIC_ORDER_SETTINGS;
   if (items.length === 0) return null;
   const subtotalCents = items.reduce((s, i) => s + Math.round(i.pricePerYard * i.yards * 100), 0);
@@ -80,7 +83,7 @@ export function FabricCartSection({
                     <Plus className="h-3.5 w-3.5" />
                   </Button>
                   <Button size="sm" variant="ghost" className="ml-auto text-red-600 hover:text-red-700"
-                    onClick={() => remove(item.baseSku)} aria-label={`Remove ${item.name}`}>
+                    onClick={() => onRemoveRequest(item.baseSku, item.name)} aria-label={`Remove ${item.name}`}>
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
