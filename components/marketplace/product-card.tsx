@@ -1,6 +1,7 @@
 'use client';
 
 import { FoundingDesignerBadge } from '@/components/marketplace/founding-designer-badge';
+import { SewnSampleBadge } from '@/components/marketplace/sewn-sample';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,6 +41,7 @@ interface Product {
     category: Category;
   }>;
   is_free?: boolean;
+  sewn_sample?: boolean | null;
 }
 
 interface ProductCardProps {
@@ -234,6 +236,7 @@ export function ProductCard({
               )}
             </p>
           )}
+          {product.sewn_sample && <SewnSampleBadge className="mt-2" />}
         </CardHeader>
       </Link>
 

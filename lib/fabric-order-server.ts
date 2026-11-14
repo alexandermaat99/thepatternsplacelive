@@ -17,6 +17,8 @@ type OrderWithItems = {
   shipping_cents: number;
   tax_cents: number;
   total_cents: number;
+  discount_cents?: number | null;
+  points_used?: number | null;
   shipping_name: string | null;
   shipping_address: Record<string, string | null> | null;
   phone: string | null;
@@ -69,6 +71,9 @@ export async function sendFabricOrderPlacedEmails(order: OrderWithItems) {
   const shippingSettings = await getFabricShippingSettings();
   const totals = [
     `Subtotal: ${formatCents(order.subtotal_cents)}`,
+    order.discount_cents
+      ? `Pattern points (${order.points_used} pts): -${formatCents(order.discount_cents)}`
+      : null,
     order.fulfillment === 'ship' ? `Shipping: ${formatCents(order.shipping_cents)}` : 'Pickup: free',
     order.tax_cents ? `Tax: ${formatCents(order.tax_cents)}` : null,
     `Total: ${formatCents(order.total_cents)}`,
@@ -126,10 +131,13 @@ export async function handleFabricCheckoutCompleted(
   const sessionSubtotal = session.amount_subtotal ?? 0;
   const sessionTax = session.total_details?.amount_tax ?? 0;
   const shippingCents = session.total_details?.amount_shipping ?? 0;
-  const fabricSubtotal = options.mixedCart ? existingOrder.subtotal_cents : sessionSubtotal;
+  // subtotal_cents is before the points discount; Stripe line amounts are after it.
+  const discount = existingOrder.discount_cents ?? 0;
+  const fabricSubtotal = options.mixedCart ? existingOrder.subtotal_cents : sessionSubtotal + discount;
+  const fabricNet = fabricSubtotal - discount;
   const fabricTax = options.mixedCart
     ? sessionSubtotal > 0
-      ? Math.round((sessionTax * fabricSubtotal) / sessionSubtotal)
+      ? Math.round((sessionTax * fabricNet) / sessionSubtotal)
       : 0
     : sessionTax;
   const shipping =
@@ -146,7 +154,7 @@ export async function handleFabricCheckoutCompleted(
     subtotal_cents: fabricSubtotal,
     shipping_cents: shippingCents,
     tax_cents: fabricTax,
-    total_cents: options.mixedCart ? fabricSubtotal + shippingCents + fabricTax : (session.amount_total ?? 0),
+    total_cents: options.mixedCart ? fabricNet + shippingCents + fabricTax : (session.amount_total ?? 0),
     stripe_payment_intent: typeof session.payment_intent === 'string' ? session.payment_intent : null,
   };
 
@@ -161,14 +169,25 @@ export async function handleFabricCheckoutCompleted(
     const existing = await loadFabricOrder(orderId);
     if (!existing || (existing.status !== 'expired' && existing.status !== 'cancelled')) return; // already processed
     // Rare race: the hold was released (abandoned/expired) but payment still went
-    // through. Record the payment and flag it: stock was returned to inventory.
+    // through. Record the payment and flag it: stock was returned to inventory,
+    // and any points spent were refunded, so take those back.
+    let pointsNote = '';
+    if (existing.points_used) {
+      const { data: unrecovered } = await supabase.rpc('recharge_fabric_points_after_release', {
+        p_order_id: orderId,
+      });
+      if (Number(unrecovered) > 0) {
+        pointsNote = ` ${unrecovered} pattern points used for the discount couldn't be taken back (balance too low).`;
+      }
+    }
     await supabase
       .from('fabric_orders')
       .update({
         status: 'paid',
         ...paidFields,
         admin_notes:
-          'PAID AFTER THE STOCK HOLD WAS RELEASED. Check the bolts still have this yardage before cutting; refund if not.',
+          'PAID AFTER THE STOCK HOLD WAS RELEASED. Check the bolts still have this yardage before cutting; refund if not.' +
+          pointsNote,
       })
       .eq('id', orderId);
   }

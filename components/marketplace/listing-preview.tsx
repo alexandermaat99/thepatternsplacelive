@@ -21,6 +21,7 @@ export function ListingPreview({
   categories,
   username,
   fabricRequirements,
+  sewnSample = false,
 }: {
   title: string;
   description: string;
@@ -31,6 +32,7 @@ export function ListingPreview({
   categories: string;
   username: string | null;
   fabricRequirements: FabricRequirements | null;
+  sewnSample?: boolean;
 }) {
   const priceNumber = isFree ? 0 : parseFloat(price) || 0;
   const categoryList = categories
@@ -50,6 +52,7 @@ export function ListingPreview({
     category: categoryList[0] ?? '',
     difficulty: difficulty || null,
     is_free: isFree,
+    sewn_sample: sewnSample,
     profiles: username ? { username } : undefined,
     product_categories: categoryList.map(name => ({
       category: { id: name, name, slug: name.toLowerCase().replace(/\s+/g, '-') },

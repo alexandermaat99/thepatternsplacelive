@@ -8,6 +8,7 @@ import { Upload, X, Image as ImageIcon, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { compressImage, validateImageFile } from '@/lib/image-compression';
 import { toDisplayableImage } from '@/lib/heic';
+import { detectAiImageLabels } from '@/lib/ai-image-metadata';
 
 interface ImageItem {
   id: string;
@@ -22,6 +23,8 @@ interface MultiImageUploadProps {
   onChange: (urls: string[]) => void;
   userId: string;
   maxImages?: number;
+  /** Called after upload when a photo is labeled AI-generated in its metadata (for admin review). */
+  onAiLabel?: (flag: { url: string; fileName: string; labels: string[] }) => void;
 }
 
 export function MultiImageUpload({
@@ -29,6 +32,7 @@ export function MultiImageUpload({
   onChange,
   userId,
   maxImages = 10,
+  onAiLabel,
 }: MultiImageUploadProps) {
   const [images, setImages] = useState<ImageItem[]>(
     value.map((url, index) => ({ id: `existing-${index}`, url }))
@@ -86,6 +90,7 @@ export function MultiImageUpload({
         
         // iPhone HEIC photos -> JPEG first. If that fails, the error is shown
         // below; never fall back to uploading a HEIC most browsers can't display.
+        const aiLabels = await detectAiImageLabels(item.file);
         const displayable = await toDisplayableImage(item.file);
 
         // Compress image with timeout and fallback
@@ -142,6 +147,7 @@ export function MultiImageUpload({
         if (!url) {
           throw new Error('Upload failed: No URL returned');
         }
+        if (aiLabels.length > 0) onAiLabel?.({ url, fileName: item.file.name, labels: aiLabels });
 
         // Update item with final URL
         setImages((prevImages) => {

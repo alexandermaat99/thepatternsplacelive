@@ -25,6 +25,8 @@ import { ProductFilesDownload } from '@/components/marketplace/product-files-dow
 import { EditProductModal } from '@/components/edit-product-modal';
 import { ProductReviews } from '@/components/marketplace/product-reviews';
 import { ShareButton } from '@/components/marketplace/share-button';
+import { SewnSampleBadge } from '@/components/marketplace/sewn-sample';
+import { ReportListingButton } from '@/components/marketplace/report-listing-button';
 import { Download } from 'lucide-react';
 
 interface Category {
@@ -57,6 +59,7 @@ interface Product {
     category: Category;
   }>;
   is_free?: boolean;
+  sewn_sample?: boolean | null;
 }
 
 interface ProductDetailProps {
@@ -354,6 +357,7 @@ export function ProductDetail({ product, fabricOptions }: ProductDetailProps) {
                   {getDifficultyLabel(product.difficulty)}
                 </Badge>
               )}
+              {product.sewn_sample && <SewnSampleBadge className="text-sm px-2.5 py-0.5" />}
             </div>
           </div>
 
@@ -471,6 +475,12 @@ export function ProductDetail({ product, fabricOptions }: ProductDetailProps) {
                   </Button>
                 )}
               </div>
+            </div>
+          )}
+
+          {!isOwner && (
+            <div className="border-t pt-4">
+              <ReportListingButton productId={product.id} />
             </div>
           )}
         </div>

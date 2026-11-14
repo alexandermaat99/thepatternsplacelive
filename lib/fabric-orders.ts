@@ -68,6 +68,14 @@ export type FabricShippingSettings = {
     estimate: string;
   };
   pickup: { enabled: boolean; area: string; instructions: string };
+  /** Spending pattern points on fabric (fabric only: designers' earnings are never touched). */
+  points: {
+    enabled: boolean;
+    /** How many points make $1 off. */
+    pointsPerDollar: number;
+    /** Points can cover at most this % of the fabric subtotal. */
+    maxPercentOfFabric: number;
+  };
 };
 
 export const DEFAULT_FABRIC_SHIPPING: FabricShippingSettings = {
@@ -82,6 +90,7 @@ export const DEFAULT_FABRIC_SHIPPING: FabricShippingSettings = {
     area: 'Utah Valley',
     instructions: "We'll email you within 1–2 business days to arrange pickup.",
   },
+  points: { enabled: true, pointsPerDollar: 20, maxPercentOfFabric: 50 },
 };
 
 /** Coerce stored/admin-submitted settings into a valid shape (falls back to defaults). */
@@ -119,7 +128,46 @@ export function normalizeShippingSettings(raw: unknown): FabricShippingSettings 
       area: text(r.pickup?.area, d.pickup.area),
       instructions: text(r.pickup?.instructions, d.pickup.instructions),
     },
+    points: {
+      enabled: typeof r.points?.enabled === 'boolean' ? r.points.enabled : d.points.enabled,
+      pointsPerDollar: clampInt(r.points?.pointsPerDollar, 1, 1000, d.points.pointsPerDollar),
+      maxPercentOfFabric: clampInt(r.points?.maxPercentOfFabric, 1, 100, d.points.maxPercentOfFabric),
+    },
   };
+}
+
+function clampInt(v: unknown, min: number, max: number, fallback: number): number {
+  return typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, Math.round(v))) : fallback;
+}
+
+/**
+ * How many points to spend and how much they take off the fabric subtotal.
+ * Uses as many points as allowed (up to the cap), in whole points.
+ */
+export function pointsDiscountFor(
+  settings: FabricShippingSettings['points'],
+  balance: number,
+  fabricSubtotalCents: number
+): { points: number; discountCents: number } {
+  if (!settings.enabled || balance <= 0 || fabricSubtotalCents <= 0) return { points: 0, discountCents: 0 };
+  const ppd = settings.pointsPerDollar;
+  const maxDiscount = Math.floor((fabricSubtotalCents * settings.maxPercentOfFabric) / 100);
+  const usable = Math.min(Math.floor(balance), Math.floor((maxDiscount * ppd) / 100));
+  const discountCents = Math.floor((usable * 100) / ppd);
+  if (discountCents <= 0) return { points: 0, discountCents: 0 };
+  return { points: Math.ceil((discountCents * ppd) / 100), discountCents };
+}
+
+/** Split a discount across lines in proportion to their price (sums exactly to the discount). */
+export function spreadDiscount(lineCents: number[], discountCents: number): number[] {
+  const total = lineCents.reduce((a, b) => a + b, 0);
+  if (discountCents <= 0 || total <= 0) return lineCents.map(() => 0);
+  let left = discountCents;
+  return lineCents.map((c, i) => {
+    const share = i === lineCents.length - 1 ? left : Math.min(c, Math.floor((discountCents * c) / total));
+    left -= share;
+    return share;
+  });
 }
 
 export function shippingCentsFor(

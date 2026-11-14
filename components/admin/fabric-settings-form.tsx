@@ -11,6 +11,7 @@ import {
   describeShipping,
   formatCents,
   normalizeShippingSettings,
+  pointsDiscountFor,
   shippingCentsFor,
   type FabricShippingSettings,
 } from '@/lib/fabric-orders';
@@ -23,12 +24,15 @@ export function FabricSettingsForm({ initial }: { initial: FabricShippingSetting
   const [s, setS] = useState(initial);
   const [saving, setSaving] = useState(false);
   const preview = normalizeShippingSettings(s);
-  const { shipping, pickup } = s;
+  const { shipping, pickup, points } = s;
 
   const setShipping = (patch: Partial<FabricShippingSettings['shipping']>) =>
     setS(prev => ({ ...prev, shipping: { ...prev.shipping, ...patch } }));
   const setPickup = (patch: Partial<FabricShippingSettings['pickup']>) =>
     setS(prev => ({ ...prev, pickup: { ...prev.pickup, ...patch } }));
+  const setPoints = (patch: Partial<FabricShippingSettings['points']>) =>
+    setS(prev => ({ ...prev, points: { ...prev.points, ...patch } }));
+  const pointExample = pointsDiscountFor(preview.points, 1000, 4000);
   const bounded = shipping.tiers.filter(t => t.upToYards != null);
   const open = shipping.tiers.find(t => t.upToYards == null) ?? { upToYards: null, cents: 0 };
   const setTiers = (b: typeof bounded, o: typeof open) => setShipping({ tiers: [...b, o] });
@@ -170,6 +174,49 @@ export function FabricSettingsForm({ initial }: { initial: FabricShippingSetting
           <Label htmlFor="instructions">Pickup instructions (shown at checkout and in emails)</Label>
           <Input id="instructions" value={pickup.instructions} onChange={e => setPickup({ instructions: e.target.value })} />
         </div>
+      </section>
+
+      {/* Pattern points */}
+      <section className="space-y-4 rounded-lg border p-5">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold">Pattern points on fabric</h2>
+          <label className="flex items-center gap-2 text-sm">
+            <Switch checked={points.enabled} onCheckedChange={v => setPoints({ enabled: v })} />
+            {points.enabled ? 'On' : 'Off'}
+          </label>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Signed-in shoppers can use their points for money off fabric. Points never reduce what a
+          designer earns: they only apply to fabric.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1">
+            <Label htmlFor="ppd">Points per $1 off</Label>
+            <Input
+              id="ppd"
+              type="number"
+              min={1}
+              value={points.pointsPerDollar}
+              onChange={e => setPoints({ pointsPerDollar: parseInt(e.target.value) || 1 })}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="maxpct">Max % of the fabric subtotal</Label>
+            <Input
+              id="maxpct"
+              type="number"
+              min={1}
+              max={100}
+              value={points.maxPercentOfFabric}
+              onChange={e => setPoints({ maxPercentOfFabric: parseInt(e.target.value) || 1 })}
+            />
+          </div>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Example: with 1,000 points and {formatCents(4000)} of fabric, a shopper gets{' '}
+          {formatCents(pointExample.discountCents)} off for {pointExample.points} points. A pattern
+          purchase earns 10 points ({formatCents(Math.floor(1000 / preview.points.pointsPerDollar))}).
+        </p>
       </section>
 
       <Button onClick={save} disabled={saving || (!shipping.enabled && !pickup.enabled)} size="lg">

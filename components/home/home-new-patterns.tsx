@@ -9,7 +9,7 @@ export async function HomeNewPatterns() {
   const { data: products } = await supabase
     .from('products')
     .select(
-      'id, title, description, price, currency, image_url, images, category, difficulty, is_free, created_at, profiles:user_id (full_name, username, avatar_url, founding_designer), product_categories (category:categories (id, name, slug))'
+      'id, title, description, price, currency, image_url, images, category, difficulty, is_free, sewn_sample, created_at, profiles:user_id (full_name, username, avatar_url, founding_designer), product_categories (category:categories (id, name, slug))'
     )
     .eq('is_active', true)
     .order('created_at', { ascending: false })

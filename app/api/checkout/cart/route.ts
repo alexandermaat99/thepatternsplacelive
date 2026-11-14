@@ -6,7 +6,15 @@ import { createClient } from '@/lib/supabase/server';
 import { createServiceRoleClient } from '@/lib/supabase/service-role';
 import { calculateEtsyFees, sellerHasFeeWaiver } from '@/lib/company-info';
 import { canReceiveSales } from '@/lib/stripe-connect';
-import { FABRIC_ORDER_SETTINGS, formatYardsLabel, shippingCentsFor, type Fulfillment } from '@/lib/fabric-orders';
+import {
+  FABRIC_ORDER_SETTINGS,
+  formatCents,
+  formatYardsLabel,
+  pointsDiscountFor,
+  shippingCentsFor,
+  spreadDiscount,
+  type Fulfillment,
+} from '@/lib/fabric-orders';
 import { getFabricShippingSettings } from '@/lib/fabric-settings-server';
 import { createAndReserveFabricOrder, prepareFabricLines, type FabricLine } from '@/lib/cart-checkout-server';
 import { rateLimit, getClientIdentifier, RATE_LIMITS } from '@/lib/security/rate-limit';
@@ -17,6 +25,8 @@ type Body = {
   items?: { productId?: unknown }[];
   fabric?: { baseSku?: unknown; yards?: unknown }[];
   fulfillment?: unknown;
+  /** Spend pattern points on the fabric (signed-in shoppers only). */
+  usePoints?: unknown;
 };
 
 /**
@@ -151,10 +161,46 @@ export async function POST(request: NextRequest) {
 
   const service = createServiceRoleClient();
   const releaseFabric = async () => {
+    // Also refunds any points spent on this order.
     if (fabricOrder) {
       await service.rpc('release_fabric_order', { p_order_id: fabricOrder.id, p_status: 'cancelled' });
     }
   };
+
+  // ---- Pattern points: money off the fabric only (designers' earnings untouched) ----
+  let fabricDiscounts = fabricLines.map(() => 0);
+  let pointsUsed = 0;
+  let discountCents = 0;
+  if (fabricOrder && user && body.usePoints === true && shippingSettings.points.enabled) {
+    const { data: profile } = await service.from('profiles').select('pattern_points').eq('id', user.id).single();
+    const fabricSubtotal = fabricLines.reduce((s, l) => s + l.lineCents, 0);
+    const discount = pointsDiscountFor(shippingSettings.points, Number(profile?.pattern_points) || 0, fabricSubtotal);
+    if (discount.points > 0) {
+      const { error } = await service.rpc('apply_fabric_points', {
+        p_order_id: fabricOrder.id,
+        p_points: discount.points,
+        p_discount_cents: discount.discountCents,
+      });
+      if (error) {
+        await releaseFabric();
+        console.error('Error applying pattern points:', error.message);
+        return NextResponse.json(
+          {
+            error: error.message.includes('INSUFFICIENT_POINTS')
+              ? 'Your points balance changed. Please refresh your cart and try again.'
+              : 'Could not apply your pattern points. Please try again.',
+          },
+          { status: 409 }
+        );
+      }
+      pointsUsed = discount.points;
+      discountCents = discount.discountCents;
+      fabricDiscounts = spreadDiscount(
+        fabricLines.map(l => l.lineCents),
+        discount.discountCents
+      );
+    }
+  }
 
   // ---- Stripe Checkout (platform charge; designers are paid after payment) ----
   const transferGroup = `cart_${randomUUID()}`;
@@ -177,13 +223,17 @@ export async function POST(request: NextRequest) {
           },
           quantity: 1,
         })),
-        ...fabricLines.map(l => ({
+        ...fabricLines.map((l, i) => ({
           price_data: {
             currency: 'usd',
-            unit_amount: l.lineCents,
+            unit_amount: l.lineCents - fabricDiscounts[i],
             product_data: {
               name: `${l.name} (${formatYardsLabel(l.yards)} of fabric)`,
-              description: `Fabric, SKU ${l.baseSku}, cut as one continuous piece`,
+              description:
+                `Fabric, SKU ${l.baseSku}, cut as one continuous piece` +
+                (fabricDiscounts[i] > 0
+                  ? `. Includes ${formatCents(fabricDiscounts[i])} off with pattern points`
+                  : ''),
               ...(l.image && { images: [l.image] }),
               tax_code: FABRIC_ORDER_SETTINGS.stripeTaxCode,
             },
@@ -200,6 +250,7 @@ export async function POST(request: NextRequest) {
         type: 'cart',
         transfer_group: transferGroup,
         ...(fabricOrder && { fabric_order_id: fabricOrder.id }),
+        ...(pointsUsed > 0 && { points_used: String(pointsUsed), points_discount_cents: String(discountCents) }),
         ...(user?.id && { buyerId: user.id }),
         ...(user?.email && { buyerEmail: user.email }),
       },
@@ -267,6 +318,7 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     url: session.url,
+    ...(pointsUsed > 0 && { pointsUsed, discountCents }),
     ...(fabricOrder && { fabricOrderId: fabricOrder.id, expiresAt: (session.expires_at ?? 0) * 1000 }),
   });
 }

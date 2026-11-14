@@ -16,6 +16,8 @@ import { createClient } from '@/lib/supabase/client';
 import { MultiImageUpload } from '@/components/marketplace/multi-image-upload';
 import { DigitalFileUpload } from '@/components/marketplace/digital-file-upload';
 import { FabricRequirementsInput } from '@/components/marketplace/fabric-requirements-input';
+import { SewnSampleInput } from '@/components/marketplace/sewn-sample';
+import { sendAiImageFlags, type AiImageFlag } from '@/lib/listing-flags';
 import { normalizeFabricRequirements, type FabricRequirements } from '@/lib/fabric-requirements';
 import { CategoryInput, linkCategoriesToProduct } from '@/components/marketplace/category-input';
 import { useAuth } from '@/contexts/auth-context';
@@ -106,6 +108,8 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
     is_free: false,
   });
   const [fabricRequirements, setFabricRequirements] = useState<FabricRequirements | null>(null);
+  const [sewnSample, setSewnSample] = useState(false);
+  const [aiImageFlags, setAiImageFlags] = useState<AiImageFlag[]>([]);
 
   // Scroll to error field when fieldErrors change
   useEffect(() => {
@@ -166,6 +170,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
           }
 
           setFabricRequirements(normalizeFabricRequirements((product as any).fabric_requirements));
+          setSewnSample(!!(product as any).sewn_sample);
           setFormData({
             title: product.title,
             description: product.description,
@@ -183,6 +188,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
           console.error('Error loading categories:', error);
           // Fallback to old category field
           setFabricRequirements(normalizeFabricRequirements((product as any).fabric_requirements));
+          setSewnSample(!!(product as any).sewn_sample);
           setFormData({
             title: product.title,
             description: product.description,
@@ -491,6 +497,8 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
         ...('fabric_requirements' in (product as any) && {
           fabric_requirements: normalizeFabricRequirements(fabricRequirements),
         }),
+        // Only send once the column exists (sql/add-trust-and-fabric-points.sql)
+        ...('sewn_sample' in (product as any) && { sewn_sample: sewnSample }),
       };
 
       console.log('Update data prepared, description length:', updateData.description?.length || 0);
@@ -519,6 +527,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
       }
 
       console.log('Step 1 successful, rows affected:', count1);
+      sendAiImageFlags(product.id, aiImageFlags, validImages);
 
       // Step 2: Update description separately with special handling for URLs
       if (description !== undefined && description !== null) {
@@ -1019,6 +1028,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
                     }}
                     userId={user.id}
                     maxImages={10}
+                    onAiLabel={flag => setAiImageFlags(prev => [...prev, flag])}
                   />
                   {fieldErrors.images && (
                     <p className="text-sm text-red-600 dark:text-red-400 mt-1">
@@ -1026,6 +1036,8 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
                     </p>
                   )}
                 </div>
+
+                <SewnSampleInput checked={sewnSample} onChange={setSewnSample} />
 
                 <div>
                   <DigitalFileUpload
