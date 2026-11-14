@@ -6,6 +6,7 @@ import { useTheme } from 'next-themes';
 import { ProfileDropdown } from '@/components/profile-dropdown';
 import { CartIcon } from '@/components/cart-icon';
 import { AuthLink } from '@/components/auth-link';
+import { NavHoverMenu, NavLink } from '@/components/nav-hover-menu';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -54,7 +55,7 @@ export function Navigation({ showMarketplaceLinks = false }: NavigationProps) {
                 {/* Mobile menu */}
                 <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="lg:hidden" aria-label="Menu">
+                    <Button variant="ghost" size="icon" className="md:hidden" aria-label="Menu">
                       {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
                     </Button>
                   </DropdownMenuTrigger>
@@ -92,38 +93,36 @@ export function Navigation({ showMarketplaceLinks = false }: NavigationProps) {
                   </DropdownMenuContent>
                 </DropdownMenu>
 
-                {/* Desktop links */}
-                <div className="hidden lg:flex items-center gap-1 xl:gap-2">
-                  <Button asChild variant="ghost" size="sm">
-                    <Link href="/" className="flex items-center gap-2">
-                      <Home className="hidden xl:block h-4 w-4" />
-                      <span>Home</span>
-                    </Link>
-                  </Button>
-                  <Button asChild variant="ghost" size="sm">
-                    <Link href="/marketplace" className="flex items-center gap-2">
-                      <ShoppingBag className="hidden xl:block h-4 w-4" />
-                      <span>Marketplace</span>
-                    </Link>
-                  </Button>
-                  <Button asChild variant="ghost" size="sm">
-                    <AuthLink href="/marketplace/sell" className="flex items-center gap-2">
-                      <Package className="hidden xl:block h-4 w-4" />
-                      <span>Sell</span>
-                    </AuthLink>
-                  </Button>
-                  <Button asChild variant="ghost" size="sm">
-                    <Link href="/fabric" className="flex items-center gap-2">
-                      <Layers className="hidden xl:block h-4 w-4" />
-                      <span>Fabric</span>
-                    </Link>
-                  </Button>
-                  <Button asChild variant="ghost" size="sm">
-                    <Link href="/about" className="flex items-center gap-2">
-                      <Info className="hidden xl:block h-4 w-4" />
-                      <span>About</span>
-                    </Link>
-                  </Button>
+                {/* Desktop: click goes to the page, hover shows related links */}
+                <div className="hidden md:flex items-center gap-1">
+                  <NavHoverMenu
+                    href="/"
+                    label="Home"
+                    icon={Home}
+                    items={[
+                      { href: '/', label: 'Home', icon: Home },
+                      { href: '/about', label: 'About us', icon: Info },
+                    ]}
+                  />
+                  <NavHoverMenu
+                    href="/marketplace"
+                    label="Marketplace"
+                    icon={ShoppingBag}
+                    items={[
+                      { href: '/marketplace', label: 'Marketplace', icon: ShoppingBag },
+                      {
+                        href: '/marketplace/sell',
+                        label: 'Sell',
+                        icon: Package,
+                        render: (className, children) => (
+                          <AuthLink href="/marketplace/sell" className={className}>
+                            {children}
+                          </AuthLink>
+                        ),
+                      },
+                    ]}
+                  />
+                  <NavLink href="/fabric" label="Fabric" icon={Layers} />
                 </div>
               </>
             )}
