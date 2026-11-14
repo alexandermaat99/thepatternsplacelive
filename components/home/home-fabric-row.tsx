@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { getFabricCatalogRows } from '@/lib/fabric-catalog';
 import { formatCents } from '@/lib/fabric-orders';
+import { PointsForFabric } from '@/components/fabric/points-for-fabric';
 
 /** Curated deadstock fabric in stock now. Hidden if none. */
 export async function HomeFabricRow() {
@@ -47,6 +48,9 @@ export async function HomeFabricRow() {
             </li>
           ))}
         </ul>
+        <div className="mt-8">
+          <PointsForFabric variant="home" />
+        </div>
       </div>
     </section>
   );

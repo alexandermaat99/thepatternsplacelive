@@ -130,7 +130,8 @@ export function normalizeShippingSettings(raw: unknown): FabricShippingSettings 
     },
     points: {
       enabled: typeof r.points?.enabled === 'boolean' ? r.points.enabled : d.points.enabled,
-      pointsPerDollar: clampInt(r.points?.pointsPerDollar, 1, 1000, d.points.pointsPerDollar),
+      // At least 5 points per $1 (a point is worth 20¢ at most), so points can't be set to near-cash value.
+      pointsPerDollar: clampInt(r.points?.pointsPerDollar, 5, 1000, d.points.pointsPerDollar),
       maxPercentOfFabric: clampInt(r.points?.maxPercentOfFabric, 1, 100, d.points.maxPercentOfFabric),
     },
   };

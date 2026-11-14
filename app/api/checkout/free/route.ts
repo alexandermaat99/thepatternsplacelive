@@ -2,10 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceRoleClient } from '@/lib/supabase/service-role';
 import { deliverProductToCustomer } from '@/lib/product-delivery';
-import { awardPointsForFreeDownload, awardPointsForFreeSale } from '@/lib/pattern-points';
+import { awardPointsForFreeDownload } from '@/lib/pattern-points';
+import { rateLimit, getClientIdentifier, RATE_LIMITS } from '@/lib/security/rate-limit';
 
 export async function POST(request: NextRequest) {
   try {
+    const limit = rateLimit(`free:${getClientIdentifier(request)}`, RATE_LIMITS.STRICT);
+    if (!limit.success) {
+      return NextResponse.json({ error: 'Too many downloads. Please try again in a minute.' }, { status: 429 });
+    }
     const { productId, email: guestEmail } = await request.json();
 
     const supabase = await createClient();
@@ -82,21 +87,8 @@ export async function POST(request: NextRequest) {
       // Don't fail the request if delivery fails - order is already created
     });
 
-    // Award pattern points (non-blocking)
-    (async () => {
-      try {
-        // Award points to buyer for downloading free pattern
-        if (user?.id) {
-          await awardPointsForFreeDownload(user.id);
-        }
-
-        // Award points to seller for free pattern download
-        await awardPointsForFreeSale(product.user_id);
-      } catch (error) {
-        console.error('Error awarding pattern points for free product:', error);
-        // Don't throw - points are non-critical
-      }
-    })();
+    // Points: once per pattern (signed-in only, never for your own pattern). See lib/pattern-points.ts.
+    await awardPointsForFreeDownload(user?.id ?? null, product.id, product.user_id);
 
     return NextResponse.json({
       success: true,

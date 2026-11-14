@@ -195,7 +195,7 @@ export function FabricSettingsForm({ initial }: { initial: FabricShippingSetting
             <Input
               id="ppd"
               type="number"
-              min={1}
+              min={5}
               value={points.pointsPerDollar}
               onChange={e => setPoints({ pointsPerDollar: parseInt(e.target.value) || 1 })}
             />

@@ -65,7 +65,7 @@ export function Footer() {
                   href="/fabric"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  In-stock fabric
+                  Deadstock fabric
                 </Link>
               </li>
             </ul>

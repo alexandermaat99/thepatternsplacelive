@@ -5,7 +5,7 @@ import { getFabricPublicDetail } from '@/lib/fabric-catalog';
 import { COMPANY_INFO } from '@/lib/company-info';
 import { sendSellerSaleNotificationEmail } from '@/lib/email';
 import { deliverProductsForOrders } from '@/lib/product-delivery';
-import { awardPatternPointsOnce, PATTERN_POINTS } from '@/lib/pattern-points';
+import { awardPointsForPaidOrders } from '@/lib/pattern-points';
 import { FABRIC_ORDER_SETTINGS, formatYardsLabel, isValidCut, maxOrderableYards, type Fulfillment } from '@/lib/fabric-orders';
 import { handleFabricCheckoutCompleted } from '@/lib/fabric-order-server';
 import { alertAdmin } from '@/lib/admin-alert';
@@ -203,14 +203,11 @@ async function notifySellersAndAwardPoints(
   buyerEmail: string | null
 ) {
   const supabase = createServiceRoleClient();
-  for (const o of orders) {
-    if (o.buyer_id) await awardPatternPointsOnce(o.buyer_id, PATTERN_POINTS.BUY_PRODUCT, 'purchase', o.id);
-  }
+  await awardPointsForPaidOrders(orders, session.id);
   const bySeller = new Map<string, CompletedOrder[]>();
   for (const o of orders) bySeller.set(o.seller_id, [...(bySeller.get(o.seller_id) ?? []), o]);
 
   for (const [sellerId, sellerOrders] of bySeller) {
-    await awardPatternPointsOnce(sellerId, PATTERN_POINTS.SELL_PRODUCT, 'sale', `${session.id}:${sellerId}`);
     try {
       const [{ data: sellerUser }, { data: profile }, { data: products }] = await Promise.all([
         supabase.auth.admin.getUserById(sellerId),

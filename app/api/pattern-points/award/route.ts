@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { awardPatternPointsOnce, PATTERN_POINTS } from '@/lib/pattern-points';
+import { awardPointsForListing, PATTERN_POINTS } from '@/lib/pattern-points';
 import { rateLimit, getClientIdentifier, RATE_LIMITS } from '@/lib/security/rate-limit';
 
 export async function POST(request: NextRequest) {
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     }
 
     const points = PATTERN_POINTS.LIST_PRODUCT;
-    const newTotal = await awardPatternPointsOnce(user.id, points, 'list_product', productId);
+    const newTotal = await awardPointsForListing(user.id, productId);
     if (newTotal === null) {
       return NextResponse.json({ success: true, pointsAwarded: 0, alreadyAwarded: true });
     }

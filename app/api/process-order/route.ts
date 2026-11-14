@@ -5,7 +5,7 @@ import { calculateEtsyFees, sellerHasFeeWaiver } from '@/lib/company-info';
 import { deliverProductsForOrders } from '@/lib/product-delivery';
 import { handleCartCheckoutCompleted } from '@/lib/cart-checkout-server';
 import { sendSellerSaleNotificationEmail } from '@/lib/email';
-import { awardPointsForPurchase, awardPointsForSale } from '@/lib/pattern-points';
+import { awardPointsForPaidOrders } from '@/lib/pattern-points';
 
 // Whether each seller's platform fees are waived (same rule as checkout and the webhook)
 async function getFeeWaivers(supabase: any, sellerIds: string[]): Promise<Map<string, boolean>> {
@@ -190,29 +190,10 @@ export async function POST(request: NextRequest) {
                 );
               });
 
-              // Award pattern points (non-blocking)
-              // Award points per item: 10 points per product purchased
-              (async () => {
-                try {
-                  const uniqueSellers = new Set<string>();
+              // Points (idempotent via the ledger; nothing for buying your own pattern)
 
-                  for (const order of insertedOrders) {
-                    // Award points to buyer for each item purchased (if authenticated)
-                    if (order.buyer_id) {
-                      await awardPointsForPurchase(order.buyer_id);
-                    }
 
-                    // Award points to seller (once per seller, not per item)
-                    if (order.seller_id && !uniqueSellers.has(order.seller_id)) {
-                      uniqueSellers.add(order.seller_id);
-                      await awardPointsForSale(order.seller_id);
-                    }
-                  }
-                } catch (error) {
-                  console.error('Error awarding pattern points:', error);
-                  // Don't throw - points are non-critical
-                }
-              })();
+              awardPointsForPaidOrders(insertedOrders, session.id).catch(() => {});
 
               // Send seller notification emails (non-blocking)
               (async () => {

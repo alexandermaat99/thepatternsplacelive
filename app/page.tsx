@@ -122,8 +122,8 @@ export default function Home() {
                     </p>
                   </div>
                   <div className={TILE}>
-                    <p className="font-semibold">PDF patterns</p>
-                    <p className="text-muted-foreground">Print at home or send to a copy shop.</p>
+                    <p className="font-semibold">Points for fabric</p>
+                    <p className="text-muted-foreground">Every pattern you buy earns points toward fabric.</p>
                   </div>
                   <div className={TILE}>
                     <p className="font-semibold">Curated deadstock</p>
