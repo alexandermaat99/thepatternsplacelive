@@ -68,7 +68,7 @@ export function FabricPhotoUpload({
       console.error('Compression error:', err);
       setStatus(null);
       setUploading(false);
-      alert('Failed to process image. Try a smaller file.');
+      alert(err instanceof Error && /HEIC/.test(err.message) ? err.message : 'Failed to process image. Try a smaller file.');
       return;
     }
     setStatus('Uploading...');
