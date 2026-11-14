@@ -13,7 +13,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Menu, X, ShoppingBag, Package, Info, Layers } from 'lucide-react';
+import { Menu, X, ShoppingBag, Package, Info, Layers, Home } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 
 interface NavigationProps {
@@ -54,11 +54,17 @@ export function Navigation({ showMarketplaceLinks = false }: NavigationProps) {
                 {/* Mobile menu */}
                 <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="md:hidden" aria-label="Menu">
+                    <Button variant="ghost" size="icon" className="lg:hidden" aria-label="Menu">
                       {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" className="w-48">
+                    <DropdownMenuItem asChild onClick={() => setIsMenuOpen(false)}>
+                      <Link href="/" className="flex items-center">
+                        <Home className="mr-2 h-4 w-4" />
+                        <span>Home</span>
+                      </Link>
+                    </DropdownMenuItem>
                     <DropdownMenuItem asChild onClick={() => setIsMenuOpen(false)}>
                       <Link href="/marketplace" className="flex items-center">
                         <ShoppingBag className="mr-2 h-4 w-4" />
@@ -87,23 +93,35 @@ export function Navigation({ showMarketplaceLinks = false }: NavigationProps) {
                 </DropdownMenu>
 
                 {/* Desktop links */}
-                <div className="hidden md:flex items-center gap-2">
+                <div className="hidden lg:flex items-center gap-1 xl:gap-2">
+                  <Button asChild variant="ghost" size="sm">
+                    <Link href="/" className="flex items-center gap-2">
+                      <Home className="hidden xl:block h-4 w-4" />
+                      <span>Home</span>
+                    </Link>
+                  </Button>
                   <Button asChild variant="ghost" size="sm">
                     <Link href="/marketplace" className="flex items-center gap-2">
-                      <ShoppingBag className="h-4 w-4" />
+                      <ShoppingBag className="hidden xl:block h-4 w-4" />
                       <span>Marketplace</span>
                     </Link>
                   </Button>
                   <Button asChild variant="ghost" size="sm">
                     <AuthLink href="/marketplace/sell" className="flex items-center gap-2">
-                      <Package className="h-4 w-4" />
+                      <Package className="hidden xl:block h-4 w-4" />
                       <span>Sell</span>
                     </AuthLink>
                   </Button>
                   <Button asChild variant="ghost" size="sm">
                     <Link href="/fabric" className="flex items-center gap-2">
-                      <Layers className="h-4 w-4" />
+                      <Layers className="hidden xl:block h-4 w-4" />
                       <span>Fabric</span>
+                    </Link>
+                  </Button>
+                  <Button asChild variant="ghost" size="sm">
+                    <Link href="/about" className="flex items-center gap-2">
+                      <Info className="hidden xl:block h-4 w-4" />
+                      <span>About</span>
                     </Link>
                   </Button>
                 </div>
