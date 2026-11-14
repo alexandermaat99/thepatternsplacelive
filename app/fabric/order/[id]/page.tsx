@@ -75,6 +75,12 @@ export default async function FabricOrderPage({
 
         <div className="rounded-lg border p-4 text-sm space-y-1">
           <div className="flex justify-between"><span>Subtotal</span><span>{formatCents(order.subtotal_cents)}</span></div>
+          {!!order.discount_cents && (
+            <div className="flex justify-between text-green-700 dark:text-green-400">
+              <span>Pattern points ({order.points_used} pts)</span>
+              <span>-{formatCents(order.discount_cents)}</span>
+            </div>
+          )}
           <div className="flex justify-between">
             <span className="inline-flex items-center gap-1.5">
               {order.fulfillment === 'ship' ? <Truck className="h-4 w-4" /> : <Store className="h-4 w-4" />}

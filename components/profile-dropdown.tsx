@@ -12,7 +12,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/auth-context';
-import { User, LogOut, ShoppingBag, Package, Plus, Ruler, ReceiptText, Barcode, Megaphone, BookOpen, EyeOff, Truck, Settings } from 'lucide-react';
+import { User, LogOut, ShoppingBag, Package, Plus, Ruler, ReceiptText, Barcode, Megaphone, BookOpen, EyeOff, Truck, Settings, Flag } from 'lucide-react';
 import Link from 'next/link';
 
 export function ProfileDropdown() {
@@ -207,6 +207,18 @@ export function ProfileDropdown() {
               >
                 <EyeOff className="mr-2 h-4 w-4" />
                 <span>Hidden listings</span>
+              </Link>
+            </DropdownMenuItem>
+          )}
+          {isAdmin && (
+            <DropdownMenuItem asChild>
+              <Link
+                href="/admin/listing-reports"
+                className="flex items-center w-full"
+                onClick={() => setIsOpen(false)}
+              >
+                <Flag className="mr-2 h-4 w-4" />
+                <span>Listing reports</span>
               </Link>
             </DropdownMenuItem>
           )}

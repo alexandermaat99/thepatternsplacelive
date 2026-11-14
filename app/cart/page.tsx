@@ -24,7 +24,8 @@ import {
   type PendingCheckout,
 } from '@/lib/pending-checkout';
 import { FabricCartSection } from '@/components/fabric/fabric-cart-section';
-import { formatCents, shippingCentsFor, type Fulfillment } from '@/lib/fabric-orders';
+import { formatCents, pointsDiscountFor, shippingCentsFor, type Fulfillment } from '@/lib/fabric-orders';
+import { Switch } from '@/components/ui/switch';
 import { useFabricShippingSettings } from '@/hooks/useFabricShippingSettings';
 
 export default function CartPage() {
@@ -54,7 +55,6 @@ export default function CartPage() {
   const paidPatternCount = paidPatterns.length;
   const freePatternCount = state.items.length - paidPatternCount;
   const patternSubtotalCents = paidPatterns.reduce((sum, item) => sum + Math.round(item.price * 100), 0);
-  const grandTotalCents = patternSubtotalCents + fabricSubtotalCents + fabricShippingCents;
 
   // A checkout that is still holding fabric (shopper came back without paying).
   const [pendingCheckout, setPendingCheckout] = useState<PendingCheckout | null>(null);
@@ -70,7 +70,22 @@ export default function CartPage() {
     // Back via the browser's back button: offer to resume or cancel.
     setPendingCheckout(getPendingCheckout());
   }, []);
-  const { user, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading, refreshProfile } = useAuth();
+  // Pattern points: money off the fabric (estimate; the server recomputes at checkout).
+  const [usePoints, setUsePoints] = useState(false);
+  useEffect(() => {
+    // Points are awarded server-side after purchases; make sure the balance is current.
+    if (user?.id) refreshProfile().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+  const pointsBalance = Number(profile?.pattern_points) || 0;
+  const pointsOffer =
+    user && fabric.items.length > 0
+      ? pointsDiscountFor(shippingSettings.points, pointsBalance, fabricSubtotalCents)
+      : { points: 0, discountCents: 0 };
+  const pointsDiscountCents = usePoints ? pointsOffer.discountCents : 0;
+  const grandTotalCents =
+    patternSubtotalCents + fabricSubtotalCents - pointsDiscountCents + fabricShippingCents;
   const router = useRouter();
   const [itemToRemove, setItemToRemove] = useState<{
     id: string;
@@ -130,6 +145,7 @@ export default function CartPage() {
             patterns: paidProducts.map(item => ({ productId: item.id })),
             fabric: fabric.items.map(i => ({ baseSku: i.baseSku, yards: i.yards })),
             fulfillment,
+            usePoints: usePoints && pointsOffer.points > 0,
           }),
         });
 
@@ -384,6 +400,12 @@ export default function CartPage() {
                       <span>Fabric ({fabric.items.length})</span>
                       <span className="font-medium">{formatCents(fabricSubtotalCents)}</span>
                     </div>
+                    {pointsDiscountCents > 0 && (
+                      <div className="flex justify-between text-green-700 dark:text-green-400">
+                        <span>Pattern points ({pointsOffer.points} pts)</span>
+                        <span className="font-medium">-{formatCents(pointsDiscountCents)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between">
                       <span>{fulfillment === 'ship' ? 'Fabric shipping' : 'Fabric pickup'}</span>
                       <span className="font-medium">
@@ -406,6 +428,28 @@ export default function CartPage() {
                   <span>{grandTotalCents > 0 ? formatCents(grandTotalCents) : 'Free'}</span>
                 </div>
               </div>
+
+              {pointsOffer.points > 0 && (
+                <label className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer">
+                  <Switch
+                    checked={usePoints}
+                    onCheckedChange={setUsePoints}
+                    aria-label="Use pattern points on fabric"
+                    className="mt-0.5"
+                  />
+                  <span className="text-sm">
+                    <strong>Use {pointsOffer.points} pattern points</strong> for{' '}
+                    {formatCents(pointsOffer.discountCents)} off your fabric
+                    <span className="block text-xs text-muted-foreground">
+                      You have {pointsBalance} points. Points apply to fabric only
+                      {shippingSettings.points.maxPercentOfFabric < 100
+                        ? `, up to ${shippingSettings.points.maxPercentOfFabric}% of the fabric price`
+                        : ''}
+                      . If you don&apos;t finish checkout, they come back.
+                    </span>
+                  </span>
+                </label>
+              )}
 
               {user && (
                 <div className="p-3 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800 rounded-lg">

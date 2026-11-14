@@ -88,6 +88,12 @@ export function SellLanding() {
           </Link>
           .
         </p>
+        <p className="text-muted-foreground">
+          How we keep it human-made: a person reviews listings that shoppers report, and photos whose
+          file data says they were made with AI. Nothing is removed automatically. If your photos
+          show a garment sewn from the pattern, tick &quot;Sewn sample&quot; when you list it and
+          shoppers will see a badge.
+        </p>
       </section>
 
       <section className="text-center">

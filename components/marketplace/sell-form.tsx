@@ -13,6 +13,8 @@ import { MultiImageUpload } from '@/components/marketplace/multi-image-upload';
 import { DigitalFileUpload } from '@/components/marketplace/digital-file-upload';
 import { FabricRequirementsInput } from '@/components/marketplace/fabric-requirements-input';
 import { ListingPreview } from '@/components/marketplace/listing-preview';
+import { SewnSampleInput } from '@/components/marketplace/sewn-sample';
+import { sendAiImageFlags, type AiImageFlag } from '@/lib/listing-flags';
 import { normalizeFabricRequirements, type FabricRequirements } from '@/lib/fabric-requirements';
 import { CategoryInput, linkCategoriesToProduct } from '@/components/marketplace/category-input';
 import { ArrowLeft, Info, Award } from 'lucide-react';
@@ -63,6 +65,8 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
     is_free: !canSell,
   });
   const [fabricRequirements, setFabricRequirements] = useState<FabricRequirements | null>(null);
+  const [sewnSample, setSewnSample] = useState(false);
+  const [aiImageFlags, setAiImageFlags] = useState<AiImageFlag[]>([]);
 
   // Scroll to error field when fieldErrors change
   useEffect(() => {
@@ -226,11 +230,14 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
           ...(normalizeFabricRequirements(fabricRequirements) && {
             fabric_requirements: normalizeFabricRequirements(fabricRequirements),
           }),
+          ...(sewnSample && { sewn_sample: true }),
         })
         .select()
         .single();
 
       if (error) throw error;
+
+      if (product) sendAiImageFlags(product.id, aiImageFlags, formData.images);
 
       // Link categories to the product (comma-separated input)
       // Also automatically add "free" category if product is free
@@ -666,6 +673,7 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                         }}
                         userId={user.id}
                         maxImages={10}
+                        onAiLabel={flag => setAiImageFlags(prev => [...prev, flag])}
                       />
                       {fieldErrors.images && (
                         <p className="text-sm text-rose-400 dark:text-rose-400 mt-1">
@@ -673,6 +681,8 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                         </p>
                       )}
                     </div>
+
+                    <SewnSampleInput checked={sewnSample} onChange={setSewnSample} />
 
                     <div>
                       <DigitalFileUpload
@@ -716,6 +726,7 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
             categories={formData.category}
             username={profile?.username ?? null}
             fabricRequirements={fabricRequirements}
+            sewnSample={sewnSample}
           />
         </div>
         </div>
