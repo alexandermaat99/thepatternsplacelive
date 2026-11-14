@@ -11,6 +11,9 @@ import { createClient } from '@/lib/supabase/client';
 import { StripeConnectButton } from '@/components/marketplace/stripe-connect-button';
 import { MultiImageUpload } from '@/components/marketplace/multi-image-upload';
 import { DigitalFileUpload } from '@/components/marketplace/digital-file-upload';
+import { FabricRequirementsInput } from '@/components/marketplace/fabric-requirements-input';
+import { ListingPreview } from '@/components/marketplace/listing-preview';
+import { normalizeFabricRequirements, type FabricRequirements } from '@/lib/fabric-requirements';
 import { CategoryInput, linkCategoriesToProduct } from '@/components/marketplace/category-input';
 import { ArrowLeft, Info, Award } from 'lucide-react';
 import Link from 'next/link';
@@ -59,6 +62,7 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
     files: [] as string[],
     is_free: !canSell,
   });
+  const [fabricRequirements, setFabricRequirements] = useState<FabricRequirements | null>(null);
 
   // Scroll to error field when fieldErrors change
   useEffect(() => {
@@ -219,6 +223,9 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
           user_id: user.id,
           is_active: true,
           is_free: isFree,
+          ...(normalizeFabricRequirements(fabricRequirements) && {
+            fabric_requirements: normalizeFabricRequirements(fabricRequirements),
+          }),
         })
         .select()
         .single();
@@ -297,13 +304,14 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
   return (
     <>
       <FeesInfoModal isOpen={showFeesModal} onClose={() => setShowFeesModal(false)} />
-      <div className="container  mx-auto px-4 py-8 max-w-2xl">
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
         <div className="mb-6">
           <Button variant="ghost" onClick={() => router.back()} className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
             Back
           </Button>
         </div>
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -643,6 +651,8 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
                   )}
                 </div>
 
+                <FabricRequirementsInput value={fabricRequirements} onChange={setFabricRequirements} />
+
                 {user && (
                   <>
                     <div>
@@ -693,6 +703,22 @@ export function SellForm({ user, profile, stripeStatus, canSell }: SellFormProps
             )}
           </CardContent>
         </Card>
+
+        {/* Live preview: beside the form on desktop, below it on mobile */}
+        <div className="lg:sticky lg:top-20">
+          <ListingPreview
+            title={formData.title}
+            description={formData.description}
+            price={formData.price}
+            isFree={formData.is_free}
+            images={formData.images}
+            difficulty={formData.difficulty}
+            categories={formData.category}
+            username={profile?.username ?? null}
+            fabricRequirements={fabricRequirements}
+          />
+        </div>
+        </div>
       </div>
     </>
   );

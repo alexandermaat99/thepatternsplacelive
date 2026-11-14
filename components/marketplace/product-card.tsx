@@ -47,9 +47,16 @@ interface ProductCardProps {
   hideFavorite?: boolean;
   /** Admin-only: listing is hidden by an admin (never passed for other viewers). */
   adminHidden?: boolean;
+  /** Sell-form preview: no reviews fetch, no links, no favorite button. */
+  preview?: boolean;
 }
 
-export function ProductCard({ product, hideFavorite = false, adminHidden = false }: ProductCardProps) {
+export function ProductCard({
+  product,
+  hideFavorite = false,
+  adminHidden = false,
+  preview = false,
+}: ProductCardProps) {
   const router = useRouter();
   const { isFavorite, toggleFavorite } = useFavorites();
   const { showToast } = useToast();
@@ -82,6 +89,7 @@ export function ProductCard({ product, hideFavorite = false, adminHidden = false
 
   // Fetch reviews to calculate average rating
   useEffect(() => {
+    if (preview) return;
     const fetchReviews = async () => {
       try {
         const response = await fetch(`/api/reviews?productId=${product.id}`);
@@ -101,7 +109,7 @@ export function ProductCard({ product, hideFavorite = false, adminHidden = false
     };
 
     fetchReviews();
-  }, [product.id]);
+  }, [product.id, preview]);
 
   const handleFavoriteClick = async (e: React.MouseEvent) => {
     e.preventDefault();
