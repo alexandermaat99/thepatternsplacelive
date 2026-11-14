@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { ProductCard } from '@/components/marketplace/product-card';
+import { getProductModeration } from '@/lib/product-moderation';
 
 /** Newest patterns. Hidden listings are excluded by RLS. Hidden if none. */
 export async function HomeNewPatterns() {
@@ -15,6 +16,8 @@ export async function HomeNewPatterns() {
     .order('created_at', { ascending: false })
     .limit(8);
   if (!products?.length) return null;
+  // Admin-only "Hidden by admin" markers (returns nothing for everyone else)
+  const moderation = await getProductModeration(products.map(p => p.id));
 
   return (
     <section aria-labelledby="home-patterns" className="border-b">
@@ -32,7 +35,7 @@ export async function HomeNewPatterns() {
         </div>
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {products.map(product => (
-            <ProductCard key={product.id} product={product as never} />
+            <ProductCard key={product.id} product={product as never} adminHidden={moderation.has(product.id)} />
           ))}
         </div>
         {products.length < 4 && (
