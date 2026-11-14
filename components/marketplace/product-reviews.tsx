@@ -28,6 +28,7 @@ import { createClient } from '@/lib/supabase/client';
 import { DIFFICULTY_LEVELS, getDifficultyLabel, getDifficultyColor } from '@/lib/constants';
 import Image from 'next/image';
 import { compressImage, validateImageFile } from '@/lib/image-compression';
+import { toDisplayableImage } from '@/lib/heic';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PATTERN_POINTS } from '@/lib/pattern-points';
 
@@ -283,10 +284,19 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
           continue;
         }
 
-        // Compress image
-        let processedFile = file;
+        // iPhone HEIC photos -> JPEG (never upload HEIC: most browsers can't show it)
+        let displayable: File;
         try {
-          processedFile = await compressImage(file, {
+          displayable = await toDisplayableImage(file);
+        } catch (heicError) {
+          showToast(heicError instanceof Error ? heicError.message : 'Could not read this photo', 'error');
+          continue;
+        }
+
+        // Compress image
+        let processedFile = displayable;
+        try {
+          processedFile = await compressImage(displayable, {
             maxSizeMB: 1,
             maxWidthOrHeight: 1920,
             useWebWorker: false,
@@ -296,7 +306,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
         }
 
         // Generate unique filename
-        const fileExt = file.name.split('.').pop() || 'jpg';
+        const fileExt = processedFile.name.split('.').pop() || 'jpg';
         const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
         // Upload to review-images bucket

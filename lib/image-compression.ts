@@ -1,4 +1,5 @@
 import imageCompression from 'browser-image-compression';
+import { toDisplayableImage } from '@/lib/heic';
 
 export interface CompressionOptions {
   maxSizeMB?: number;
@@ -26,6 +27,10 @@ export async function compressImage(
     ...defaultOptions,
     ...options,
   };
+
+  // iPhone HEIC photos -> JPEG first (throws a friendly error if that fails,
+  // rather than uploading a file most browsers can't show).
+  file = await toDisplayableImage(file);
 
   try {
     const compressedFile = await imageCompression(file, compressionOptions);
@@ -86,6 +91,7 @@ export async function cropAndCompressAvatar(
   size: number = 512,
   maxSizeMB: number = 1.0
 ): Promise<File> {
+  file = await toDisplayableImage(file);
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     

@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Upload, X, Image as ImageIcon, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { compressImage, validateImageFile } from '@/lib/image-compression';
+import { toDisplayableImage } from '@/lib/heic';
 
 interface ImageItem {
   id: string;
@@ -83,12 +84,16 @@ export function MultiImageUpload({
       try {
         console.log(`Processing image ${i + 1}/${newItems.length}: ${item.file.name}`);
         
+        // iPhone HEIC photos -> JPEG first. If that fails, the error is shown
+        // below; never fall back to uploading a HEIC most browsers can't display.
+        const displayable = await toDisplayableImage(item.file);
+
         // Compress image with timeout and fallback
         console.log('Compressing image...');
         let compressedFile: File;
         
         try {
-          const compressionPromise = compressImage(item.file, {
+          const compressionPromise = compressImage(displayable, {
             maxSizeMB: 1,
             maxWidthOrHeight: 1920,
             useWebWorker: false, // Disable web worker to avoid hanging issues
@@ -102,8 +107,8 @@ export function MultiImageUpload({
           console.log('Compression complete, size:', compressedFile.size);
         } catch (compressionError) {
           console.warn('Compression failed or timed out, using original file:', compressionError);
-          // Fallback to original file if compression fails
-          compressedFile = item.file;
+          // Fallback to the (already browser-displayable) original if compression fails
+          compressedFile = displayable;
         }
 
         // Update item to show it's done compressing, now uploading
