@@ -7,6 +7,7 @@ import { Footer } from '@/components/footer';
 import { CookieConsent } from '@/components/cookie-consent';
 import { CONSENT_DEFAULTS_SCRIPT } from '@/lib/cookie-consent';
 import { FeedbackBubbleConditional } from '@/components/feedback-bubble-conditional';
+import { ScrollToTop } from '@/components/scroll-to-top';
 import './globals.css';
 
 import { COMPANY_INFO } from '@/lib/company-info';
@@ -164,6 +165,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <Providers>
+            <ScrollToTop />
             <div className="flex-1">{children}</div>
             <Footer />
             <CookieConsent />
