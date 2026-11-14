@@ -26,6 +26,9 @@ export async function HomeFabricRow() {
             Shop all fabric <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
+        <div className="mb-6">
+          <PointsForFabric variant="home" />
+        </div>
         <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           {rows.map(f => (
             <li key={f.sku}>
@@ -48,9 +51,6 @@ export async function HomeFabricRow() {
             </li>
           ))}
         </ul>
-        <div className="mt-8">
-          <PointsForFabric variant="home" />
-        </div>
       </div>
     </section>
   );
