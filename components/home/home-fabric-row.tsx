@@ -3,7 +3,7 @@ import { ArrowRight } from 'lucide-react';
 import { getFabricCatalogRows } from '@/lib/fabric-catalog';
 import { formatCents } from '@/lib/fabric-orders';
 
-/** "Need fabric too?": a low-key row of in-stock fabrics. Hidden if none. */
+/** Curated deadstock fabric in stock now. Hidden if none. */
 export async function HomeFabricRow() {
   const rows = (await getFabricCatalogRows())
     .filter(r => (r.current_quantity ?? 0) > 0 && r.sell_price != null)
@@ -16,13 +16,13 @@ export async function HomeFabricRow() {
       <div className="container mx-auto max-w-7xl px-4 py-12">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 id="home-fabric" className="text-xl sm:text-2xl font-semibold">Need fabric too?</h2>
+            <h2 id="home-fabric" className="text-2xl sm:text-3xl font-bold">Curated deadstock fabric</h2>
             <p className="text-muted-foreground mt-1">
-              We keep a small stock of fabric you can add to the same order. Ships in the US, or pick up in Utah Valley.
+              Hand-picked, limited yardage. When a bolt is gone, it&apos;s gone. Ships in the US, or pick up in Utah Valley.
             </p>
           </div>
           <Link href="/fabric" className="inline-flex items-center gap-1 text-sm font-medium hover:underline">
-            Browse fabric <ArrowRight className="h-4 w-4" />
+            Shop all fabric <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
         <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
