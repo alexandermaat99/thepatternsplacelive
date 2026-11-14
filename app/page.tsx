@@ -6,6 +6,7 @@ import { FoundingDesignersSpotlight } from '@/components/marketplace/founding-de
 import { HomeFabricRow } from '@/components/home/home-fabric-row';
 import { HomeNewPatterns } from '@/components/home/home-new-patterns';
 import { HomeHowItWorks, HomeSellCta } from '@/components/home/home-how-and-sell';
+import { WhyDifferent } from '@/components/home/why-different';
 
 // The homepage title is the most important one on the site. Lead with what
 // people search for, then the brand.
@@ -50,8 +51,6 @@ export const metadata: Metadata = {
     },
   },
 };
-
-const TILE = 'space-y-2 rounded-2xl bg-muted p-3';
 
 export default function Home() {
   return (
@@ -102,35 +101,8 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="relative hidden h-full lg:block">
-              <div className="absolute inset-0 -translate-x-6 rounded-3xl bg-gradient-to-br from-rose-500/20 via-rose-500/20 to-rose-500/20 blur-3xl" />
-              <div className="relative rounded-3xl border bg-background/80 p-6 shadow-xl backdrop-blur">
-                <p className="mb-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Why it&apos;s different
-                </p>
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div className={TILE}>
-                    <p className="font-semibold">Designers come first</p>
-                    <p className="text-muted-foreground">
-                      No listing fees. Designers keep the rights to their work and sell anywhere else too.
-                    </p>
-                  </div>
-                  <div className={TILE}>
-                    <p className="font-semibold">Human-made only</p>
-                    <p className="text-muted-foreground">
-                      AI-generated patterns aren&apos;t allowed. We review listings and act on reports.
-                    </p>
-                  </div>
-                  <div className={TILE}>
-                    <p className="font-semibold">Points for fabric</p>
-                    <p className="text-muted-foreground">Every pattern you buy earns points toward fabric.</p>
-                  </div>
-                  <div className={TILE}>
-                    <p className="font-semibold">Curated deadstock</p>
-                    <p className="text-muted-foreground">Hand-picked fabric in limited yardage, in the same checkout.</p>
-                  </div>
-                </div>
-              </div>
+            <div className="relative hidden lg:block">
+              <WhyDifferent />
             </div>
           </div>
         </div>

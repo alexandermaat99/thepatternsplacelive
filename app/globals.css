@@ -69,3 +69,77 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ---------- Homepage motion (components/motion) ---------- */
+.tilt-card {
+  --rx: 0deg;
+  --ry: 0deg;
+  --mx: 50%;
+  --my: 50%;
+  transform: perspective(1000px) rotateX(var(--rx)) rotateY(var(--ry));
+  transform-style: preserve-3d;
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+.tilt-card[data-active='true'] {
+  transition: transform 0.12s ease-out;
+}
+/* Idle drift is driven every frame, so no transition lag */
+.tilt-card[data-idle='true']:not([data-active='true']) {
+  transition: none;
+}
+.tilt-card[data-idle='true'] .tilt-glare {
+  opacity: 0.6;
+}
+.tilt-glare {
+  background: radial-gradient(circle at var(--mx) var(--my), rgba(255, 255, 255, 0.55), transparent 45%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  mix-blend-mode: soft-light;
+}
+.tilt-card[data-active='true'] .tilt-glare {
+  opacity: 1;
+}
+.dark .tilt-glare {
+  background: radial-gradient(circle at var(--mx) var(--my), rgba(255, 255, 255, 0.12), transparent 45%);
+  mix-blend-mode: normal;
+}
+
+/* Pattern-paper grid */
+.pattern-paper {
+  background-image:
+    linear-gradient(to right, hsl(var(--border) / 0.7) 1px, transparent 1px),
+    linear-gradient(to bottom, hsl(var(--border) / 0.7) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* Running stitch: a dashed line that slowly moves */
+.stitch-line {
+  background-image: linear-gradient(to right, rgb(251 113 133 / 0.6) 60%, transparent 0%);
+  background-size: 16px 2px;
+  background-repeat: repeat-x;
+  animation: stitch-run 1.6s linear infinite;
+}
+@keyframes stitch-run {
+  to {
+    background-position: 16px 0;
+  }
+}
+
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition-property: opacity, transform;
+  transition-duration: 0.7s;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+.reveal[data-visible='true'] {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tilt-card { transform: none !important; }
+  .stitch-line { animation: none; }
+  .reveal { opacity: 1; transform: none; transition: none; }
+}
