@@ -8,15 +8,16 @@ import { Button } from '@/components/ui/button';
 import { FabricCatalogGrid } from '@/components/fabric/fabric-catalog-grid';
 import { getFabricCatalogRows } from '@/lib/fabric-catalog';
 import { COMPANY_INFO } from '@/lib/company-info';
+import { PointsForFabric } from '@/components/fabric/points-for-fabric';
 
 // Always live: stock changes the moment someone starts or abandons a checkout.
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'In-stock fabric',
-  description: `Shop in-stock fabric by the yard at ${COMPANY_INFO.name}. US shipping or free local pickup in Utah Valley.`,
+  title: 'Deadstock fabric by the yard',
+  description: `Curated deadstock fabric by the yard at ${COMPANY_INFO.name}. Limited yardage, US shipping or free local pickup in Utah Valley. Use pattern points for money off.`,
   openGraph: {
-    title: `In-stock fabric | ${COMPANY_INFO.name}`,
+    title: `Deadstock fabric by the yard | ${COMPANY_INFO.name}`,
     description: `Browse in-stock fabric: photos, SKU, price per yard, and current yardage.`,
     type: 'website',
     url: `${COMPANY_INFO.urls.website}/fabric`,
@@ -41,10 +42,11 @@ export default async function FabricCatalogPage() {
             </Link>
           </Button>
           <header className="space-y-2 max-w-2xl">
-            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">In-stock fabric</h1>
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Curated deadstock fabric</h1>
             <p className="text-muted-foreground">
-              Order by the yard online. We ship in the US, or you can pick up for free in Utah
-              Valley. We also sell in person; follow us on Instagram{' '}
+              Hand-picked deadstock in limited yardage: when a bolt is gone, it&apos;s gone. Order
+              by the yard and we ship in the US, or pick up for free in Utah Valley. We also sell in
+              person; follow us on Instagram{' '}
               <Link
                 href="https://www.instagram.com/thepatternsplace/"
                 target="_blank"
@@ -57,6 +59,7 @@ export default async function FabricCatalogPage() {
             </p>
             <FabricCartLink />
           </header>
+          <PointsForFabric variant="fabric" />
         </div>
 
         <FabricCatalogGrid rows={rows} />

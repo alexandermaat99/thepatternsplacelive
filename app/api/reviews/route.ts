@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { awardPointsForReview } from '@/lib/pattern-points';
+import { createServiceRoleClient } from '@/lib/supabase/service-role';
 import { rateLimit, getClientIdentifier, RATE_LIMITS } from '@/lib/security/rate-limit';
 import { sanitizeString, validateUUID } from '@/lib/security/input-validation';
 
@@ -262,11 +263,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Failed to create review' }, { status: 500 });
       }
 
-      // Award pattern points for creating a review (non-blocking)
-      awardPointsForReview(user.id).catch(error => {
-        console.error('Error awarding pattern points for review:', error);
-        // Don't fail the operation if points fail
-      });
+      // Points: once per pattern, never for reviewing your own pattern.
+      const { data: reviewed } = await createServiceRoleClient()
+        .from('products')
+        .select('user_id')
+        .eq('id', productId)
+        .single();
+      if (reviewed) await awardPointsForReview(user.id, productId, reviewed.user_id);
 
       return NextResponse.json({ review: newReview, message: 'Review created successfully' });
     }
