@@ -64,14 +64,22 @@ export function ProfileDropdown() {
           className="flex items-center gap-2 h-8 px-1 rounded-full hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer"
           onClick={e => e.stopPropagation()}
         >
-          <Avatar className="h-8 w-8 pointer-events-none">
-            <AvatarImage src={avatarUrl} alt={profile?.full_name || user.email || 'User'} />
-            <AvatarFallback className="text-xs bg-primary/10 text-primary">
-              {initials}
-            </AvatarFallback>
-          </Avatar>
-          {profile?.pattern_points !== null && profile?.pattern_points !== undefined && (
-            <Badge className="text-xs font-semibold shrink-0 bg-rose-300 text-white border-0 tabular-nums whitespace-nowrap">
+          <span className="relative">
+            <Avatar className="h-8 w-8 pointer-events-none">
+              <AvatarImage src={avatarUrl} alt={profile?.full_name || user.email || 'User'} />
+              <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+            {/* Mobile: points as a small banner across the bottom of the photo */}
+            {profile?.pattern_points != null && (
+              <span className="sm:hidden pointer-events-none absolute -bottom-1.5 left-1/2 -translate-x-1/2 rounded-full bg-rose-300 px-1.5 text-[10px] font-semibold leading-4 text-white tabular-nums whitespace-nowrap ring-2 ring-background">
+                {profile.pattern_points} pts
+              </span>
+            )}
+          </span>
+          {profile?.pattern_points != null && (
+            <Badge className="hidden sm:inline-flex text-xs font-semibold shrink-0 bg-rose-300 text-white border-0 tabular-nums whitespace-nowrap">
               {profile.pattern_points} pts
             </Badge>
           )}

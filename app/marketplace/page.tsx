@@ -7,6 +7,7 @@ import { ActiveFilters } from '@/components/marketplace/active-filters';
 import { MarketplacePagination } from '@/components/marketplace/marketplace-pagination';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { Plus } from 'lucide-react';
 import { Suspense } from 'react';
 import type { Category } from '@/lib/types/categories';
 import { Metadata } from 'next';
@@ -630,6 +631,12 @@ async function MarketplaceContent({ searchParams, embedded }: MarketplacePagePro
             Discover and shop beautiful patterns from talented creators
           </p>
         </div>
+        <Button asChild variant="outline" className="self-start sm:self-auto">
+          <Link href="/marketplace/sell">
+            <Plus className="h-4 w-4 mr-1.5" />
+            Sell your patterns
+          </Link>
+        </Button>
       </div>
 
       {/* Filters and Products Grid */}
