@@ -1,6 +1,8 @@
 'use client';
 
 import { FoundingDesignerBadge } from '@/components/marketplace/founding-designer-badge';
+import { FabricRequirementsDisplay } from '@/components/marketplace/fabric-requirements-display';
+import { normalizeFabricRequirements } from '@/lib/fabric-requirements';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -34,6 +36,7 @@ interface Product {
   title: string;
   description: string;
   details?: string | null;
+  fabric_requirements?: unknown;
   price: number;
   currency: string;
   image_url?: string;
@@ -59,6 +62,7 @@ interface ProductDetailProps {
 }
 
 export function ProductDetail({ product }: ProductDetailProps) {
+  const fabricRequirements = normalizeFabricRequirements(product.fabric_requirements);
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
@@ -411,6 +415,13 @@ export function ProductDetail({ product }: ProductDetailProps) {
               ))}
             </div>
           </div>
+
+          {/* Fabric needed (from the pattern's yardage chart) */}
+          {fabricRequirements && (
+            <div className="border-t pt-4">
+              <FabricRequirementsDisplay requirements={fabricRequirements} />
+            </div>
+          )}
 
           {/* More Details Section */}
           {product.details && (

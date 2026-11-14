@@ -15,6 +15,8 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { MultiImageUpload } from '@/components/marketplace/multi-image-upload';
 import { DigitalFileUpload } from '@/components/marketplace/digital-file-upload';
+import { FabricRequirementsInput } from '@/components/marketplace/fabric-requirements-input';
+import { normalizeFabricRequirements, type FabricRequirements } from '@/lib/fabric-requirements';
 import { CategoryInput, linkCategoriesToProduct } from '@/components/marketplace/category-input';
 import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
@@ -103,6 +105,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
     is_active: true,
     is_free: false,
   });
+  const [fabricRequirements, setFabricRequirements] = useState<FabricRequirements | null>(null);
 
   // Scroll to error field when fieldErrors change
   useEffect(() => {
@@ -162,6 +165,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
             }
           }
 
+          setFabricRequirements(normalizeFabricRequirements((product as any).fabric_requirements));
           setFormData({
             title: product.title,
             description: product.description,
@@ -178,6 +182,7 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
         } catch (error) {
           console.error('Error loading categories:', error);
           // Fallback to old category field
+          setFabricRequirements(normalizeFabricRequirements((product as any).fabric_requirements));
           setFormData({
             title: product.title,
             description: product.description,
@@ -482,6 +487,10 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
         is_active: formData.is_active,
         is_free: isFree,
         updated_at: new Date().toISOString(),
+        // Only send once the column exists (sql/add-fabric-requirements.sql)
+        ...('fabric_requirements' in (product as any) && {
+          fabric_requirements: normalizeFabricRequirements(fabricRequirements),
+        }),
       };
 
       console.log('Update data prepared, description length:', updateData.description?.length || 0);
@@ -993,6 +1002,8 @@ export function EditProductModal({ product, isOpen, onClose }: EditProductModalP
                   </p>
                 )}
               </div>
+
+              <FabricRequirementsInput value={fabricRequirements} onChange={setFabricRequirements} />
             </div>
 
             {!authLoading && user && (
