@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server';
 import { ProductDetail } from '@/components/marketplace/product-detail';
 import { ProductModerationPanel } from '@/components/admin/product-moderation-panel';
 import { getProductModeration } from '@/lib/product-moderation';
+import { getOrderableFabrics } from '@/lib/fabric-catalog';
+import { normalizeFabricRequirements } from '@/lib/fabric-requirements';
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
 import { COMPANY_INFO } from '@/lib/company-info';
@@ -170,6 +172,10 @@ export default async function ProductPage({ params }: ProductPageProps) {
     isAdmin = !!viewer?.admin;
   }
   const moderation = isAdmin ? ((await getProductModeration([id])).get(id) ?? null) : null;
+  // "Buy fabric for this pattern": only load inventory when the pattern lists yardage.
+  const fabricOptions = normalizeFabricRequirements(product.fabric_requirements)
+    ? await getOrderableFabrics()
+    : [];
 
   return (
     <>
@@ -183,7 +189,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
       />
       <div className="container mx-auto px-4 py-4 sm:py-8">
         {isAdmin && <ProductModerationPanel productId={id} hidden={moderation} />}
-        <ProductDetail product={product} />
+        <ProductDetail product={product} fabricOptions={fabricOptions} />
       </div>
     </>
   );

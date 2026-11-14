@@ -3,6 +3,8 @@
 import { FoundingDesignerBadge } from '@/components/marketplace/founding-designer-badge';
 import { FabricRequirementsDisplay } from '@/components/marketplace/fabric-requirements-display';
 import { normalizeFabricRequirements } from '@/lib/fabric-requirements';
+import { PatternFabricSuggestions } from '@/components/marketplace/pattern-fabric-suggestions';
+import type { OrderableFabric } from '@/lib/fabric-match';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -59,9 +61,11 @@ interface Product {
 
 interface ProductDetailProps {
   product: Product;
+  /** In-stock fabrics for "Buy fabric for this pattern" (server-loaded). */
+  fabricOptions?: OrderableFabric[];
 }
 
-export function ProductDetail({ product }: ProductDetailProps) {
+export function ProductDetail({ product, fabricOptions }: ProductDetailProps) {
   const fabricRequirements = normalizeFabricRequirements(product.fabric_requirements);
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -421,6 +425,9 @@ export function ProductDetail({ product }: ProductDetailProps) {
             <div className="border-t pt-4">
               <FabricRequirementsDisplay requirements={fabricRequirements} />
             </div>
+          )}
+          {fabricRequirements && fabricOptions && fabricOptions.length > 0 && (
+            <PatternFabricSuggestions requirements={fabricRequirements} fabrics={fabricOptions} />
           )}
 
           {/* More Details Section */}
