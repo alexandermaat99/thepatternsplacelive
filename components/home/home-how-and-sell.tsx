@@ -5,7 +5,7 @@ import { COMPANY_INFO } from '@/lib/company-info';
 const STEPS = [
   { icon: BookOpen, title: 'Find a pattern', body: 'Browse PDF patterns from independent designers. Your purchase goes straight to the person who made it.' },
   { icon: ShoppingBag, title: 'Download instantly', body: 'Your pattern arrives by email right away. Print at home or send it to a copy shop.' },
-  { icon: Scissors, title: 'Fabric, if you want it', body: 'Many patterns list the yardage they need. Add in-stock fabric to the same order, or use your own.' },
+  { icon: Scissors, title: 'Choose your fabric', body: 'Many patterns list the yardage they need, so you can add the right amount of curated deadstock fabric to the same order.' },
 ];
 
 export function HomeHowItWorks() {
@@ -43,9 +43,8 @@ export function HomeSellCta() {
                 Sell your patterns here, and keep what you earn
               </h2>
               <p className="text-muted-foreground">
-                We&apos;re a small, independent shop built for pattern designers. List PDFs in
-                minutes, keep selling everywhere else, and keep ownership of your work. We earn
-                only when you do.
+                Put your patterns in front of sewists who are ready to make them. List PDFs in
+                minutes, keep selling everywhere else, and keep full ownership of your work.
               </p>
               <Link
                 href="/marketplace/sell"
@@ -56,8 +55,7 @@ export function HomeSellCta() {
             </div>
             <ul className="space-y-3 text-sm">
               <li className="rounded-xl border bg-background p-4">
-                <strong>No listing fees, no ad fees.</strong> A flat {fees.transactionFeePercent * 100}% when you
-                sell, plus card processing.
+                <strong>No listing fees, no ad fees.</strong> List as many patterns as you like.
               </li>
               <li className="rounded-xl border bg-background p-4">
                 <strong>Your first {fees.freeSalesCount} sales are platform-fee free.</strong>

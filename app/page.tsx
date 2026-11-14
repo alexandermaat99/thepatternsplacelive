@@ -14,7 +14,7 @@ const HOME_TITLE = `Indie Sewing & Knitting Patterns | ${COMPANY_INFO.name}`;
 export const metadata: Metadata = {
   title: { absolute: HOME_TITLE },
   description:
-    'Indie sewing and knitting patterns sold by the independent designers who made them. Designers pay a flat 5% fee, no listing fees. AI-generated patterns aren\'t allowed.',
+    'Indie sewing and knitting patterns from independent designers, plus curated deadstock fabric to sew them. Instant PDF downloads. AI-generated patterns aren\'t allowed.',
   openGraph: {
     title: HOME_TITLE,
     description: 'Discover modern sewing and crafting patterns from independent designers.',
@@ -74,9 +74,9 @@ export default function Home() {
                   </span>
                 </h1>
                 <p className="max-w-xl text-base text-muted-foreground sm:text-lg">
-                  Sewing and knitting patterns sold by the independent designers who made them.
-                  Designers pay a flat 5% fee and no listing fees. AI-generated patterns aren&apos;t
-                  allowed, and we review listings.
+                  Sewing and knitting patterns from independent designers, and curated deadstock
+                  fabric to sew them in. AI-generated patterns aren&apos;t allowed, and we review
+                  listings.
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
@@ -96,7 +96,7 @@ export default function Home() {
               <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-xs text-muted-foreground sm:text-sm">
                 <span>Instant PDF downloads</span>
                 <span className="h-1 w-1 rounded-full bg-muted-foreground/60" />
-                <span>Flat 5% fee for designers</span>
+                <span>Curated deadstock fabric</span>
                 <span className="h-1 w-1 rounded-full bg-muted-foreground/60" />
                 <span>Secure checkout</span>
               </div>
@@ -112,7 +112,7 @@ export default function Home() {
                   <div className={TILE}>
                     <p className="font-semibold">Designers come first</p>
                     <p className="text-muted-foreground">
-                      No listing or ad fees. Designers keep their rights and can sell anywhere else too.
+                      No listing fees. Designers keep the rights to their work and sell anywhere else too.
                     </p>
                   </div>
                   <div className={TILE}>
@@ -126,8 +126,8 @@ export default function Home() {
                     <p className="text-muted-foreground">Print at home or send to a copy shop.</p>
                   </div>
                   <div className={TILE}>
-                    <p className="font-semibold">Fabric if you need it</p>
-                    <p className="text-muted-foreground">Optional in-stock fabric, in the same checkout.</p>
+                    <p className="font-semibold">Curated deadstock</p>
+                    <p className="text-muted-foreground">Hand-picked fabric in limited yardage, in the same checkout.</p>
                   </div>
                 </div>
               </div>
@@ -139,9 +139,9 @@ export default function Home() {
       {/* Each section hides itself when it has nothing to show, so the page grows with the catalog. */}
       <HomeNewPatterns />
       <FoundingDesignersSpotlight />
-      <HomeSellCta />
-      <HomeHowItWorks />
       <HomeFabricRow />
+      <HomeHowItWorks />
+      <HomeSellCta />
     </div>
   );
 }
