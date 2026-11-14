@@ -14,7 +14,7 @@ const HOME_TITLE = `Indie Sewing & Knitting Patterns | ${COMPANY_INFO.name}`;
 export const metadata: Metadata = {
   title: { absolute: HOME_TITLE },
   description:
-    'Indie sewing and knitting patterns from independent designers, plus fabric by the yard to make them. Human-made, never AI. US shipping or free Utah Valley pickup.',
+    'Indie sewing and knitting patterns sold by the independent designers who made them. Designers pay a flat 5% fee, no listing fees. AI-generated patterns aren\'t allowed.',
   openGraph: {
     title: HOME_TITLE,
     description: 'Discover modern sewing and crafting patterns from independent designers.',
@@ -64,18 +64,19 @@ export default function Home() {
           <div className="grid gap-10 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:items-center">
             <div className="space-y-6">
               <div className="inline-flex items-center rounded-full border bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur-sm">
-                Independent patterns · Fabric by the yard · Utah Valley
+                Independent designers · PDF patterns · Human-made
               </div>
               <div className="space-y-4">
                 <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
                   Indie sewing patterns,{' '}
                   <span className="bg-gradient-to-r from-rose-400 via-rose-300 to-rose-500 bg-clip-text text-transparent">
-                    and the fabric to make them
+                    straight from the designers
                   </span>
                 </h1>
                 <p className="max-w-xl text-base text-muted-foreground sm:text-lg">
-                  Digital patterns from independent designers, human-made and never AI. Pick a
-                  pattern, add the right amount of fabric, and check out once.
+                  Sewing and knitting patterns sold by the independent designers who made them.
+                  Designers pay a flat 5% fee and no listing fees. AI-generated patterns aren&apos;t
+                  allowed, and we review listings.
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
@@ -86,16 +87,16 @@ export default function Home() {
                   Browse patterns
                 </a>
                 <a
-                  href="/fabric"
+                  href="/marketplace/sell"
                   className="inline-flex items-center justify-center rounded-md border border-input bg-background px-5 py-2.5 text-sm font-semibold text-foreground shadow-sm transition hover:bg-muted"
                 >
-                  Shop fabric
+                  Sell your patterns
                 </a>
               </div>
               <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-xs text-muted-foreground sm:text-sm">
                 <span>Instant PDF downloads</span>
                 <span className="h-1 w-1 rounded-full bg-muted-foreground/60" />
-                <span>US shipping or Utah Valley pickup</span>
+                <span>Flat 5% fee for designers</span>
                 <span className="h-1 w-1 rounded-full bg-muted-foreground/60" />
                 <span>Secure checkout</span>
               </div>
@@ -105,19 +106,19 @@ export default function Home() {
               <div className="absolute inset-0 -translate-x-6 rounded-3xl bg-gradient-to-br from-rose-500/20 via-rose-500/20 to-rose-500/20 blur-3xl" />
               <div className="relative rounded-3xl border bg-background/80 p-6 shadow-xl backdrop-blur">
                 <p className="mb-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Why shop here
+                  Why it&apos;s different
                 </p>
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div className={TILE}>
-                    <p className="font-semibold">Human-made only</p>
+                    <p className="font-semibold">Designers come first</p>
                     <p className="text-muted-foreground">
-                      Every pattern is by a real designer. No AI-generated patterns.
+                      No listing or ad fees. Designers keep their rights and can sell anywhere else too.
                     </p>
                   </div>
                   <div className={TILE}>
-                    <p className="font-semibold">Fabric to match</p>
+                    <p className="font-semibold">Human-made only</p>
                     <p className="text-muted-foreground">
-                      Patterns list the yardage they need. Add the right amount in one click.
+                      AI-generated patterns aren&apos;t allowed. We review listings and act on reports.
                     </p>
                   </div>
                   <div className={TILE}>
@@ -125,8 +126,8 @@ export default function Home() {
                     <p className="text-muted-foreground">Print at home or send to a copy shop.</p>
                   </div>
                   <div className={TILE}>
-                    <p className="font-semibold">Pattern points</p>
-                    <p className="text-muted-foreground">Earn points every time you shop or sell.</p>
+                    <p className="font-semibold">Fabric if you need it</p>
+                    <p className="text-muted-foreground">Optional in-stock fabric, in the same checkout.</p>
                   </div>
                 </div>
               </div>
@@ -136,11 +137,11 @@ export default function Home() {
       </section>
 
       {/* Each section hides itself when it has nothing to show, so the page grows with the catalog. */}
-      <HomeFabricRow />
       <HomeNewPatterns />
       <FoundingDesignersSpotlight />
-      <HomeHowItWorks />
       <HomeSellCta />
+      <HomeHowItWorks />
+      <HomeFabricRow />
     </div>
   );
 }

@@ -3,9 +3,9 @@ import { BookOpen, Scissors, ShoppingBag, Sparkles } from 'lucide-react';
 import { COMPANY_INFO } from '@/lib/company-info';
 
 const STEPS = [
-  { icon: BookOpen, title: 'Pick a pattern', body: 'Find a PDF pattern from an independent designer. Every one is human-made.' },
-  { icon: Scissors, title: 'Add the fabric', body: 'Patterns list how much fabric they need, so you can add the right amount from our in-stock fabric in one click.' },
-  { icon: ShoppingBag, title: 'Check out once', body: 'Your pattern arrives by email instantly. Fabric ships in the US or is ready for pickup in Utah Valley.' },
+  { icon: BookOpen, title: 'Find a pattern', body: 'Browse PDF patterns from independent designers. Your purchase goes straight to the person who made it.' },
+  { icon: ShoppingBag, title: 'Download instantly', body: 'Your pattern arrives by email right away. Print at home or send it to a copy shop.' },
+  { icon: Scissors, title: 'Fabric, if you want it', body: 'Many patterns list the yardage they need. Add in-stock fabric to the same order, or use your own.' },
 ];
 
 export function HomeHowItWorks() {
@@ -40,11 +40,12 @@ export function HomeSellCta() {
                 <Sparkles className="h-3.5 w-3.5 text-rose-400" /> For pattern designers
               </p>
               <h2 id="home-sell" className="text-2xl sm:text-3xl font-bold">
-                Sell your patterns where sewists also buy their fabric
+                Sell your patterns here, and keep what you earn
               </h2>
               <p className="text-muted-foreground">
-                List PDFs in minutes and keep selling everywhere else too. Shoppers can add the
-                exact fabric your pattern needs, so your listing helps them get started.
+                We&apos;re a small, independent shop built for pattern designers. List PDFs in
+                minutes, keep selling everywhere else, and keep ownership of your work. We earn
+                only when you do.
               </p>
               <Link
                 href="/marketplace/sell"
@@ -62,8 +63,8 @@ export function HomeSellCta() {
                 <strong>Your first {fees.freeSalesCount} sales are platform-fee free.</strong>
               </li>
               <li className="rounded-xl border bg-background p-4">
-                <strong>Human-made only.</strong>{' '}No AI-generated patterns, so your work isn&apos;t
-                buried under them.
+                <strong>Human-made only.</strong>{' '}AI-generated patterns aren&apos;t allowed, and we
+                review listings, so your work isn&apos;t buried under them.
               </li>
             </ul>
           </div>
