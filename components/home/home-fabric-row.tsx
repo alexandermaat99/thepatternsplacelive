@@ -3,12 +3,12 @@ import { ArrowRight } from 'lucide-react';
 import { getFabricCatalogRows } from '@/lib/fabric-catalog';
 import { formatCents } from '@/lib/fabric-orders';
 
-/** "Shop fabric by the yard": in-stock fabrics with photos. Hidden if none. */
+/** "Need fabric too?": a low-key row of in-stock fabrics. Hidden if none. */
 export async function HomeFabricRow() {
   const rows = (await getFabricCatalogRows())
     .filter(r => (r.current_quantity ?? 0) > 0 && r.sell_price != null)
     .sort((a, b) => Number(!!b.photo_url) - Number(!!a.photo_url))
-    .slice(0, 8);
+    .slice(0, 4);
   if (rows.length === 0) return null;
 
   return (
@@ -16,13 +16,13 @@ export async function HomeFabricRow() {
       <div className="container mx-auto max-w-7xl px-4 py-12">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 id="home-fabric" className="text-2xl sm:text-3xl font-bold">Shop fabric by the yard</h2>
+            <h2 id="home-fabric" className="text-xl sm:text-2xl font-semibold">Need fabric too?</h2>
             <p className="text-muted-foreground mt-1">
-              In stock now. US shipping or free pickup in Utah Valley.
+              We keep a small stock of fabric you can add to the same order. Ships in the US, or pick up in Utah Valley.
             </p>
           </div>
           <Link href="/fabric" className="inline-flex items-center gap-1 text-sm font-medium hover:underline">
-            See all fabric <ArrowRight className="h-4 w-4" />
+            Browse fabric <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
         <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
