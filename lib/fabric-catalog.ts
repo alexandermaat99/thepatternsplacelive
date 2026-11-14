@@ -275,3 +275,51 @@ export const getFabricPublicDetail = cache(async function getFabricPublicDetail(
     bolts,
   };
 });
+
+/**
+ * Server-only: every fabric that can be ordered online right now, one entry
+ * per base SKU, with the largest single cut available. Used by "Buy fabric
+ * for this pattern".
+ */
+export async function getOrderableFabrics(): Promise<import('@/lib/fabric-match').OrderableFabric[]> {
+  const { maxOrderableYards } = await import('@/lib/fabric-orders');
+  const supabase = createServiceRoleClient();
+  const [{ data: rows, error }, { data: photos }] = await Promise.all([
+    supabase
+      .from('fabric')
+      .select('sku, name, weave, fiber, width, sell_price, photo_url, current_quantity')
+      .gt('current_quantity', 0)
+      .not('sell_price', 'is', null),
+    supabase.from('fabric_photos').select('base_sku, photo_url, sort_order').order('sort_order', { ascending: true }),
+  ]);
+  if (error || !rows) return [];
+
+  const firstPhoto = new Map<string, string>();
+  for (const p of photos ?? []) if (!firstPhoto.has(p.base_sku)) firstPhoto.set(p.base_sku, p.photo_url);
+
+  const groups = new Map<string, typeof rows>();
+  for (const row of rows) {
+    const parsed = parseFabricSku(row.sku);
+    const base = parsed.ok ? parsed.baseSku : row.sku;
+    groups.set(base, [...(groups.get(base) ?? []), row]);
+  }
+
+  const out: import('@/lib/fabric-match').OrderableFabric[] = [];
+  for (const [baseSku, bolts] of groups) {
+    const rep = bolts.find(b => b.sku === baseSku) ?? bolts[0];
+    const maxCut = maxOrderableYards(bolts);
+    if (maxCut <= 0 || rep.sell_price == null) continue;
+    const photo = firstPhoto.get(baseSku) ?? bolts.find(b => b.photo_url)?.photo_url ?? null;
+    out.push({
+      baseSku,
+      name: rep.name?.trim() || baseSku,
+      weave: rep.weave ?? null,
+      fiber: rep.fiber ?? null,
+      widthInches: rep.width != null ? Number(rep.width) : null,
+      pricePerYard: Number(rep.sell_price),
+      photoUrl: photo?.startsWith('http') ? photo : null,
+      maxCut,
+    });
+  }
+  return out;
+}
