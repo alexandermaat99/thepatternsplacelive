@@ -58,13 +58,47 @@ export function StripeEmbeddedOnboarding() {
         heldY.current = window.scrollY;
       }
     };
+    // Coming back from Stripe's sign-in window: Stripe reloads the form, so
+    // hold the page still for a few seconds.
+    let blurredAt = 0;
+    const onBlur = () => {
+      blurredAt = Date.now();
+    };
+    const onFocus = () => {
+      if (blurredAt && Date.now() - blurredAt > 800) {
+        heldY.current = window.scrollY;
+        guardUntil.current = Math.max(guardUntil.current, Date.now() + 5000);
+      }
+      blurredAt = 0;
+    };
+    // Any time the form resizes on its own (loading, reloading), keep holding
+    // briefly, however long Stripe takes.
+    // Only big jumps count (a step loading or reloading), not small changes
+    // like an error message appearing while someone types.
+    let lastHeight = containerRef.current?.offsetHeight ?? 0;
+    const resizeObserver = new ResizeObserver(([entry]) => {
+      const height = entry.contentRect.height;
+      const bigChange = Math.abs(height - lastHeight) > 150;
+      lastHeight = height;
+      const now = Date.now();
+      if (bigChange && now - lastUserInput.current > 1000) {
+        guardUntil.current = Math.max(guardUntil.current, now + 1500);
+      }
+    });
+    if (containerRef.current) resizeObserver.observe(containerRef.current);
+
     const opts = { passive: true } as const;
+    window.addEventListener("blur", onBlur);
+    window.addEventListener("focus", onFocus);
     window.addEventListener("wheel", markInput, opts);
     window.addEventListener("touchstart", markInput, opts);
     window.addEventListener("keydown", markInput, opts);
     window.addEventListener("pointerdown", markInput, opts);
     window.addEventListener("scroll", onScroll, opts);
     return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("blur", onBlur);
+      window.removeEventListener("focus", onFocus);
       window.removeEventListener("wheel", markInput);
       window.removeEventListener("touchstart", markInput);
       window.removeEventListener("keydown", markInput);
@@ -83,7 +117,7 @@ export function StripeEmbeddedOnboarding() {
       window.scrollTo({ top: target, behavior: "instant" });
     }
     heldY.current = target;
-    guardUntil.current = Date.now() + 2500;
+    guardUntil.current = Date.now() + 4000;
   }, []);
 
   useEffect(() => {
