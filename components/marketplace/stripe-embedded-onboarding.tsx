@@ -36,16 +36,54 @@ export function StripeEmbeddedOnboarding() {
   const [slowToLoad, setSlowToLoad] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Stripe's form changes height and moves focus as the seller goes through
-  // steps, which can leave the page scrolled to the bottom of the form. After
-  // each step, bring the top of the form back into view (below the sticky nav).
-  const scrollFormToTop = useCallback(() => {
-    setTimeout(() => {
-      const el = containerRef.current;
-      if (el && el.getBoundingClientRect().top < 64) {
-        el.scrollIntoView({ block: "start", behavior: "smooth" });
+  // Scroll guard. While Stripe's form loads (and right after each step), it
+  // resizes and moves focus into its fields, which makes the browser jump the
+  // page to the middle of the form. During those windows we hold the page
+  // where it was unless the person scrolls or types themselves.
+  const guardUntil = useRef(Number.POSITIVE_INFINITY); // on until the form starts
+  const heldY = useRef(0);
+  const lastUserInput = useRef(0);
+
+  useEffect(() => {
+    heldY.current = window.scrollY;
+    const markInput = () => {
+      lastUserInput.current = Date.now();
+    };
+    const onScroll = () => {
+      const now = Date.now();
+      const guarding = now < guardUntil.current && now - lastUserInput.current > 700;
+      if (guarding && Math.abs(window.scrollY - heldY.current) > 2) {
+        window.scrollTo({ top: heldY.current, behavior: "instant" });
+      } else if (!guarding) {
+        heldY.current = window.scrollY;
       }
-    }, 150);
+    };
+    const opts = { passive: true } as const;
+    window.addEventListener("wheel", markInput, opts);
+    window.addEventListener("touchstart", markInput, opts);
+    window.addEventListener("keydown", markInput, opts);
+    window.addEventListener("pointerdown", markInput, opts);
+    window.addEventListener("scroll", onScroll, opts);
+    return () => {
+      window.removeEventListener("wheel", markInput);
+      window.removeEventListener("touchstart", markInput);
+      window.removeEventListener("keydown", markInput);
+      window.removeEventListener("pointerdown", markInput);
+      window.removeEventListener("scroll", onScroll);
+    };
+  }, []);
+
+  // After the form appears or changes step: if its top is hidden under the
+  // sticky nav, bring it into view once, then hold that position briefly.
+  const settleForm = useCallback(() => {
+    const el = containerRef.current;
+    let target = window.scrollY;
+    if (el && el.getBoundingClientRect().top < 64) {
+      target = Math.max(0, window.scrollY + el.getBoundingClientRect().top - 80);
+      window.scrollTo({ top: target, behavior: "instant" });
+    }
+    heldY.current = target;
+    guardUntil.current = Date.now() + 2500;
   }, []);
 
   useEffect(() => {
@@ -117,13 +155,14 @@ export function StripeEmbeddedOnboarding() {
           <ConnectAccountOnboarding
             onLoaderStart={() => {
               setFormStarted(true);
-              scrollFormToTop();
+              settleForm();
             }}
             onLoadError={({ error }) => {
               console.error("Stripe onboarding failed to load:", error);
+              guardUntil.current = 0;
               setLoadFailed(true);
             }}
-            onStepChange={scrollFormToTop}
+            onStepChange={settleForm}
             onExit={() => router.refresh()}
             collectionOptions={{
               fields: "eventually_due",
