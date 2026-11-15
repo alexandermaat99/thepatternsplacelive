@@ -23,6 +23,9 @@ const siteUrl = typeof defaultUrl === 'string'
   ? (defaultUrl.includes('localhost') ? defaultUrl : COMPANY_INFO.urls.website)
   : COMPANY_INFO.urls.website;
 
+// Google Analytics Measurement ID
+const gaId = process.env.NEXT_PUBLIC_GA_ID || 'G-41YY2ZJVNN';
+
 // Google Tag Manager Container ID
 const gtmId = process.env.NEXT_PUBLIC_GTM_ID || 'GTM-MVJ3TWSH';
 
@@ -170,7 +173,19 @@ export default function RootLayout({
           </Providers>
         </ThemeProvider>
         <SpeedInsights />
-        {/* Google Analytics (GA4) is loaded by Google Tag Manager above; loading gtag.js here too downloaded it twice. */}
+        {/* Google Analytics. Required: the GTM container does NOT load GA4 itself. */}
+        <Script
+          strategy="afterInteractive"
+          src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', '${gaId}');
+          `}
+        </Script>
       </body>
     </html>
   );
