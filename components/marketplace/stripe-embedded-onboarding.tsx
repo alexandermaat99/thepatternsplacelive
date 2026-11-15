@@ -36,88 +36,16 @@ export function StripeEmbeddedOnboarding() {
   const [slowToLoad, setSlowToLoad] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Scroll guard. While Stripe's form loads (and right after each step), it
-  // resizes and moves focus into its fields, which makes the browser jump the
-  // page to the middle of the form. During those windows we hold the page
-  // where it was unless the person scrolls or types themselves.
-  const guardUntil = useRef(Number.POSITIVE_INFINITY); // on until the form starts
-  const heldY = useRef(0);
-  const lastUserInput = useRef(0);
-
-  useEffect(() => {
-    heldY.current = window.scrollY;
-    const markInput = () => {
-      lastUserInput.current = Date.now();
-    };
-    const onScroll = () => {
-      const now = Date.now();
-      const guarding = now < guardUntil.current && now - lastUserInput.current > 700;
-      if (guarding && Math.abs(window.scrollY - heldY.current) > 2) {
-        window.scrollTo({ top: heldY.current, behavior: "instant" });
-      } else if (!guarding) {
-        heldY.current = window.scrollY;
+  // Stripe's form changes height and moves focus as the seller goes through
+  // steps, which can leave the page scrolled to the bottom of the form. After
+  // each step, bring the top of the form back into view (below the sticky nav).
+  const scrollFormToTop = useCallback(() => {
+    setTimeout(() => {
+      const el = containerRef.current;
+      if (el && el.getBoundingClientRect().top < 64) {
+        el.scrollIntoView({ block: "start", behavior: "smooth" });
       }
-    };
-    // Coming back from Stripe's sign-in window: Stripe reloads the form, so
-    // hold the page still for a few seconds.
-    let blurredAt = 0;
-    const onBlur = () => {
-      blurredAt = Date.now();
-    };
-    const onFocus = () => {
-      if (blurredAt && Date.now() - blurredAt > 800) {
-        heldY.current = window.scrollY;
-        guardUntil.current = Math.max(guardUntil.current, Date.now() + 5000);
-      }
-      blurredAt = 0;
-    };
-    // Any time the form resizes on its own (loading, reloading), keep holding
-    // briefly, however long Stripe takes.
-    // Only big jumps count (a step loading or reloading), not small changes
-    // like an error message appearing while someone types.
-    let lastHeight = containerRef.current?.offsetHeight ?? 0;
-    const resizeObserver = new ResizeObserver(([entry]) => {
-      const height = entry.contentRect.height;
-      const bigChange = Math.abs(height - lastHeight) > 150;
-      lastHeight = height;
-      const now = Date.now();
-      if (bigChange && now - lastUserInput.current > 1000) {
-        guardUntil.current = Math.max(guardUntil.current, now + 1500);
-      }
-    });
-    if (containerRef.current) resizeObserver.observe(containerRef.current);
-
-    const opts = { passive: true } as const;
-    window.addEventListener("blur", onBlur);
-    window.addEventListener("focus", onFocus);
-    window.addEventListener("wheel", markInput, opts);
-    window.addEventListener("touchstart", markInput, opts);
-    window.addEventListener("keydown", markInput, opts);
-    window.addEventListener("pointerdown", markInput, opts);
-    window.addEventListener("scroll", onScroll, opts);
-    return () => {
-      resizeObserver.disconnect();
-      window.removeEventListener("blur", onBlur);
-      window.removeEventListener("focus", onFocus);
-      window.removeEventListener("wheel", markInput);
-      window.removeEventListener("touchstart", markInput);
-      window.removeEventListener("keydown", markInput);
-      window.removeEventListener("pointerdown", markInput);
-      window.removeEventListener("scroll", onScroll);
-    };
-  }, []);
-
-  // After the form appears or changes step: if its top is hidden under the
-  // sticky nav, bring it into view once, then hold that position briefly.
-  const settleForm = useCallback(() => {
-    const el = containerRef.current;
-    let target = window.scrollY;
-    if (el && el.getBoundingClientRect().top < 64) {
-      target = Math.max(0, window.scrollY + el.getBoundingClientRect().top - 80);
-      window.scrollTo({ top: target, behavior: "instant" });
-    }
-    heldY.current = target;
-    guardUntil.current = Date.now() + 4000;
+    }, 150);
   }, []);
 
   useEffect(() => {
@@ -189,14 +117,13 @@ export function StripeEmbeddedOnboarding() {
           <ConnectAccountOnboarding
             onLoaderStart={() => {
               setFormStarted(true);
-              settleForm();
+              scrollFormToTop();
             }}
             onLoadError={({ error }) => {
               console.error("Stripe onboarding failed to load:", error);
-              guardUntil.current = 0;
               setLoadFailed(true);
             }}
-            onStepChange={settleForm}
+            onStepChange={scrollFormToTop}
             onExit={() => router.refresh()}
             collectionOptions={{
               fields: "eventually_due",
