@@ -1,27 +1,27 @@
-"use client";
+'use client';
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { loadConnectAndInitialize, type StripeConnectInstance } from "@stripe/connect-js";
-import { ConnectComponentsProvider, ConnectAccountOnboarding } from "@stripe/react-connect-js";
-import { Loader2, Lock } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { loadConnectAndInitialize, type StripeConnectInstance } from '@stripe/connect-js';
+import { ConnectComponentsProvider, ConnectAccountOnboarding } from '@stripe/react-connect-js';
+import { Loader2, Lock } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 // Stripe-hosted onboarding; used if the embedded form can't load (e.g. blocked by an extension).
-const HOSTED_ONBOARDING_URL = "/api/connect/continue";
+const HOSTED_ONBOARDING_URL = '/api/connect/continue';
 
 async function fetchClientSecret(): Promise<string> {
-  const response = await fetch("/api/connect/account-session", {
-    method: "POST",
-    credentials: "include",
+  const response = await fetch('/api/connect/account-session', {
+    method: 'POST',
+    credentials: 'include',
   });
 
   if (response.status === 401) {
-    window.location.assign("/auth/login");
-    throw new Error("Not signed in");
+    window.location.assign('/auth/login');
+    throw new Error('Not signed in');
   }
   if (!response.ok) {
-    throw new Error("Failed to start payout setup");
+    throw new Error('Failed to start payout setup');
   }
 
   const { clientSecret } = await response.json();
@@ -35,6 +35,59 @@ export function StripeEmbeddedOnboarding() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [slowToLoad, setSlowToLoad] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+  // While Stripe's form loads it flips between interim screens (and briefly
+  // collapses to a spinner), which made the page jump. Reserve space until
+  // it has settled, then make one correction if the person hasn't scrolled.
+  const [settled, setSettled] = useState(false);
+  const userScrolled = useRef(false);
+
+  useEffect(() => {
+    const mark = () => {
+      userScrolled.current = true;
+    };
+    const opts = { passive: true, once: true } as const;
+    window.addEventListener('wheel', mark, opts);
+    window.addEventListener('touchmove', mark, opts);
+    window.addEventListener('keydown', mark, opts);
+    return () => {
+      window.removeEventListener('wheel', mark);
+      window.removeEventListener('touchmove', mark);
+      window.removeEventListener('keydown', mark);
+    };
+  }, []);
+
+  // "Settled" = real content (taller than Stripe's spinner) has stopped
+  // changing size for 800ms, or 12s at most.
+  useEffect(() => {
+    if (!formStarted || settled) return;
+    const el = formRef.current;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const settle = () => {
+      setSettled(true);
+      const box = containerRef.current;
+      if (!userScrolled.current && box && box.getBoundingClientRect().top < 64) {
+        window.scrollTo({
+          top: Math.max(0, window.scrollY + box.getBoundingClientRect().top - 80),
+          behavior: 'instant',
+        });
+      }
+    };
+    const observer = el
+      ? new ResizeObserver(([entry]) => {
+          clearTimeout(timer);
+          // Stripe's own spinner is ~130px; wait for real content.
+          if (entry.contentRect.height > 160) timer = setTimeout(settle, 800);
+        })
+      : null;
+    if (el && observer) observer.observe(el);
+    const fallback = setTimeout(settle, 12000);
+    return () => {
+      observer?.disconnect();
+      clearTimeout(timer);
+      clearTimeout(fallback);
+    };
+  }, [formStarted, settled]);
 
   // Stripe's form changes height and moves focus as the seller goes through
   // steps, which can leave the page scrolled to the bottom of the form. After
@@ -43,7 +96,7 @@ export function StripeEmbeddedOnboarding() {
     setTimeout(() => {
       const el = containerRef.current;
       if (el && el.getBoundingClientRect().top < 64) {
-        el.scrollIntoView({ block: "start", behavior: "smooth" });
+        el.scrollIntoView({ block: 'start', behavior: 'smooth' });
       }
     }, 150);
   }, []);
@@ -51,7 +104,7 @@ export function StripeEmbeddedOnboarding() {
   useEffect(() => {
     const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
     if (!publishableKey) {
-      console.error("Missing NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY");
+      console.error('Missing NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY');
       setLoadFailed(true);
       return;
     }
@@ -61,11 +114,11 @@ export function StripeEmbeddedOnboarding() {
         publishableKey,
         fetchClientSecret,
         appearance: {
-          overlays: "dialog",
+          overlays: 'dialog',
           variables: {
-            colorPrimary: "#0F172A",
-            fontFamily: "system-ui, -apple-system, sans-serif",
-            borderRadius: "8px",
+            colorPrimary: '#0F172A',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            borderRadius: '8px',
           },
         },
       })
@@ -103,7 +156,7 @@ export function StripeEmbeddedOnboarding() {
           <Loader2 className="h-6 w-6 animate-spin" />
           {slowToLoad && (
             <p className="text-sm">
-              Taking longer than usual?{" "}
+              Taking longer than usual?{' '}
               <a href={HOSTED_ONBOARDING_URL} className="underline underline-offset-4">
                 Continue on Stripe&apos;s site
               </a>
@@ -113,24 +166,25 @@ export function StripeEmbeddedOnboarding() {
       )}
 
       {connectInstance && (
-        <ConnectComponentsProvider connectInstance={connectInstance}>
-          <ConnectAccountOnboarding
-            onLoaderStart={() => {
-              setFormStarted(true);
-              scrollFormToTop();
-            }}
-            onLoadError={({ error }) => {
-              console.error("Stripe onboarding failed to load:", error);
-              setLoadFailed(true);
-            }}
-            onStepChange={scrollFormToTop}
-            onExit={() => router.refresh()}
-            collectionOptions={{
-              fields: "eventually_due",
-              futureRequirements: "include",
-            }}
-          />
-        </ConnectComponentsProvider>
+        <div style={formStarted && !settled ? { minHeight: 560 } : undefined}>
+          <div ref={formRef}>
+            <ConnectComponentsProvider connectInstance={connectInstance}>
+              <ConnectAccountOnboarding
+                onLoaderStart={() => setFormStarted(true)}
+                onLoadError={({ error }) => {
+                  console.error('Stripe onboarding failed to load:', error);
+                  setLoadFailed(true);
+                }}
+                onStepChange={scrollFormToTop}
+                onExit={() => router.refresh()}
+                collectionOptions={{
+                  fields: 'eventually_due',
+                  futureRequirements: 'include',
+                }}
+              />
+            </ConnectComponentsProvider>
+          </div>
+        </div>
       )}
 
       <p className="flex items-start gap-2 text-xs text-muted-foreground border-t pt-4">
