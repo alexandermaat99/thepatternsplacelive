@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { ArrowRight } from 'lucide-react';
 import { getFabricCatalogRows } from '@/lib/fabric-catalog';
 import { formatCents } from '@/lib/fabric-orders';
@@ -33,13 +34,14 @@ export async function HomeFabricRow() {
           {rows.map(f => (
             <li key={f.sku}>
               <Link href={`/fabric/${encodeURIComponent(f.sku)}`} className="group block">
-                <div className="aspect-square overflow-hidden rounded-xl border bg-muted">
+                <div className="relative aspect-square overflow-hidden rounded-xl border bg-muted">
                   {f.photo_url ? (
-                    <img
+                    <Image
                       src={f.photo_url}
                       alt={f.name ?? f.sku}
-                      loading="lazy"
-                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      fill
+                      sizes="(min-width: 1280px) 300px, (min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
+                      className="object-cover transition-transform duration-300 group-hover:scale-105"
                     />
                   ) : null}
                 </div>

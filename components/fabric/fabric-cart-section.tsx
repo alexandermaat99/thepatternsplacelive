@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { Minus, Plus, Trash2, Truck, Store, Scissors } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -63,7 +64,7 @@ export function FabricCartSection({
           <CardContent className="p-6">
             <div className="flex gap-4">
               {item.photoUrl ? (
-                <img src={item.photoUrl} alt={item.name} className="h-20 w-20 rounded-lg object-cover flex-shrink-0" />
+                <Image src={item.photoUrl} alt={item.name} width={80} height={80} sizes="80px" className="h-20 w-20 rounded-lg object-cover flex-shrink-0" />
               ) : (
                 <div className="h-20 w-20 rounded-lg bg-muted flex-shrink-0" />
               )}

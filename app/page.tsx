@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
+import { SectionSkeleton } from '@/components/home/section-skeleton';
 import { COMPANY_INFO } from '@/lib/company-info';
 import { Navigation } from '@/components/navigation';
 import { PlatformBanner } from '@/components/platform-banner';
@@ -109,9 +111,16 @@ export default function Home() {
       </section>
 
       {/* Each section hides itself when it has nothing to show, so the page grows with the catalog. */}
-      <HomeNewPatterns />
-      <FoundingDesignersSpotlight />
-      <HomeFabricRow />
+      {/* Streamed: the hero shows right away while these load from the database. */}
+      <Suspense fallback={<SectionSkeleton />}>
+        <HomeNewPatterns />
+      </Suspense>
+      <Suspense fallback={null}>
+        <FoundingDesignersSpotlight />
+      </Suspense>
+      <Suspense fallback={<SectionSkeleton />}>
+        <HomeFabricRow />
+      </Suspense>
       <HomeHowItWorks />
       <HomeSellCta />
     </div>
