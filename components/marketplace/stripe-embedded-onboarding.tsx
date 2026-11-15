@@ -36,37 +36,51 @@ export function StripeEmbeddedOnboarding() {
   const [slowToLoad, setSlowToLoad] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLDivElement>(null);
-  // While Stripe's form loads it flips between interim screens (and briefly
-  // collapses to a spinner), which made the page jump. Reserve space until
-  // it has settled, then make one correction if the person hasn't scrolled.
-  const [settled, setSettled] = useState(false);
-  const userScrolled = useRef(false);
+  // While Stripe's form loads it flips through interim screens (a spinner,
+  // a "Privacy & Terms" box, an "Onboard with Link" screen it focuses into,
+  // then the real form). Each one resizes the form and can scroll the page.
+  // There's no "done loading" signal, so: until the person first scrolls,
+  // types or clicks (and for 20s at most), after every big resize bring the
+  // form's top back into view if it's hidden. Their first scroll turns this
+  // off for good; we never undo their own scrolling.
+  const [following, setFollowing] = useState(true);
+  const lastBigResize = useRef(0);
+  const ignoreScrollUntil = useRef(0);
 
   useEffect(() => {
-    const mark = () => {
-      userScrolled.current = true;
-    };
+    const stop = () => setFollowing(false);
     const opts = { passive: true, once: true } as const;
-    window.addEventListener('wheel', mark, opts);
-    window.addEventListener('touchmove', mark, opts);
-    window.addEventListener('keydown', mark, opts);
+    window.addEventListener('wheel', stop, opts);
+    window.addEventListener('touchmove', stop, opts);
+    window.addEventListener('keydown', stop, opts);
+    window.addEventListener('pointerdown', stop, opts);
+    // Scrolling over Stripe's form doesn't reach our page as wheel/touch
+    // events, so also watch the page scroll itself: Stripe's jumps happen
+    // right as its form resizes; any other scroll is the person's own.
+    const onScroll = () => {
+      const now = Date.now();
+      if (now < ignoreScrollUntil.current) return; // our own correction
+      if (now - lastBigResize.current > 700) stop();
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
     return () => {
-      window.removeEventListener('wheel', mark);
-      window.removeEventListener('touchmove', mark);
-      window.removeEventListener('keydown', mark);
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('wheel', stop);
+      window.removeEventListener('touchmove', stop);
+      window.removeEventListener('keydown', stop);
+      window.removeEventListener('pointerdown', stop);
     };
   }, []);
 
-  // "Settled" = real content (taller than Stripe's spinner) has stopped
-  // changing size for 800ms, or 12s at most.
   useEffect(() => {
-    if (!formStarted || settled) return;
+    if (!formStarted || !following) return;
     const el = formRef.current;
+    let lastHeight = el?.offsetHeight ?? 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const settle = () => {
-      setSettled(true);
+    const bringTopIntoView = () => {
       const box = containerRef.current;
-      if (!userScrolled.current && box && box.getBoundingClientRect().top < 64) {
+      if (box && box.getBoundingClientRect().top < 64) {
+        ignoreScrollUntil.current = Date.now() + 150;
         window.scrollTo({
           top: Math.max(0, window.scrollY + box.getBoundingClientRect().top - 80),
           behavior: 'instant',
@@ -75,19 +89,23 @@ export function StripeEmbeddedOnboarding() {
     };
     const observer = el
       ? new ResizeObserver(([entry]) => {
+          const height = entry.contentRect.height;
+          if (Math.abs(height - lastHeight) < 120) return; // small changes (errors, typing) don't count
+          lastHeight = height;
+          lastBigResize.current = Date.now();
           clearTimeout(timer);
-          // Stripe's own spinner is ~130px; wait for real content.
-          if (entry.contentRect.height > 160) timer = setTimeout(settle, 800);
+          // Let Stripe finish moving focus first, then correct once.
+          timer = setTimeout(bringTopIntoView, 350);
         })
       : null;
     if (el && observer) observer.observe(el);
-    const fallback = setTimeout(settle, 12000);
+    const stopAfter = setTimeout(() => setFollowing(false), 20000);
     return () => {
       observer?.disconnect();
       clearTimeout(timer);
-      clearTimeout(fallback);
+      clearTimeout(stopAfter);
     };
-  }, [formStarted, settled]);
+  }, [formStarted, following]);
 
   // Stripe's form changes height and moves focus as the seller goes through
   // steps, which can leave the page scrolled to the bottom of the form. After
@@ -166,7 +184,7 @@ export function StripeEmbeddedOnboarding() {
       )}
 
       {connectInstance && (
-        <div style={formStarted && !settled ? { minHeight: 560 } : undefined}>
+        <div style={formStarted && following ? { minHeight: 560 } : undefined}>
           <div ref={formRef}>
             <ConnectComponentsProvider connectInstance={connectInstance}>
               <ConnectAccountOnboarding
