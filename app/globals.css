@@ -76,29 +76,16 @@
   --ry: 0deg;
   --mx: 50%;
   --my: 50%;
+  --glare: 0;
+  /* Driven every frame by TiltCard's easing loop, so no CSS transition. */
   transform: perspective(1000px) rotateX(var(--rx)) rotateY(var(--ry));
   transform-style: preserve-3d;
-  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
   will-change: transform;
-}
-.tilt-card[data-active='true'] {
-  transition: transform 0.12s ease-out;
-}
-/* Idle drift is driven every frame, so no transition lag */
-.tilt-card[data-idle='true']:not([data-active='true']) {
-  transition: none;
-}
-.tilt-card[data-idle='true'] .tilt-glare {
-  opacity: 0.6;
 }
 .tilt-glare {
   background: radial-gradient(circle at var(--mx) var(--my), rgba(255, 255, 255, 0.55), transparent 45%);
-  opacity: 0;
-  transition: opacity 0.3s ease;
+  opacity: var(--glare);
   mix-blend-mode: soft-light;
-}
-.tilt-card[data-active='true'] .tilt-glare {
-  opacity: 1;
 }
 .dark .tilt-glare {
   background: radial-gradient(circle at var(--mx) var(--my), rgba(255, 255, 255, 0.12), transparent 45%);
