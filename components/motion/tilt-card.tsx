@@ -6,7 +6,12 @@ import { cn } from '@/lib/utils';
 /**
  * A card that tilts in 3D toward the mouse, with a soft glare that follows the
  * cursor. Children can float above it with `[transform:translateZ(..px)]`.
- * Mouse only (no tilt on touch), and off for "reduce motion".
+ *
+ * All motion runs through one animation loop that eases the tilt toward its
+ * target every frame, so entering, moving, leaving and the idle drift all
+ * blend smoothly instead of snapping. Mouse tracking happens on an outer box
+ * that never tilts, so the card's moving edge can't flicker in and out under
+ * the cursor. Mouse only (no tilt on touch), and off for "reduce motion".
  */
 export function TiltCard({
   children,
@@ -22,99 +27,139 @@ export function TiltCard({
   /** Drift gently on its own (bigger sweep on load) so people notice it's interactive. */
   idle?: boolean;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const frame = useRef<number | null>(null);
-  const reduced = useRef(false);
-  const hovering = useRef(false);
-  const resumedAt = useRef(0);
+  const outerRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  // Where the mouse is over the card (0..1), or null when it isn't.
+  const pointer = useRef<{ x: number; y: number } | null>(null);
+  const wake = useRef<() => void>(() => {});
 
   useEffect(() => {
-    reduced.current = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    return () => {
-      if (frame.current) cancelAnimationFrame(frame.current);
-    };
-  }, []);
+    const outer = outerRef.current;
+    const card = cardRef.current;
+    if (!outer || !card || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
-  // Idle drift: a decaying sweep on load, then a slow float. Paused while the
-  // mouse is over the card or the card is off screen.
-  useEffect(() => {
-    const el = ref.current;
-    if (!idle || !el || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    let raf: number | null = null;
+    const cur = { rx: 0, ry: 0, mx: 50, my: 50, glare: 0 };
     const start = performance.now();
-    resumedAt.current = start;
-    const tick = (now: number) => {
-      raf = requestAnimationFrame(tick);
-      if (hovering.current) return;
-      const t = (now - start) / 1000;
-      const amp = 2.5 + 5 * Math.exp(-t / 1.4); // big hello, settles to a gentle float
-      const blend = Math.min(1, (now - resumedAt.current) / 900); // ease back in after hover
-      const rx = blend * amp * Math.sin(t * 1.3);
-      const ry = blend * amp * 1.4 * Math.sin(t * 0.9 + 0.8);
-      el.style.setProperty('--rx', `${rx}deg`);
-      el.style.setProperty('--ry', `${ry}deg`);
-      el.style.setProperty('--mx', `${50 + ry * 5}%`);
-      el.style.setProperty('--my', `${50 - rx * 5}%`);
+    let last = start;
+    let raf: number | null = null;
+    let visible = true;
+
+    const apply = () => {
+      card.style.setProperty('--rx', `${cur.rx.toFixed(3)}deg`);
+      card.style.setProperty('--ry', `${cur.ry.toFixed(3)}deg`);
+      card.style.setProperty('--mx', `${cur.mx.toFixed(2)}%`);
+      card.style.setProperty('--my', `${cur.my.toFixed(2)}%`);
+      card.style.setProperty('--glare', cur.glare.toFixed(3));
     };
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting && raf === null) {
-        el.dataset.idle = 'true';
+
+    const tick = (now: number) => {
+      raf = null;
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      const p = pointer.current;
+
+      let target: typeof cur;
+      if (p) {
+        target = {
+          rx: (0.5 - p.y) * maxTilt * 2,
+          ry: (p.x - 0.5) * maxTilt * 2,
+          mx: p.x * 100,
+          my: p.y * 100,
+          glare: 1,
+        };
+      } else if (idle) {
+        const t = (now - start) / 1000;
+        const amp = 2.5 + 5 * Math.exp(-t / 1.4); // big hello, settles to a gentle float
+        const rx = amp * Math.sin(t * 1.3);
+        const ry = amp * 1.4 * Math.sin(t * 0.9 + 0.8);
+        target = { rx, ry, mx: 50 + ry * 5, my: 50 - rx * 5, glare: 0.6 };
+      } else {
+        target = { rx: 0, ry: 0, mx: 50, my: 50, glare: 0 };
+      }
+
+      // Follow the mouse quickly; drift back slowly and softly when it leaves.
+      const tau = p ? 0.12 : 0.6;
+      const k = 1 - Math.exp(-dt / tau);
+      let moving = false;
+      for (const key of Object.keys(cur) as (keyof typeof cur)[]) {
+        cur[key] += (target[key] - cur[key]) * k;
+        if (Math.abs(target[key] - cur[key]) > 0.01) moving = true;
+      }
+      apply();
+
+      if (visible && (p || idle || moving)) raf = requestAnimationFrame(tick);
+    };
+
+    const run = () => {
+      if (raf === null && visible) {
+        last = performance.now();
         raf = requestAnimationFrame(tick);
-      } else if (!entry.isIntersecting && raf !== null) {
+      }
+    };
+    wake.current = run;
+
+    const observer = new IntersectionObserver(([entry]) => {
+      visible = entry.isIntersecting;
+      if (visible) run();
+      else if (raf !== null) {
         cancelAnimationFrame(raf);
         raf = null;
       }
     });
-    observer.observe(el);
+    observer.observe(outer);
+    run();
+
     return () => {
       observer.disconnect();
       if (raf !== null) cancelAnimationFrame(raf);
-      delete el.dataset.idle;
+      wake.current = () => {};
     };
-  }, [idle]);
+  }, [idle, maxTilt]);
 
-  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.pointerType !== 'mouse' || reduced.current || !ref.current) return;
-    const el = ref.current;
-    hovering.current = true;
-    const rect = el.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width; // 0..1
-    const y = (e.clientY - rect.top) / rect.height;
-    if (frame.current) cancelAnimationFrame(frame.current);
-    frame.current = requestAnimationFrame(() => {
-      el.style.setProperty('--rx', `${(0.5 - y) * maxTilt * 2}deg`);
-      el.style.setProperty('--ry', `${(x - 0.5) * maxTilt * 2}deg`);
-      el.style.setProperty('--mx', `${x * 100}%`);
-      el.style.setProperty('--my', `${y * 100}%`);
-      el.dataset.active = 'true';
-    });
+  const track = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== 'mouse' || !outerRef.current) return;
+    const rect = outerRef.current.getBoundingClientRect();
+    pointer.current = {
+      x: Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)),
+      y: Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height)),
+    };
+    wake.current();
   };
 
-  const onPointerLeave = () => {
-    const el = ref.current;
-    if (!el) return;
-    if (frame.current) cancelAnimationFrame(frame.current);
-    hovering.current = false;
-    resumedAt.current = performance.now();
-    el.style.setProperty('--rx', '0deg');
-    el.style.setProperty('--ry', '0deg');
-    delete el.dataset.active;
+  const leave = (e: React.PointerEvent<HTMLDivElement>) => {
+    // Ignore "leave" events fired while the cursor is still within the
+    // card's footprint (can happen as the tilted card moves under it).
+    const rect = outerRef.current?.getBoundingClientRect();
+    if (
+      rect &&
+      e.clientX > rect.left &&
+      e.clientX < rect.right &&
+      e.clientY > rect.top &&
+      e.clientY < rect.bottom
+    ) {
+      return;
+    }
+    pointer.current = null;
+    wake.current();
   };
 
   return (
     <div
-      ref={ref}
-      onPointerMove={onPointerMove}
-      onPointerLeave={onPointerLeave}
-      className={cn('tilt-card group/tilt relative', className)}
+      ref={outerRef}
+      onPointerMove={track}
+      onPointerEnter={track}
+      onPointerLeave={leave}
+      className={cn('group/tilt', className)}
     >
-      {children}
-      {glare && (
-        <div
-          aria-hidden
-          className="tilt-glare pointer-events-none absolute inset-0 rounded-[inherit]"
-        />
-      )}
+      <div ref={cardRef} className="tilt-card relative h-full rounded-[inherit]">
+        {children}
+        {glare && (
+          <div
+            aria-hidden
+            className="tilt-glare pointer-events-none absolute inset-0 rounded-[inherit]"
+          />
+        )}
+      </div>
     </div>
   );
 }
