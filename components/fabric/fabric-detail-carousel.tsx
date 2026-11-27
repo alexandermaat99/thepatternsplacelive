@@ -56,7 +56,7 @@ export function FabricDetailCarousel({ urls, alt }: { urls: string[]; alt: strin
               'object-cover transition-opacity duration-200 absolute inset-0',
               isActive ? 'z-[1] opacity-100' : 'pointer-events-none z-0 opacity-0'
             )}
-            sizes="(max-width: 1024px) 100vw, 50vw"
+            sizes="(max-width: 640px) 100vw, 576px"
             quality={85}
             priority={i === 0}
             decoding="async"

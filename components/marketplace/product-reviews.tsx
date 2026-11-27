@@ -538,7 +538,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
                           alt={`Review image ${idx + 1}`}
                           fill
                           className="object-cover"
-                          sizes="(max-width: 768px) 33vw, 25vw"
+                          sizes="(max-width: 767px) 33vw, 200px"
                         />
                       </div>
                     ))}
@@ -666,7 +666,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
                                 alt={`Review image ${idx + 1}`}
                                 fill
                                 className="object-cover"
-                                sizes="(max-width: 768px) 33vw, 25vw"
+                                sizes="(max-width: 767px) 33vw, 200px"
                               />
                             </div>
                             <button
@@ -820,7 +820,7 @@ export function ProductReviews({ productId }: ProductReviewsProps) {
                           alt={`Review image ${idx + 1}`}
                           fill
                           className="object-cover"
-                          sizes="(max-width: 768px) 33vw, 25vw"
+                          sizes="(max-width: 767px) 33vw, 200px"
                         />
                       </div>
                     ))}

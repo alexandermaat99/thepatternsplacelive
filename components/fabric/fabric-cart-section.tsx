@@ -64,7 +64,7 @@ export function FabricCartSection({
           <CardContent className="p-6">
             <div className="flex gap-4">
               {item.photoUrl ? (
-                <Image src={item.photoUrl} alt={item.name} width={80} height={80} sizes="80px" className="h-20 w-20 rounded-lg object-cover flex-shrink-0" />
+                <Image src={item.photoUrl} alt={item.name} width={80} height={80} quality={85} className="h-20 w-20 rounded-lg object-cover flex-shrink-0" />
               ) : (
                 <div className="h-20 w-20 rounded-lg bg-muted flex-shrink-0" />
               )}

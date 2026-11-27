@@ -117,7 +117,7 @@ export function FabricPhotoUpload({
             className="absolute inset-0 w-full h-full cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 rounded-lg"
             aria-label="View photo larger"
           >
-            <Image src={preview} alt="Fabric" fill className="object-cover" />
+            <Image src={preview} alt="Fabric" fill sizes="200px" className="object-cover" />
           </button>
           <Button
             type="button"

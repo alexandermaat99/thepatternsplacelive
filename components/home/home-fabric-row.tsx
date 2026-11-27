@@ -41,6 +41,7 @@ export async function HomeFabricRow() {
                       alt={f.name ?? f.sku}
                       fill
                       sizes="(min-width: 1280px) 300px, (min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
+                      quality={85}
                       className="object-cover transition-transform duration-300 group-hover:scale-105"
                     />
                   ) : null}

@@ -66,6 +66,7 @@ export default function AboutPage() {
             <div className="relative w-full aspect-[3/4] rounded-lg overflow-hidden bg-muted/30">
               <Image
                 src="/photos/GailAndAlex-optimized.webp"
+                unoptimized
                 alt="Gail and Alex - Founders of The Pattern's Place"
                 fill
                 className="object-contain"

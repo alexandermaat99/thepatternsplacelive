@@ -357,7 +357,7 @@ export function MultiImageUpload({
                       alt={`Product image ${index + 1}`}
                       fill
                       className="object-cover"
-                      sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw"
+                      sizes="(max-width: 640px) 50vw, 200px"
                     />
                     {(item.compressing || item.uploading) && (
                       <div className="absolute inset-0 bg-black/50 flex items-center justify-center">

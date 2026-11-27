@@ -321,6 +321,7 @@ export default function CartPage() {
                           src={item.image_url}
                           alt={item.title}
                           fill
+                          sizes="80px"
                           className="object-cover rounded-lg"
                         />
                       ) : (
