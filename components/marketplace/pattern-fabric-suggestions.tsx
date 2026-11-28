@@ -65,7 +65,7 @@ export function PatternFabricSuggestions({
               <li key={fabric.baseSku} className="flex gap-3 rounded-lg border p-3">
                 <Link href={`/fabric/${encodeURIComponent(fabric.baseSku)}`} className="shrink-0">
                   {fabric.photoUrl ? (
-                    <Image src={fabric.photoUrl} alt={fabric.name} width={80} height={80} sizes="80px" className="h-20 w-20 rounded-md object-cover" />
+                    <Image src={fabric.photoUrl} alt={fabric.name} width={80} height={80} quality={85} className="h-20 w-20 rounded-md object-cover" />
                   ) : (
                     <div className="h-20 w-20 rounded-md bg-muted" />
                   )}

@@ -53,6 +53,7 @@ export default function WatermarkingInfoPage() {
               <div className="relative w-full aspect-[8.5/11] max-w-md mx-auto">
                 <Image
                   src="/photos/markedPattern.png"
+              unoptimized
                   alt="Example of watermarked PDF pattern"
                   fill
                   className="object-contain rounded"

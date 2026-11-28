@@ -1174,6 +1174,7 @@ export function FabricInventory({
                                     src={row.photo_url}
                                     alt={row.name || row.sku}
                                     fill
+                                    sizes="48px"
                                     className="object-cover"
                                   />
                                 </button>
@@ -1264,6 +1265,7 @@ export function FabricInventory({
                               src={group.photo_url}
                               alt={group.name || group.baseSku}
                               fill
+                              sizes="(max-width: 639px) 100vw, (max-width: 1023px) 33vw, 300px"
                               className="object-cover group-hover:scale-[1.02] transition-transform duration-200"
                             />
                           ) : (
@@ -1586,6 +1588,7 @@ export function FabricInventory({
                             src={scannedFabric.photo_url}
                             alt={scannedFabric.name || scannedFabric.sku}
                             fill
+                            sizes="64px"
                             className="object-cover"
                           />
                         </button>
@@ -1864,6 +1867,7 @@ export function FabricInventory({
                               src={item.photoUrl}
                               alt={item.name || item.sku}
                               fill
+                              sizes="40px"
                               className="object-cover"
                             />
                           ) : (

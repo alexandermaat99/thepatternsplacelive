@@ -102,6 +102,7 @@ export function ImageUpload({ value, onChange, userId }: ImageUploadProps) {
             src={preview}
             alt="Product preview"
             fill
+            sizes="200px"
             className="object-cover"
           />
           <Button

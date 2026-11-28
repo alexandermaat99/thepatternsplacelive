@@ -133,6 +133,7 @@ export default async function PurchasesPage() {
                           src={product.image_url}
                           alt={product?.title || 'Product'}
                           fill
+                          sizes="(max-width: 767px) 100vw, (max-width: 1023px) 50vw, 400px"
                           className="object-cover rounded-t-lg"
                         />
                       ) : (

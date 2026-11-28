@@ -91,7 +91,7 @@ export function ProductImageGallery({ images, title }: ProductImageGalleryProps)
             height={800}
             className="object-contain w-full h-auto max-w-full cursor-pointer rounded-lg select-none"
             onClick={openFullscreen}
-            sizes="(max-width: 768px) 100vw, 50vw"
+            sizes="(max-width: 1023px) 100vw, 432px"
             priority={selectedIndex === 0}
             style={{ maxHeight: 'none' }}
             draggable={false}
@@ -147,7 +147,7 @@ export function ProductImageGallery({ images, title }: ProductImageGalleryProps)
                   alt={`${title} - Image ${index + 1}`}
                   fill
                   className="object-cover"
-                  sizes="(max-width: 640px) 25vw, 20vw"
+                  sizes="(max-width: 1023px) 25vw, 96px"
                 />
               </button>
             ))}
